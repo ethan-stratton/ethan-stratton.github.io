@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "youtube-captions-scraper": "^2.0.3",
+    "youtube-transcript": "^1.3.0"
+  }
+}
