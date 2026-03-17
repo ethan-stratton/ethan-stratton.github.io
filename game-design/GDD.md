@@ -60,6 +60,64 @@
 
 ---
 
+## Weapons & Equipment
+
+### Starting Weapons
+- **Sling & Stones** — First ranged weapon. Fast projectile speed with arc falloff; damage decreases at range. Found/crafted early.
+- **Stick** — Found on the ground at game start. Basic melee. Breakable.
+
+### Weapon System
+- Carry up to 3 weapons at a time. Swap between them freely.
+- Store excess weapons (in shelter/camp inventory once built).
+- Melee weapons found along the way have **durability** — they break at certain stages of wear.
+- Progression path: Stick → Axe (crafted) → random melee drops → late-game crafted weapons
+- Ranged progression: Sling & Stones → Bow & Arrows → Gun & Bullets
+
+### Crafting Progression (Early Game)
+1. **Shelter** — Craft using tree leaves. EVE analyzes which leaves have structural integrity (first quest/tutorial for EVE's examine ability).
+2. **Axe** — Crafted for melee combat AND tree chopping (dual-purpose tools).
+3. **Bow & Arrows** — Mid-game ranged upgrade.
+4. **Gun & Bullets** — Late-game ranged. Requires more advanced materials.
+5. **Body Armor** — Crafted from animal corpses and materials. Multiple tiers. EVE examines animal remains to determine what's usable.
+
+---
+
+## EVE as Knowledge Engine
+
+EVE isn't just a companion — she's your scientific instrument.
+
+### Examine System
+- Point EVE at anything in the world: trees, rocks, animals, corpses, ruins, NPCs
+- She analyzes and tells you what it can be used for (or can't)
+- Not required — examining is always optional but rewarded
+- Sometimes examining reveals nothing useful. That's fine. Not every tree is special.
+
+### Language & Translation
+- Natives speak their own language. Early game: you can't understand them fully.
+- With enough interaction and exposure, EVE learns to **translate the native language**.
+- Progression: broken fragments → partial understanding → full translation
+- EVE can eventually **talk to natives on your behalf** and relay summaries of their questlines and what they wanted to discuss.
+
+### EVE as Delegate (Player Agency)
+- **Story-driven players:** Talk to every NPC yourself, examine everything, soak in the world.
+- **Action-driven players:** Send EVE to handle NPC conversations, get quest summaries, skip to the action.
+- Both approaches are valid. Neither is punished.
+- EVE's summaries are accurate but lose flavor — you miss the Native's poetry, the emotional beats. Incentive to do it yourself without forcing it.
+
+---
+
+## Core Design Principle: No Forced Pauses
+
+**The player chooses when to engage.** Gameplay should never stop and force interaction.
+
+- Find a cool tree? Examine it with EVE or walk past it. Your call.
+- NPC wants to talk? Listen yourself, send EVE, or ignore them entirely.
+- Examining/interacting is rewarded but never strictly necessary for progression.
+- Sometimes examining something yields nothing. The world isn't a theme park where everything is meaningful — that unpredictability makes the discoveries feel real.
+- Cutscenes and forced stops should be extremely rare and earned (major story beats only).
+
+---
+
 ## Crafting / Combination System
 - Inspired by: DSS cards (Circle of the Moon), spell books (Harmony of Dissonance), Plague Knight potions (Shovel Knight)
 - Two-axis combination: Base item + Modifier = unique result
@@ -114,6 +172,20 @@ Each type can complete the game. EVE provides scaffolding for weak areas so no o
 - Alien planet aesthetic — not Earth. Strange flora, unfamiliar sky.
 - Civilization areas should feel warm and human vs hostile wilderness
 - The Dragon and its forces: mechanical, cold, cybernetic
+
+### Style Pillars (ref: "Modern Games NEED Style")
+1. **Kinetic Beauty** — Every movement ability should look like art. The combo system is the visual signature. Design for GIF-ability: screen shake, hit-freeze frames, color bursts on DSS activations, speed lines during blade dashes.
+2. **Tonal Whiplash (Controlled)** — The shift between frenetic action and contemplative civilization-building IS the style. Embrace the contrast.
+3. **Strategic Abstraction** — Pixel art that suggests more than it shows. Horror through implication. Lore through fragments. The Mecha Dragon is scarier when you can't fully see it. Keep sprites expressive but abstracted — let the player's imagination do the work (Crow Country principle).
+4. **Personal Mythology** — The Genesis retelling filtered through Ethan's specific worldview. Sincere, weird, and unforgettable. The Suda 51 approach: inject yourself, don't sand down the weird edges. The genre mashup (ActRaiser + Castlevania + Dark Souls + fighting game combos) IS the style.
+5. **Systemic Depth as Style** — The DSS card system, the civ-building consequences, the Metroidvania progression — mechanical depth IS a stylistic statement that says "this game respects you."
+
+### Style as Marketing
+- The genre collision is the hook: "Did you see that game where you do stylish combo parkour and then build a civilization between levels?"
+- Something niche is way better than something forgotten. Target the overlap: Dark Souls community + Metroidvania fans + ActRaiser nostalgia.
+- There is no safety in playing too safe. The most dangerous thing is being forgettable.
+- Don't simplify the combo system to be "more accessible" — the depth IS the appeal.
+- Don't soften the mystery/horror — the Dark Souls approach to lore works because it respects the player's intelligence.
 
 ---
 
