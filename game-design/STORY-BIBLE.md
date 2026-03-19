@@ -97,6 +97,26 @@ The story is a sci-fi retelling of Genesis, inspired by LDS scriptural context w
 
 ---
 
+---
+
+## The Three Accounts (Conflicting Creation Myth)
+
+The story is told through three competing perspectives. The game never confirms which is true.
+
+### Account A — The Federation Record (Official)
+Adam was a decorated pilot. His ship malfunctioned during routine transit. He was lost. A rescue was attempted but the planet was classified as hostile and quarantined. End of file. EVE's original programming carries fragments of this — clinical, detached, bureaucratic. "Pilot error" or "system failure." No mention of the Dragon. The Federation doesn't acknowledge its existence.
+
+### Account B — The Natives' Oral History
+The natives saw a star fall from the sky. A being emerged. Some native factions think Adam is a divine figure sent to restore the planet. Others think he's the *cause* of the corruption — it started spreading after he arrived. They have their own names for the Dragon, the Voice, the Watcher. Their creation myth predates Adam's arrival and has eerie parallels to Genesis. *Why?* That's the mystery. EVE's translation of their myths is imperfect — you're never sure if the parallels are real or if EVE's algorithms are imposing human frameworks on alien concepts.
+
+### Account C — What the Player Pieces Together
+Environmental storytelling. Ruins that predate both Adam and the natives. Technology that doesn't match anything. The Voice. The Watcher. Item descriptions that contradict the other two accounts. The player's version is the most complete but never fully resolved. *The game never confirms which account is true.*
+
+### Why This Works
+The Mystery pillar says "preserve mystery at all times." Conflicting accounts IS the mystery. The Elder Scrolls approach — unreliable narrators make the world feel ancient. Different factions remember the same events differently. Religious doctrines contradict each other. That's what makes a world feel lived-in for thousands of years.
+
+---
+
 ## Open Questions
 - Working title?
 - How much player choice affects the story? (branching vs linear with flavor)
