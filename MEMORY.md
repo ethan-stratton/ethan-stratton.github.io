@@ -13,6 +13,11 @@
 - He values demonstrated competence (noticed I knew CENTS without being told).
 - Present inference as fact = instant trust loss. Say "I don't know" when you don't.
 
+## Technical Notes
+- Ethan is NOT using the sprite sheet — fallback grey rectangles only. All visual effects MUST be implemented in DrawFallback path.
+- .NET 9 SDK installed in container at ~/.dotnet. Arial font at ~/.fonts for content pipeline.
+- TranscriptAPI key exists but isn't in env vars — must pass explicitly to subagents.
+
 ## Active Projects
 - Genesis Action RPG — 2D side-scrolling action RPG with civilization building. Sci-fi retelling of Genesis. Status: Idea → Designing.
 
