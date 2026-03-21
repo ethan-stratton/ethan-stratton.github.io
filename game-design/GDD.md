@@ -52,11 +52,20 @@
 
 ## The EVE System (AI Companion)
 - EVE assists with all four pillars based on player need
-- Combat: enemy analysis, weakness hints
-- Building: layout suggestions, resource optimization
-- Relationships: NPC mood/need indicators, dialogue hints
-- Exploration: map reveals, hidden area hints
+- Combat: passive alerts and warnings based on scan knowledge (NOT active scanning during combat)
+- Building: layout suggestions, resource optimization, scan settlement objects for efficiency data
+- Relationships: NPC mood/need indicators, translation of native language (EVE translates, player NEVER learns the language)
+- Exploration: environment scanning, hidden area hints, corruption analysis
 - Player can choose how much help to accept (difficulty/immersion slider)
+
+### EVE Scan System (L button)
+- **Universal analyze button** — works on everything: creatures, items, flora, ruins, environment, natives
+- **~10 scan entries per target** — depth increases through different contexts, states, and EVE upgrades, NOT repeat button presses
+- **Cannot scan live hostile enemies** — scan corpses, sleeping/caged/trapped creatures. Creates gameplay loops: trapping, camouflage, sleep tools, observation
+- **Combat knowledge comes from combat** (kill counts → telegraphs → weak points → damage bonus)
+- **Scan knowledge is strategic** (ecology, materials, lore, puzzle solutions, ecosystem manipulation)
+- **EVE grows**: early = basic ID, mid = chemical analysis + partial native translation, late = planetary understanding + corruption analysis
+- **See `game-design/scan-system.md` for full design document**
 
 ---
 
@@ -86,17 +95,26 @@
 
 EVE isn't just a companion — she's your scientific instrument.
 
-### Examine System
-- Point EVE at anything in the world: trees, rocks, animals, corpses, ruins, NPCs
-- She analyzes and tells you what it can be used for (or can't)
-- Not required — examining is always optional but rewarded
-- Sometimes examining reveals nothing useful. That's fine. Not every tree is special.
+### Examine System (L button = EVE Scan)
+- Point EVE at anything: creatures (non-hostile), corpses, items, flora, ruins, environment, natives
+- She analyzes with personality — curious, practical, emotional, humorous, disturbed, awed
+- ~10 depth levels per target, unlocked through different contexts (not repeat presses)
+- Scan a corpse = biology. Scan a nest = social behavior. Scan during feeding = diet. Scan near predator = trophic relationship.
+- Not required — scanning is always optional but strategically rewarded
+- Sometimes scanning reveals nothing useful. That's fine. The world isn't a theme park.
+- EVE's capabilities grow: early = basic ID, late = planetary-scale understanding
+- Feeds into the **Knowledge Tree** (Ecology, Geology, Archaeology, Linguistics, Biology, Engineering branches)
+- Knowledge gates check branch totals: "ECOLOGY 15/20" — always alternative paths exist (combat, movement, different branch)
 
 ### Language & Translation
-- Natives speak their own language. Early game: you can't understand them fully.
-- With enough interaction and exposure, EVE learns to **translate the native language**.
-- Progression: broken fragments → partial understanding → full translation
-- EVE can eventually **talk to natives on your behalf** and relay summaries of their questlines and what they wanted to discuss.
+- Natives speak their own language. **Player NEVER learns it.** EVE always translates.
+- Player communicates through **gestures and pictograms** — point, wave, show items, draw simple images
+- EVE translation progression: fragments → partial understanding → full relay (in her own words)
+- Natives don't give quest markers. They point, show drawings, perform gestures you must interpret.
+- Bringing wrong items = native reactions (disappointment, confusion, amusement). Right items = genuine gratitude + relationship building.
+- This is intentionally a guessing/deduction game — fetch quests where YOU figure out what they need
+- Sometimes natives are wrong about what they need (real solution discovered through scanning)
+- Scan natives (with permission/from observation) to learn: gaze direction, emotional state, health, cultural role, relationships
 
 ### EVE as Delegate (Player Agency)
 - **Story-driven players:** Talk to every NPC yourself, examine everything, soak in the world.
