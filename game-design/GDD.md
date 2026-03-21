@@ -212,6 +212,18 @@ Each biome should make you PLAY differently. The visual identity follows the mec
 5. Civilization growth unlocks story beats
 6. Late game: full civilization, powerful loadout, Dragon confrontation
 
+## Death Penalty
+Death should sting but not frustrate. Options to explore:
+- **Weapon drop on death** — your equipped weapon stays where you died (Souls-style corpse run). Retrieve it or lose it. Creates tension and meaningful risk.
+  - Fists always available as fallback — you're never completely helpless
+  - Multiple deaths without retrieval could permanently lose the weapon (or it degrades)
+  - Rare/crafted weapons become genuinely precious
+- **Resource loss** — drop a percentage of gathered materials
+- **Settlement impact** — repeated deaths in an area could embolden creatures (harder spawns, bolder AI)
+- **Knowledge decay** — partial scan progress lost on death? (controversial — could feel punishing for explorers)
+
+**Design goal:** death creates a retrieval objective that pulls you back into the world, not a loading screen that pulls you out of it.
+
 ---
 
 ## Player Types (balanced, not heavy-handed)
