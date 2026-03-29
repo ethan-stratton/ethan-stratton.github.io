@@ -76,3 +76,13 @@ For execution queue, see TASKS.md.
 - Camera trauma system with coherent noise: IMPLEMENTED  
 - Rain beetle animation polish: IMPLEMENTED
 - Enemy menu fix (centipede, firefly, mosquito, etc.): IMPLEMENTED
+
+## Iron & Ether — New Project (2026-03-29)
+- Arena combat + combinatorial ability crafting. Geometry Wars meets DSS/Plague Knight.
+- Three axes: Form (movement) × Behavior (on-contact) × Essence (element). 7×7×7 = 343 combos.
+- Inspired by DSS, HoD tomes, Aria souls, Plague Knight bombs.
+- Scope: small, tight, shippable. Prototype in ~2 weeks.
+- MonoGame/C#, same stack as Genesis.
+- Key insight: empty slots = simpler defaults, not broken. ∅ Form = self-buff, ∅ Behavior = single hit, ∅ Essence = kinetic.
+- Enemies embody components — kill to extract. Aria model, not random drops.
+- GDD at iron-and-ether/GAME-DESIGN.md
