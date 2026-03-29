@@ -46,3 +46,33 @@ For operating rules, see OPERATIONS.md.
 For decision protocol and model routing, see DECISIONS.md.
 For current projects, see BUSINESS.md.
 For execution queue, see TASKS.md.
+
+## GDC Talks — Animation & Camera Juice (saved 2026-03-29)
+
+### "Fast and Funky 1D Nonlinear Transformations" — Squirrel Eiserloh (GDC Math for Game Programmers)
+- **Core idea:** Don't modify parametric equations — warp the `t` parameter instead
+- SmoothStart(t) = t^n (slow start, fast end), SmoothStop(t) = 1-(1-t)^n (fast start, slow stop)
+- CrossFade(a, b, t) = lerp(a(t), b(t), t) for S-curves
+- 0-1 range is the most important range in game dev: damage curves, AI aggression, fog, loot chance, alpha
+- Squaring fractional values makes them SMALLER (0.5² = 0.25) — unique to 0-1 range
+- Terms "ease in" / "ease out" are confusing and backwards from intuition. Use SmoothStart/SmoothStop
+- Apply everywhere: UI animations, hit reactions, alpha fades, movement, scaling, color interpolation
+- Human perception of alpha is nonlinear — linear fade looks wrong
+
+### "Juicing Your Cameras with Math" — Squirrel Eiserloh (GDC)
+- **Trauma system:** Store trauma float (0-1), add on impacts, linear decay. Shake = trauma² (nonlinear)
+- Additive trauma means multiple small hits compound more-than-linearly
+- **2D: translational + rotational shake together feels best**
+- **3D: rotational only** (translational can push camera into walls, looks weird with perspective)
+- **Use Perlin/coherent noise, NOT Random** — random looks like seizure in slow-mo
+- **Asymptotic averaging for smooth follow:** `camera += (target - camera) * fraction * dt`
+- Can use different rates for X vs Y, up vs down
+- "Camera only follows vertically when player lands" = great for platformers
+- Frame-rate-independent version needed (the naive version is frame-rate dependent)
+- VR: never do camera shake
+
+### Implementation Status
+- Easing.cs utility class: IMPLEMENTED
+- Camera trauma system with coherent noise: IMPLEMENTED  
+- Rain beetle animation polish: IMPLEMENTED
+- Enemy menu fix (centipede, firefly, mosquito, etc.): IMPLEMENTED
