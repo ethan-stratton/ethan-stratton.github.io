@@ -6,418 +6,492 @@
 <title>little guy</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-canvas { border: 1px solid #333; cursor: default; }
+body { background: #0a0a0f; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: monospace; }
+canvas { cursor: default; }
+#book-overlay {
+  display: none;
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1a1a1a;
+  border: 1px solid #444;
+  padding: 30px 40px;
+  max-width: 500px;
+  color: #8a8;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  z-index: 10;
+  border-radius: 4px;
+}
+#book-overlay .close {
+  position: absolute; top: 8px; right: 12px;
+  color: #666; cursor: pointer; font-size: 16px;
+}
+#book-overlay .close:hover { color: #aaa; }
 </style>
 </head>
 <body>
-<canvas id="game" width="800" height="500"></canvas>
+<canvas id="game"></canvas>
+<div id="book-overlay"><span class="close" onclick="closeBook()">×</span><pre id="book-text"></pre></div>
 <script>
+// --- Canvas setup ---
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
+const W = 800, H = 500;
+canvas.width = W; canvas.height = H;
 
-// --- Physics constants ---
-const GRAVITY = 0.5;
-const FRICTION = 0.8;
-const GROUND_Y = 440;
+// --- Physics ---
+const GRAVITY = 0.4;
+const GROUND_Y = H - 60;
+
+// --- Game state ---
+const state = {
+  learnedMove: false,
+  learnedJump: false,
+  learnedSpeak: false,
+  bookPageUnlocked: 1,
+  wordsLearned: [],
+  dragCount: 0,
+};
+
+// --- Bodies (physics objects) ---
+class Body {
+  constructor(x, y, w, h, opts = {}) {
+    this.x = x; this.y = y; this.w = w; this.h = h;
+    this.vx = 0; this.vy = 0;
+    this.static = opts.static || false;
+    this.draggable = opts.draggable !== undefined ? opts.draggable : !this.static;
+    this.color = opts.color || '#555';
+    this.label = opts.label || null;
+    this.type = opts.type || 'box';
+    this.grounded = false;
+  }
+  get left() { return this.x; }
+  get right() { return this.x + this.w; }
+  get top() { return this.y; }
+  get bottom() { return this.y + this.h; }
+  get cx() { return this.x + this.w / 2; }
+  get cy() { return this.y + this.h / 2; }
+}
+
+// --- World objects ---
+const ground = new Body(0, GROUND_Y, W, 60, { static: true, color: '#1e1e2e' });
+
+const platforms = [
+  ground,
+  new Body(250, GROUND_Y - 40, 80, 12, { static: true, color: '#2a2a3e' }), // small step for puzzle 2
+];
+
+const book = new Body(180, GROUND_Y - 20, 22, 18, { color: '#6b5b3a', type: 'book', draggable: true });
+
+// Word blocks
+const wordBlocks = [
+  new Body(500, GROUND_Y - 16, 40, 16, { color: '#3a4a5a', type: 'word', label: 'HERE', draggable: true }),
+  new Body(560, GROUND_Y - 16, 32, 16, { color: '#3a4a5a', type: 'word', label: 'GO', draggable: true }),
+  new Body(610, GROUND_Y - 16, 32, 16, { color: '#3a4a5a', type: 'word', label: 'NO', draggable: true }),
+  new Body(660, GROUND_Y - 16, 36, 16, { color: '#3a4a5a', type: 'word', label: 'WHY', draggable: true }),
+];
+
+const dynamicBodies = [book, ...wordBlocks];
 
 // --- Character ---
 const guy = {
   x: 100, y: GROUND_Y,
   vx: 0, vy: 0,
-  headRadius: 12,
-  bodyRadius: 10,
+  w: 16, h: 34, // collision box
+  headR: 8,
+  bodyR: 7,
   grounded: false,
-  held: false,
-  // AI wander state
+  // State
+  inert: true,
+  moving: false,
+  // Expression
+  symbols: [], // floating symbols above head
+  speech: [],  // speech bubbles
+  speechTimer: 0,
+  currentSpeech: '',
+  speechFade: 0,
+  // AI
   wanderTarget: null,
   wanderTimer: 0,
-  idleTimer: 0,
-  // Dialogue
-  dialogue: '',
-  dialogueTimer: 0,
-  dialogueQueue: [],
-  // State
-  aware: false, // has noticed the player
-  trustLevel: 0,
 };
 
-// --- Platforms (static) ---
-const platforms = [
-  { x: 0, y: GROUND_Y + 30, w: 800, h: 60 }, // ground
-];
-
-// --- Player-drawn platforms ---
+// --- Drawn platforms ---
 const drawnPlatforms = [];
-let drawing = false;
-let drawStart = null;
 
-// --- Mouse state ---
+// --- Mouse ---
 const mouse = { x: 0, y: 0, down: false };
-let holdingGuy = false;
-let holdOffset = { x: 0, y: 0 };
+let dragging = null; // object being dragged
+let dragOffset = { x: 0, y: 0 };
+let draggingGuy = false;
+let drawMode = false;
+let drawStart = null;
+let lastClickTime = 0;
+let lastClickTarget = null;
 
-// --- Dialogue system ---
-const introDialogue = [
-  { text: "...", delay: 60 },
-  { text: "Okay.", delay: 40 },
-  { text: "I'm... here.", delay: 60 },
-  { text: "There's a ground. That's good.", delay: 80 },
-  { text: "I think I like ground.", delay: 60 },
-  { text: "Let me see... I can move.", delay: 80 },
-  { text: "What else...", delay: 50 },
-  { text: "There's an edge over there. And the screen just... stops.", delay: 100 },
-  { text: "That's it? That's everything?", delay: 80 },
-  { text: "Hello?", delay: 60 },
-  { text: "...", delay: 40 },
-  { text: "Didn't think so.", delay: 80 },
+// --- Book pages ---
+const bookPages = [
+  `// version 0.1
+// He's in there. All the code is running.
+// He just doesn't know what he can do yet.
+//
+// Try moving him. Click and drag.
+// He won't like it. That's okay.`,
+
+  `// jump_height: 8
+// He can jump. But he has to learn
+// what "up" means first.
+// Lift him onto something higher.
+// He'll figure it out.`,
+
+  `// talk: true (dormant)
+// He has a voice. He just needs words.
+// The blocks have labels. Bring them to him.
+// Start with something simple.`,
+
+  `// He's getting smarter. Watch.
+// Give him a path and he'll try to take it.
+// You don't have to carry him everywhere.
+//
+// You can draw platforms too —
+// click and drag on empty space.`,
+
+  `// I don't know if this is right.
+// I just wanted to see what would happen.
+// Maybe that's enough.
+// I hope it's enough.`,
 ];
-
-let dialogueIndex = 0;
-let dialogueCooldown = 120; // frames before first line
-let currentDialogue = '';
-let dialogueFade = 0;
-let dialogueTriggered = false;
-
-function queueDialogue(lines) {
-  guy.dialogueQueue = lines.slice();
-}
-
-// --- Movable objects ---
-const objects = [
-  { x: 600, y: GROUND_Y - 10, w: 30, h: 30, color: '#665544' },
-];
-let draggingObj = null;
-let dragObjOffset = { x: 0, y: 0 };
 
 // --- Input ---
 canvas.addEventListener('mousemove', e => {
-  const rect = canvas.getBoundingClientRect();
-  mouse.x = e.clientX - rect.left;
-  mouse.y = e.clientY - rect.top;
+  const r = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - r.left;
+  mouse.y = e.clientY - r.top;
+  
+  if (draggingGuy) {
+    guy.x = mouse.x - dragOffset.x;
+    guy.y = mouse.y - dragOffset.y;
+    guy.vx = 0; guy.vy = 0;
+  } else if (dragging) {
+    dragging.x = mouse.x - dragOffset.x;
+    dragging.y = mouse.y - dragOffset.y;
+    dragging.vx = 0; dragging.vy = 0;
+  }
 });
 
 canvas.addEventListener('mousedown', e => {
   mouse.down = true;
+  const now = Date.now();
   
-  // Check if clicking on the character
-  const dx = mouse.x - guy.x;
-  const dy = mouse.y - (guy.y - guy.bodyRadius - guy.headRadius);
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist < 25) {
-    holdingGuy = true;
-    holdOffset.x = dx;
-    holdOffset.y = dy;
-    guy.held = true;
-    guy.vx = 0;
-    guy.vy = 0;
-    
-    if (!guy.aware) {
-      guy.aware = true;
-      queueDialogue([
-        { text: "HEY.", delay: 30 },
-        { text: "What— what is—", delay: 40 },
-        { text: "Something is TOUCHING me.", delay: 60 },
-        { text: "Okay. Okay. This is fine.", delay: 50 },
-      ]);
-    } else {
-      if (guy.trustLevel < 2) {
-        queueDialogue([
-          { text: "Again?!", delay: 30 },
-          { text: "I... okay. I guess this is a thing we do now.", delay: 60 },
-        ]);
-      }
-    }
+  // Check double-click on book
+  if (now - lastClickTime < 350 && lastClickTarget === 'book') {
+    openBook();
     return;
   }
   
-  // Check if clicking on a movable object
-  for (const obj of objects) {
-    if (mouse.x >= obj.x - obj.w/2 && mouse.x <= obj.x + obj.w/2 &&
-        mouse.y >= obj.y - obj.h && mouse.y <= obj.y) {
-      draggingObj = obj;
-      dragObjOffset.x = mouse.x - obj.x;
-      dragObjOffset.y = mouse.y - obj.y;
+  // Check click on guy
+  const guyBounds = { x: guy.x - guy.w/2, y: guy.y - guy.h, w: guy.w, h: guy.h };
+  if (mouse.x >= guyBounds.x && mouse.x <= guyBounds.x + guyBounds.w &&
+      mouse.y >= guyBounds.y && mouse.y <= guyBounds.y + guyBounds.h) {
+    draggingGuy = true;
+    dragOffset.x = mouse.x - guy.x;
+    dragOffset.y = mouse.y - guy.y;
+    
+    state.dragCount++;
+    if (guy.inert) {
+      addSymbol('!');
+      addSymbol('?');
+    } else {
+      addSymbol('!');
+    }
+    
+    lastClickTime = now;
+    lastClickTarget = 'guy';
+    return;
+  }
+  
+  // Check click on bodies
+  for (const b of dynamicBodies) {
+    if (b.draggable && mouse.x >= b.x && mouse.x <= b.right && mouse.y >= b.y && mouse.y <= b.bottom) {
+      dragging = b;
+      dragOffset.x = mouse.x - b.x;
+      dragOffset.y = mouse.y - b.y;
+      
+      lastClickTime = now;
+      lastClickTarget = b.type;
       return;
     }
   }
   
-  // Otherwise start drawing a platform
-  drawing = true;
+  // Start drawing platform
+  drawMode = true;
   drawStart = { x: mouse.x, y: mouse.y };
+  lastClickTime = now;
+  lastClickTarget = null;
 });
 
 canvas.addEventListener('mouseup', e => {
   mouse.down = false;
   
-  if (holdingGuy) {
-    holdingGuy = false;
-    guy.held = false;
+  if (draggingGuy) {
+    draggingGuy = false;
     guy.vy = 0;
-    guy.trustLevel = Math.min(guy.trustLevel + 0.5, 10);
-  }
-  
-  if (draggingObj) {
-    // Check if object moved near the guy
-    const dx = draggingObj.x - guy.x;
-    if (Math.abs(dx) < 80 && !guy._noticedBox) {
-      guy._noticedBox = true;
-      queueDialogue([
-        { text: "Whoa.", delay: 30 },
-        { text: "That... was NOT there before.", delay: 60 },
-        { text: "Did I do that?", delay: 50 },
-        { text: "I don't think I did that.", delay: 60 },
-      ]);
+    
+    // If was inert and dragged enough, learn to move
+    if (guy.inert && state.dragCount >= 1) {
+      guy.inert = false;
+      state.learnedMove = true;
+      setTimeout(() => {
+        addSymbol('...');
+        // He tries moving on his own after a beat
+        setTimeout(() => { guy.wanderTimer = 10; }, 800);
+      }, 500);
     }
-    draggingObj = null;
+    
+    // If placed on the step (high platform), learn to jump
+    if (!state.learnedJump && guy.y < GROUND_Y - 20) {
+      state.learnedJump = true;
+      state.bookPageUnlocked = Math.max(state.bookPageUnlocked, 2);
+      addSymbol('!!');
+    }
   }
   
-  if (drawing && drawStart) {
-    const dx = mouse.x - drawStart.x;
-    const dy = mouse.y - drawStart.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len > 20) {
-      drawnPlatforms.push({
-        x: Math.min(drawStart.x, mouse.x),
-        y: Math.min(drawStart.y, mouse.y),
-        w: Math.abs(dx),
-        h: Math.max(Math.abs(dy), 8),
-      });
-      
-      if (!guy._noticedPlatform) {
-        guy._noticedPlatform = true;
-        queueDialogue([
-          { text: "...", delay: 20 },
-          { text: "Where did THAT come from?", delay: 60 },
-          { text: "Things are just... appearing now. Cool. Great.", delay: 80 },
-        ]);
+  if (dragging) {
+    // Check if word block brought near guy
+    if (dragging.type === 'word' && dragging.label) {
+      const dist = Math.abs(dragging.cx - guy.x);
+      if (dist < 60 && !state.wordsLearned.includes(dragging.label)) {
+        learnWord(dragging.label);
       }
     }
-    drawing = false;
+    // Check if book brought near guy
+    if (dragging.type === 'book') {
+      const dist = Math.abs(dragging.cx - guy.x);
+      if (dist < 50) {
+        // Character examines the book
+        if (state.learnedSpeak) {
+          showSpeech("...");
+          setTimeout(() => showSpeech("MADE... ME?"), 1500);
+        } else {
+          addSymbol('?');
+          addSymbol('...');
+        }
+      }
+    }
+    dragging = null;
+  }
+  
+  if (drawMode && drawStart) {
+    const dx = mouse.x - drawStart.x;
+    const dy = mouse.y - drawStart.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len > 20 && state.bookPageUnlocked >= 4) {
+      drawnPlatforms.push(new Body(
+        Math.min(drawStart.x, mouse.x),
+        Math.min(drawStart.y, mouse.y),
+        Math.abs(dx),
+        Math.max(Math.abs(dy), 8),
+        { static: true, color: 'rgba(80,110,140,0.4)' }
+      ));
+    }
+    drawMode = false;
     drawStart = null;
   }
 });
 
-// --- Character AI ---
-function updateGuyAI() {
-  if (guy.held) return;
-  
-  guy.wanderTimer--;
-  
-  if (guy.wanderTimer <= 0) {
-    // Pick a new behavior
-    if (Math.random() < 0.4) {
-      // Idle
-      guy.wanderTarget = null;
-      guy.wanderTimer = 60 + Math.random() * 120;
-    } else {
-      // Wander to a point
-      guy.wanderTarget = 50 + Math.random() * 700;
-      guy.wanderTimer = 120 + Math.random() * 180;
-    }
+// --- Book overlay ---
+function openBook() {
+  const text = bookPages.slice(0, state.bookPageUnlocked).join('\n\n---\n\n');
+  document.getElementById('book-text').textContent = text;
+  document.getElementById('book-overlay').style.display = 'block';
+}
+function closeBook() {
+  document.getElementById('book-overlay').style.display = 'none';
+}
+
+// --- Expression system ---
+function addSymbol(sym) {
+  guy.symbols.push({ text: sym, life: 80, y: 0 });
+}
+
+function showSpeech(text) {
+  guy.currentSpeech = text;
+  guy.speechFade = 120 + text.length * 3;
+}
+
+function learnWord(word) {
+  state.wordsLearned.push(word);
+  if (!state.learnedSpeak) {
+    state.learnedSpeak = true;
+    state.bookPageUnlocked = Math.max(state.bookPageUnlocked, 3);
   }
+  // He says the word
+  setTimeout(() => showSpeech(word), 300);
+  setTimeout(() => showSpeech(word + "..."), 1200);
   
-  if (guy.wanderTarget !== null) {
-    const dx = guy.wanderTarget - guy.x;
-    if (Math.abs(dx) > 5) {
-      guy.vx += (dx > 0 ? 0.3 : -0.3);
-    } else {
-      guy.wanderTarget = null;
-    }
+  // Unlock more book pages based on progress
+  if (state.wordsLearned.length >= 2) {
+    state.bookPageUnlocked = Math.max(state.bookPageUnlocked, 4);
+  }
+  if (state.wordsLearned.length >= 3) {
+    state.bookPageUnlocked = Math.max(state.bookPageUnlocked, 5);
   }
 }
 
-// --- Dialogue update ---
-function updateDialogue() {
-  // Queue system
-  if (guy.dialogueQueue.length > 0 && dialogueFade <= 0) {
-    const next = guy.dialogueQueue.shift();
-    currentDialogue = next.text;
-    dialogueFade = next.delay + currentDialogue.length * 2;
-    return;
-  }
+// --- Collision resolution ---
+function resolveBody(body, allPlatforms) {
+  if (body.static) return;
   
-  // Intro dialogue
-  if (dialogueCooldown > 0) {
-    dialogueCooldown--;
-    return;
-  }
-  
-  if (dialogueFade > 0) {
-    dialogueFade--;
-    return;
-  }
-  
-  if (dialogueIndex < introDialogue.length) {
-    const line = introDialogue[dialogueIndex];
-    currentDialogue = line.text;
-    dialogueFade = line.delay + currentDialogue.length * 2;
-    dialogueIndex++;
-  } else {
-    currentDialogue = '';
-  }
-}
-
-// --- Physics ---
-function resolveCollisions() {
-  const allPlatforms = platforms.concat(drawnPlatforms);
-  
-  // Also treat objects as platforms
-  for (const obj of objects) {
-    allPlatforms.push({
-      x: obj.x - obj.w/2,
-      y: obj.y - obj.h,
-      w: obj.w,
-      h: obj.h,
-    });
-  }
-  
-  guy.grounded = false;
-  const feetY = guy.y;
-  const feetX = guy.x;
+  body.vy += GRAVITY;
+  body.x += body.vx;
+  body.y += body.vy;
+  body.vx *= 0.9;
+  body.grounded = false;
   
   for (const p of allPlatforms) {
-    if (feetX > p.x && feetX < p.x + p.w) {
-      // Standing on top
-      if (feetY >= p.y && feetY <= p.y + p.h && guy.vy >= 0) {
+    if (body === p) continue;
+    // Simple top-collision
+    if (body.right > p.left && body.left < p.right) {
+      if (body.bottom >= p.top && body.bottom <= p.top + 20 && body.vy >= 0) {
+        body.y = p.top - body.h;
+        body.vy = 0;
+        body.grounded = true;
+      }
+    }
+  }
+  
+  // Screen bounds
+  body.x = Math.max(0, Math.min(W - body.w, body.x));
+  if (body.bottom > GROUND_Y) {
+    body.y = GROUND_Y - body.h;
+    body.vy = 0;
+    body.grounded = true;
+  }
+}
+
+function resolveGuy() {
+  if (draggingGuy) return;
+  
+  guy.vy += GRAVITY;
+  guy.vx *= 0.85;
+  guy.x += guy.vx;
+  guy.y += guy.vy;
+  guy.grounded = false;
+  
+  const allPlats = [...platforms, ...drawnPlatforms];
+  const halfW = guy.w / 2;
+  
+  for (const p of allPlats) {
+    if (guy.x + halfW > p.x && guy.x - halfW < p.right) {
+      if (guy.y >= p.y && guy.y <= p.y + 16 && guy.vy >= 0) {
         guy.y = p.y;
         guy.vy = 0;
         guy.grounded = true;
       }
     }
   }
+  
+  // Ground
+  if (guy.y >= GROUND_Y) {
+    guy.y = GROUND_Y;
+    guy.vy = 0;
+    guy.grounded = true;
+  }
+  
+  // Walls
+  guy.x = Math.max(20, Math.min(W - 20, guy.x));
+}
+
+// --- Guy AI ---
+function updateGuyAI() {
+  if (guy.inert || draggingGuy) return;
+  
+  guy.wanderTimer--;
+  if (guy.wanderTimer <= 0) {
+    if (Math.random() < 0.35) {
+      guy.wanderTarget = null;
+      guy.wanderTimer = 60 + Math.random() * 100 | 0;
+    } else {
+      guy.wanderTarget = 40 + Math.random() * (W - 80);
+      guy.wanderTimer = 100 + Math.random() * 150 | 0;
+    }
+  }
+  
+  if (guy.wanderTarget !== null) {
+    const dx = guy.wanderTarget - guy.x;
+    if (Math.abs(dx) > 8) {
+      guy.vx += (dx > 0 ? 0.15 : -0.15);
+      // Jump if stuck and can jump
+      if (state.learnedJump && guy.grounded && Math.abs(guy.vx) < 0.3 && Math.abs(dx) > 15) {
+        guy.vy = -7;
+      }
+    } else {
+      guy.wanderTarget = null;
+    }
+  }
 }
 
 // --- Update ---
 function update() {
-  // Character physics
-  if (guy.held) {
-    guy.x = mouse.x - holdOffset.x;
-    guy.y = mouse.y - holdOffset.y;
-  } else {
-    guy.vy += GRAVITY;
-    guy.vx *= FRICTION;
-    guy.x += guy.vx;
-    guy.y += guy.vy;
-    
-    // Screen bounds
-    guy.x = Math.max(20, Math.min(780, guy.x));
-    
-    resolveCollisions();
-    
-    // AI
-    updateGuyAI();
+  resolveGuy();
+  
+  for (const b of dynamicBodies) {
+    if (b !== dragging) {
+      resolveBody(b, [...platforms, ...drawnPlatforms]);
+    }
   }
   
-  // Object dragging
-  if (draggingObj) {
-    draggingObj.x = mouse.x - dragObjOffset.x;
-    draggingObj.y = mouse.y - dragObjOffset.y;
+  updateGuyAI();
+  
+  // Update symbols
+  for (let i = guy.symbols.length - 1; i >= 0; i--) {
+    guy.symbols[i].life--;
+    guy.symbols[i].y -= 0.5;
+    if (guy.symbols[i].life <= 0) guy.symbols.splice(i, 1);
   }
   
-  // Dialogue
-  updateDialogue();
+  // Speech timer
+  if (guy.speechFade > 0) guy.speechFade--;
 }
 
 // --- Render ---
-function drawCharacter() {
-  const x = guy.x;
-  const footY = guy.y;
-  const bodyY = footY - guy.bodyRadius - 4;
-  const headY = bodyY - guy.bodyRadius - guy.headRadius + 2;
-  
-  // Legs (simple lines)
-  ctx.strokeStyle = '#aaa';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x - 5, bodyY + guy.bodyRadius);
-  ctx.lineTo(x - 7, footY);
-  ctx.moveTo(x + 5, bodyY + guy.bodyRadius);
-  ctx.lineTo(x + 7, footY);
-  ctx.stroke();
-  
-  // Body
-  ctx.fillStyle = '#ccc';
-  ctx.beginPath();
-  ctx.arc(x, bodyY, guy.bodyRadius, 0, Math.PI * 2);
-  ctx.fill();
-  
-  // Head
-  ctx.fillStyle = '#ddd';
-  ctx.beginPath();
-  ctx.arc(x, headY, guy.headRadius, 0, Math.PI * 2);
-  ctx.fill();
-  
-  // Eyes (look toward cursor)
-  const eyeOffsetX = Math.min(3, Math.max(-3, (mouse.x - x) * 0.02));
-  const eyeOffsetY = Math.min(2, Math.max(-2, (mouse.y - headY) * 0.02));
-  
-  ctx.fillStyle = '#333';
-  // Left eye
-  ctx.beginPath();
-  ctx.arc(x - 4 + eyeOffsetX, headY - 2 + eyeOffsetY, 2, 0, Math.PI * 2);
-  ctx.fill();
-  // Right eye
-  ctx.beginPath();
-  ctx.arc(x + 4 + eyeOffsetX, headY - 2 + eyeOffsetY, 2, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawDialogue() {
-  if (!currentDialogue || dialogueFade <= 0) return;
-  
-  const alpha = Math.min(1, dialogueFade / 20);
-  const bubbleY = guy.y - 70;
-  
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.font = '14px monospace';
-  const metrics = ctx.measureText(currentDialogue);
-  const tw = metrics.width;
-  const bx = guy.x - tw / 2 - 10;
-  const by = bubbleY - 12;
-  
-  // Bubble
-  ctx.fillStyle = 'rgba(0,0,0,0.7)';
-  ctx.beginPath();
-  ctx.roundRect(bx, by, tw + 20, 28, 6);
-  ctx.fill();
-  
-  // Text
-  ctx.fillStyle = '#eee';
-  ctx.fillText(currentDialogue, guy.x - tw / 2, bubbleY + 4);
-  ctx.restore();
-}
-
 function render() {
-  // Clear
-  ctx.fillStyle = '#1a1a2e';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Background
+  ctx.fillStyle = '#0f0f1a';
+  ctx.fillRect(0, 0, W, H);
   
   // Ground
-  ctx.fillStyle = '#2a2a3e';
-  ctx.fillRect(0, GROUND_Y + 30, 800, 60);
-  
-  // Ground line
-  ctx.strokeStyle = '#444';
+  ctx.fillStyle = '#1a1a2a';
+  ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+  ctx.strokeStyle = '#2a2a3e';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(0, GROUND_Y + 30);
-  ctx.lineTo(800, GROUND_Y + 30);
+  ctx.moveTo(0, GROUND_Y);
+  ctx.lineTo(W, GROUND_Y);
   ctx.stroke();
+  
+  // Static platforms
+  for (const p of platforms) {
+    if (p === ground) continue;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+  }
   
   // Drawn platforms
   for (const p of drawnPlatforms) {
-    ctx.fillStyle = 'rgba(100, 140, 180, 0.3)';
+    ctx.fillStyle = 'rgba(80,110,140,0.3)';
     ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.strokeStyle = 'rgba(100, 140, 180, 0.6)';
+    ctx.strokeStyle = 'rgba(80,110,140,0.5)';
+    ctx.lineWidth = 1;
     ctx.strokeRect(p.x, p.y, p.w, p.h);
   }
   
-  // Drawing preview
-  if (drawing && drawStart) {
-    ctx.strokeStyle = 'rgba(100, 140, 180, 0.4)';
-    ctx.setLineDash([5, 5]);
+  // Draw preview
+  if (drawMode && drawStart && state.bookPageUnlocked >= 4) {
+    ctx.strokeStyle = 'rgba(80,110,140,0.3)';
+    ctx.setLineDash([4, 4]);
     ctx.strokeRect(
       Math.min(drawStart.x, mouse.x),
       Math.min(drawStart.y, mouse.y),
@@ -427,36 +501,142 @@ function render() {
     ctx.setLineDash([]);
   }
   
-  // Objects
-  for (const obj of objects) {
-    ctx.fillStyle = obj.color;
-    ctx.fillRect(obj.x - obj.w/2, obj.y - obj.h, obj.w, obj.h);
+  // Dynamic bodies (book, word blocks)
+  for (const b of dynamicBodies) {
+    ctx.fillStyle = b.color;
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    
+    if (b.type === 'book') {
+      // Book detail — little lines
+      ctx.strokeStyle = '#8a7a5a';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(b.x + 4, b.y + 4 + i * 5);
+        ctx.lineTo(b.x + b.w - 4, b.y + 4 + i * 5);
+        ctx.stroke();
+      }
+    }
+    
+    if (b.label) {
+      ctx.fillStyle = '#aabbcc';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(b.label, b.cx, b.cy + 3);
+      ctx.textAlign = 'left';
+    }
   }
   
   // Character
   drawCharacter();
   
-  // Dialogue
-  drawDialogue();
+  // Symbols above head
+  for (const s of guy.symbols) {
+    const alpha = Math.min(1, s.life / 20);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = '14px monospace';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.fillText(s.text, guy.x, guy.y - guy.h - 10 + s.y);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
   
-  // Cursor glow (subtle — the character can "sense" this)
-  ctx.save();
-  ctx.globalAlpha = 0.08;
-  ctx.fillStyle = '#fff';
-  ctx.beginPath();
-  ctx.arc(mouse.x, mouse.y, 20, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  // Speech bubble
+  if (guy.currentSpeech && guy.speechFade > 0) {
+    const alpha = Math.min(1, guy.speechFade / 20);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = '13px monospace';
+    const tw = ctx.measureText(guy.currentSpeech).width;
+    const bx = guy.x - tw/2 - 10;
+    const by = guy.y - guy.h - 35;
+    
+    ctx.fillStyle = 'rgba(0,0,0,0.75)';
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(bx, by, tw + 20, 24, 4);
+      ctx.fill();
+    } else {
+      ctx.fillRect(bx, by, tw + 20, 24);
+    }
+    
+    ctx.fillStyle = '#ddd';
+    ctx.textAlign = 'center';
+    ctx.fillText(guy.currentSpeech, guy.x, by + 16);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+  
+  // Hint text (only at very start)
+  if (guy.inert && state.dragCount === 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.3 + 0.1 * Math.sin(Date.now() / 1000);
+    ctx.font = '11px monospace';
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'center';
+    ctx.fillText('double-click the book', book.cx, book.y - 8);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
 }
 
-// --- Game loop ---
-function gameLoop() {
+function drawCharacter() {
+  const x = guy.x;
+  const footY = guy.y;
+  const bodyY = footY - 12;
+  const headY = footY - 26;
+  
+  // Legs
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x - 4, bodyY + 5);
+  ctx.lineTo(x - 5, footY);
+  ctx.moveTo(x + 4, bodyY + 5);
+  ctx.lineTo(x + 5, footY);
+  ctx.stroke();
+  
+  // Body
+  ctx.fillStyle = guy.inert ? '#777' : '#bbb';
+  ctx.beginPath();
+  ctx.arc(x, bodyY, guy.bodyR, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Head
+  ctx.fillStyle = guy.inert ? '#888' : '#ccc';
+  ctx.beginPath();
+  ctx.arc(x, headY, guy.headR, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Eyes (fixed forward — he can't see the player)
+  if (!guy.inert) {
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(x - 3, headY - 1, 1.5, 0, Math.PI * 2);
+    ctx.arc(x + 3, headY - 1, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Closed/dormant eyes — just lines
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x - 5, headY);
+    ctx.lineTo(x - 2, headY);
+    ctx.moveTo(x + 2, headY);
+    ctx.lineTo(x + 5, headY);
+    ctx.stroke();
+  }
+}
+
+// --- Loop ---
+function loop() {
   update();
   render();
-  requestAnimationFrame(gameLoop);
+  requestAnimationFrame(loop);
 }
-
-gameLoop();
+loop();
 </script>
 </body>
 </html>
