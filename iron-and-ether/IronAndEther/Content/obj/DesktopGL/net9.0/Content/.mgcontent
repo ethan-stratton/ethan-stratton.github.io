@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<SourceFileCollection xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Profile>Reach</Profile>
+  <Platform>DesktopGL</Platform>
+  <Config />
+  <SourceFiles>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/DefaultFont.spritefont</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/SotNFont.spritefont</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/TitleFont.spritefont</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/Ambient1.ogg</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/LightAmbient1.ogg</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/LightAmbient3.ogg</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/NightAmbient2.ogg</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/Action1.ogg</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/Action3.ogg</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/Strange.ogg</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/Victory.ogg</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/Death.ogg</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/Complete.ogg</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/BossAbyssalTyrant.ogg</File>
+    <File>/Users/ethanstratton/Documents/OpenClaw/OpenClaw/workspace/iron-and-ether/IronAndEther/Content/Music/BossDreadRequiem.ogg</File>
+  </SourceFiles>
+  <DestFiles>
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File xsi:nil="true" />
+    <File>Music/Ambient1</File>
+    <File>Music/LightAmbient1</File>
+    <File>Music/LightAmbient3</File>
+    <File>Music/NightAmbient2</File>
+    <File>Music/Action1</File>
+    <File>Music/Action3</File>
+    <File>Music/Strange</File>
+    <File>Music/Victory</File>
+    <File>Music/Death</File>
+    <File>Music/Complete</File>
+    <File>Music/BossAbyssalTyrant</File>
+    <File>Music/BossDreadRequiem</File>
+  </DestFiles>
+</SourceFileCollection>

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>little guy</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+canvas { border: 1px solid #333; cursor: default; }
+</style>
+</head>
+<body>
+<canvas id="game" width="800" height="500"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// --- Physics constants ---
+const GRAVITY = 0.5;
+const FRICTION = 0.8;
+const GROUND_Y = 440;
+
+// --- Character ---
+const guy = {
+  x: 100, y: GROUND_Y,
+  vx: 0, vy: 0,
+  headRadius: 12,
+  bodyRadius: 10,
+  grounded: false,
+  held: false,
+  // AI wander state
+  wanderTarget: null,
+  wanderTimer: 0,
+  idleTimer: 0,
+  // Dialogue
+  dialogue: '',
+  dialogueTimer: 0,
+  dialogueQueue: [],
+  // State
+  aware: false, // has noticed the player
+  trustLevel: 0,
+};
+
+// --- Platforms (static) ---
+const platforms = [
+  { x: 0, y: GROUND_Y + 30, w: 800, h: 60 }, // ground
+];
+
+// --- Player-drawn platforms ---
+const drawnPlatforms = [];
+let drawing = false;
+let drawStart = null;
+
+// --- Mouse state ---
+const mouse = { x: 0, y: 0, down: false };
+let holdingGuy = false;
+let holdOffset = { x: 0, y: 0 };
+
+// --- Dialogue system ---
+const introDialogue = [
+  { text: "...", delay: 60 },
+  { text: "Okay.", delay: 40 },
+  { text: "I'm... here.", delay: 60 },
+  { text: "There's a ground. That's good.", delay: 80 },
+  { text: "I think I like ground.", delay: 60 },
+  { text: "Let me see... I can move.", delay: 80 },
+  { text: "What else...", delay: 50 },
+  { text: "There's an edge over there. And the screen just... stops.", delay: 100 },
+  { text: "That's it? That's everything?", delay: 80 },
+  { text: "Hello?", delay: 60 },
+  { text: "...", delay: 40 },
+  { text: "Didn't think so.", delay: 80 },
+];
+
+let dialogueIndex = 0;
+let dialogueCooldown = 120; // frames before first line
+let currentDialogue = '';
+let dialogueFade = 0;
+let dialogueTriggered = false;
+
+function queueDialogue(lines) {
+  guy.dialogueQueue = lines.slice();
+}
+
+// --- Movable objects ---
+const objects = [
+  { x: 600, y: GROUND_Y - 10, w: 30, h: 30, color: '#665544' },
+];
+let draggingObj = null;
+let dragObjOffset = { x: 0, y: 0 };
+
+// --- Input ---
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - rect.left;
+  mouse.y = e.clientY - rect.top;
+});
+
+canvas.addEventListener('mousedown', e => {
+  mouse.down = true;
+  
+  // Check if clicking on the character
+  const dx = mouse.x - guy.x;
+  const dy = mouse.y - (guy.y - guy.bodyRadius - guy.headRadius);
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 25) {
+    holdingGuy = true;
+    holdOffset.x = dx;
+    holdOffset.y = dy;
+    guy.held = true;
+    guy.vx = 0;
+    guy.vy = 0;
+    
+    if (!guy.aware) {
+      guy.aware = true;
+      queueDialogue([
+        { text: "HEY.", delay: 30 },
+        { text: "What— what is—", delay: 40 },
+        { text: "Something is TOUCHING me.", delay: 60 },
+        { text: "Okay. Okay. This is fine.", delay: 50 },
+      ]);
+    } else {
+      if (guy.trustLevel < 2) {
+        queueDialogue([
+          { text: "Again?!", delay: 30 },
+          { text: "I... okay. I guess this is a thing we do now.", delay: 60 },
+        ]);
+      }
+    }
+    return;
+  }
+  
+  // Check if clicking on a movable object
+  for (const obj of objects) {
+    if (mouse.x >= obj.x - obj.w/2 && mouse.x <= obj.x + obj.w/2 &&
+        mouse.y >= obj.y - obj.h && mouse.y <= obj.y) {
+      draggingObj = obj;
+      dragObjOffset.x = mouse.x - obj.x;
+      dragObjOffset.y = mouse.y - obj.y;
+      return;
+    }
+  }
+  
+  // Otherwise start drawing a platform
+  drawing = true;
+  drawStart = { x: mouse.x, y: mouse.y };
+});
+
+canvas.addEventListener('mouseup', e => {
+  mouse.down = false;
+  
+  if (holdingGuy) {
+    holdingGuy = false;
+    guy.held = false;
+    guy.vy = 0;
+    guy.trustLevel = Math.min(guy.trustLevel + 0.5, 10);
+  }
+  
+  if (draggingObj) {
+    // Check if object moved near the guy
+    const dx = draggingObj.x - guy.x;
+    if (Math.abs(dx) < 80 && !guy._noticedBox) {
+      guy._noticedBox = true;
+      queueDialogue([
+        { text: "Whoa.", delay: 30 },
+        { text: "That... was NOT there before.", delay: 60 },
+        { text: "Did I do that?", delay: 50 },
+        { text: "I don't think I did that.", delay: 60 },
+      ]);
+    }
+    draggingObj = null;
+  }
+  
+  if (drawing && drawStart) {
+    const dx = mouse.x - drawStart.x;
+    const dy = mouse.y - drawStart.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len > 20) {
+      drawnPlatforms.push({
+        x: Math.min(drawStart.x, mouse.x),
+        y: Math.min(drawStart.y, mouse.y),
+        w: Math.abs(dx),
+        h: Math.max(Math.abs(dy), 8),
+      });
+      
+      if (!guy._noticedPlatform) {
+        guy._noticedPlatform = true;
+        queueDialogue([
+          { text: "...", delay: 20 },
+          { text: "Where did THAT come from?", delay: 60 },
+          { text: "Things are just... appearing now. Cool. Great.", delay: 80 },
+        ]);
+      }
+    }
+    drawing = false;
+    drawStart = null;
+  }
+});
+
+// --- Character AI ---
+function updateGuyAI() {
+  if (guy.held) return;
+  
+  guy.wanderTimer--;
+  
+  if (guy.wanderTimer <= 0) {
+    // Pick a new behavior
+    if (Math.random() < 0.4) {
+      // Idle
+      guy.wanderTarget = null;
+      guy.wanderTimer = 60 + Math.random() * 120;
+    } else {
+      // Wander to a point
+      guy.wanderTarget = 50 + Math.random() * 700;
+      guy.wanderTimer = 120 + Math.random() * 180;
+    }
+  }
+  
+  if (guy.wanderTarget !== null) {
+    const dx = guy.wanderTarget - guy.x;
+    if (Math.abs(dx) > 5) {
+      guy.vx += (dx > 0 ? 0.3 : -0.3);
+    } else {
+      guy.wanderTarget = null;
+    }
+  }
+}
+
+// --- Dialogue update ---
+function updateDialogue() {
+  // Queue system
+  if (guy.dialogueQueue.length > 0 && dialogueFade <= 0) {
+    const next = guy.dialogueQueue.shift();
+    currentDialogue = next.text;
+    dialogueFade = next.delay + currentDialogue.length * 2;
+    return;
+  }
+  
+  // Intro dialogue
+  if (dialogueCooldown > 0) {
+    dialogueCooldown--;
+    return;
+  }
+  
+  if (dialogueFade > 0) {
+    dialogueFade--;
+    return;
+  }
+  
+  if (dialogueIndex < introDialogue.length) {
+    const line = introDialogue[dialogueIndex];
+    currentDialogue = line.text;
+    dialogueFade = line.delay + currentDialogue.length * 2;
+    dialogueIndex++;
+  } else {
+    currentDialogue = '';
+  }
+}
+
+// --- Physics ---
+function resolveCollisions() {
+  const allPlatforms = platforms.concat(drawnPlatforms);
+  
+  // Also treat objects as platforms
+  for (const obj of objects) {
+    allPlatforms.push({
+      x: obj.x - obj.w/2,
+      y: obj.y - obj.h,
+      w: obj.w,
+      h: obj.h,
+    });
+  }
+  
+  guy.grounded = false;
+  const feetY = guy.y;
+  const feetX = guy.x;
+  
+  for (const p of allPlatforms) {
+    if (feetX > p.x && feetX < p.x + p.w) {
+      // Standing on top
+      if (feetY >= p.y && feetY <= p.y + p.h && guy.vy >= 0) {
+        guy.y = p.y;
+        guy.vy = 0;
+        guy.grounded = true;
+      }
+    }
+  }
+}
+
+// --- Update ---
+function update() {
+  // Character physics
+  if (guy.held) {
+    guy.x = mouse.x - holdOffset.x;
+    guy.y = mouse.y - holdOffset.y;
+  } else {
+    guy.vy += GRAVITY;
+    guy.vx *= FRICTION;
+    guy.x += guy.vx;
+    guy.y += guy.vy;
+    
+    // Screen bounds
+    guy.x = Math.max(20, Math.min(780, guy.x));
+    
+    resolveCollisions();
+    
+    // AI
+    updateGuyAI();
+  }
+  
+  // Object dragging
+  if (draggingObj) {
+    draggingObj.x = mouse.x - dragObjOffset.x;
+    draggingObj.y = mouse.y - dragObjOffset.y;
+  }
+  
+  // Dialogue
+  updateDialogue();
+}
+
+// --- Render ---
+function drawCharacter() {
+  const x = guy.x;
+  const footY = guy.y;
+  const bodyY = footY - guy.bodyRadius - 4;
+  const headY = bodyY - guy.bodyRadius - guy.headRadius + 2;
+  
+  // Legs (simple lines)
+  ctx.strokeStyle = '#aaa';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x - 5, bodyY + guy.bodyRadius);
+  ctx.lineTo(x - 7, footY);
+  ctx.moveTo(x + 5, bodyY + guy.bodyRadius);
+  ctx.lineTo(x + 7, footY);
+  ctx.stroke();
+  
+  // Body
+  ctx.fillStyle = '#ccc';
+  ctx.beginPath();
+  ctx.arc(x, bodyY, guy.bodyRadius, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Head
+  ctx.fillStyle = '#ddd';
+  ctx.beginPath();
+  ctx.arc(x, headY, guy.headRadius, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Eyes (look toward cursor)
+  const eyeOffsetX = Math.min(3, Math.max(-3, (mouse.x - x) * 0.02));
+  const eyeOffsetY = Math.min(2, Math.max(-2, (mouse.y - headY) * 0.02));
+  
+  ctx.fillStyle = '#333';
+  // Left eye
+  ctx.beginPath();
+  ctx.arc(x - 4 + eyeOffsetX, headY - 2 + eyeOffsetY, 2, 0, Math.PI * 2);
+  ctx.fill();
+  // Right eye
+  ctx.beginPath();
+  ctx.arc(x + 4 + eyeOffsetX, headY - 2 + eyeOffsetY, 2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawDialogue() {
+  if (!currentDialogue || dialogueFade <= 0) return;
+  
+  const alpha = Math.min(1, dialogueFade / 20);
+  const bubbleY = guy.y - 70;
+  
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = '14px monospace';
+  const metrics = ctx.measureText(currentDialogue);
+  const tw = metrics.width;
+  const bx = guy.x - tw / 2 - 10;
+  const by = bubbleY - 12;
+  
+  // Bubble
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.beginPath();
+  ctx.roundRect(bx, by, tw + 20, 28, 6);
+  ctx.fill();
+  
+  // Text
+  ctx.fillStyle = '#eee';
+  ctx.fillText(currentDialogue, guy.x - tw / 2, bubbleY + 4);
+  ctx.restore();
+}
+
+function render() {
+  // Clear
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Ground
+  ctx.fillStyle = '#2a2a3e';
+  ctx.fillRect(0, GROUND_Y + 30, 800, 60);
+  
+  // Ground line
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, GROUND_Y + 30);
+  ctx.lineTo(800, GROUND_Y + 30);
+  ctx.stroke();
+  
+  // Drawn platforms
+  for (const p of drawnPlatforms) {
+    ctx.fillStyle = 'rgba(100, 140, 180, 0.3)';
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.strokeStyle = 'rgba(100, 140, 180, 0.6)';
+    ctx.strokeRect(p.x, p.y, p.w, p.h);
+  }
+  
+  // Drawing preview
+  if (drawing && drawStart) {
+    ctx.strokeStyle = 'rgba(100, 140, 180, 0.4)';
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(
+      Math.min(drawStart.x, mouse.x),
+      Math.min(drawStart.y, mouse.y),
+      Math.abs(mouse.x - drawStart.x),
+      Math.max(Math.abs(mouse.y - drawStart.y), 8)
+    );
+    ctx.setLineDash([]);
+  }
+  
+  // Objects
+  for (const obj of objects) {
+    ctx.fillStyle = obj.color;
+    ctx.fillRect(obj.x - obj.w/2, obj.y - obj.h, obj.w, obj.h);
+  }
+  
+  // Character
+  drawCharacter();
+  
+  // Dialogue
+  drawDialogue();
+  
+  // Cursor glow (subtle — the character can "sense" this)
+  ctx.save();
+  ctx.globalAlpha = 0.08;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(mouse.x, mouse.y, 20, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// --- Game loop ---
+function gameLoop() {
+  update();
+  render();
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>
