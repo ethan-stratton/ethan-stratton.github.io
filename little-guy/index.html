@@ -1872,13 +1872,13 @@ function render() {
   // Cursor presence glow
   if (state.playerAbsentFrames < 60 && !guy.inert) {
     const glowX = mouse.x;
-    const glowY = currentGroundY;
+    const glowY = mouse.y;
     const glowAlpha = Math.max(0, 0.06 - state.playerAbsentFrames * 0.001);
-    const glow = ctx.createRadialGradient(glowX, glowY - 5, 2, glowX, glowY - 5, 80);
+    const glow = ctx.createRadialGradient(glowX, glowY, 2, glowX, glowY, 80);
     glow.addColorStop(0, `rgba(120,130,150,${glowAlpha})`);
     glow.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = glow;
-    ctx.fillRect(glowX - 80, glowY - 85, 160, 90);
+    ctx.fillRect(glowX - 80, glowY - 80, 160, 160);
   }
 
   for (const p of currentPlatforms) {
