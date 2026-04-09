@@ -254,6 +254,7 @@ const state = {
   firstGrabResist: 0,
   scene8Warm: false,
   triedGoBack: false,
+  memoryNotice: 0,
   transitionShowCode: false,
   returnFlinch: false,
   scene8Phase: 0, scene8PhaseTimer: 0,
@@ -1188,9 +1189,17 @@ canvas.addEventListener('click', () => { initAudio(); }, { once: true });
 
 // DEV: number keys 1-9 to jump to scenes (remove for release)
 document.addEventListener('keydown', e => {
+  // DEV: number keys 1-9 to jump to scenes (remove for release)
   if (e.key >= '1' && e.key <= '9') {
     const target = parseInt(e.key) - 1;
     if (target < scenes.length) { initAudio(); startAmbient(); loadScene(target); }
+  }
+  // DEV: 0 to wipe memory and restart (remove for release)
+  if (e.key === '0') {
+    if (confirm('Wipe the little guy\'s memory and start over?')) {
+      localStorage.removeItem('littleguy_save');
+      location.reload();
+    }
   }
 });
 
@@ -2207,6 +2216,15 @@ function render() {
     ctx.font = '9px monospace'; ctx.fillStyle = '#555'; ctx.textAlign = 'right';
     ctx.fillText('saved', W - 8, H - 8); ctx.textAlign = 'left'; ctx.restore();
   }
+  // Memory persistence notice
+  if (state.memoryNotice > 0) {
+    state.memoryNotice--;
+    const a = state.memoryNotice > 80 ? (120 - state.memoryNotice) / 40 : state.memoryNotice / 80;
+    ctx.save(); ctx.globalAlpha = a * 0.5;
+    ctx.font = '11px monospace'; ctx.fillStyle = '#778'; ctx.textAlign = 'center';
+    ctx.fillText('he remembers', W / 2, 30);
+    ctx.textAlign = 'left'; ctx.restore();
+  }
   if (state.transitioning || state.transitionAlpha > 0) { ctx.fillStyle = `rgba(0,0,0,${state.transitionAlpha})`; ctx.fillRect(0, 0, W, H);
     if (state.transitionShowCode && state.transitionAlpha > 0.7) {
       ctx.save();
@@ -2380,7 +2398,12 @@ function drawCharacter() {
 // ============================================================
 // LOOP
 // ============================================================
-if (!loadGame()) loadScene(0);
+const didLoad = loadGame();
+if (!didLoad) loadScene(0);
+if (didLoad) {
+  // Brief message so the player knows he remembers
+  state.memoryNotice = 120; // frames to show
+}
 window.addEventListener('beforeunload', saveGame);
 function loop() { update(); render(); requestAnimationFrame(loop); }
 loop();
