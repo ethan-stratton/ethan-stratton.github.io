@@ -1443,7 +1443,7 @@ function updateIdleBehavior() {
     else if (state.wordsLearned.length > 0) showSpeech(state.wordsLearned[Math.random() * state.wordsLearned.length | 0] + '...');
     queueBark({ headTilt: -0.2, duration: 80 });
   } else if (guy.idleTime > THINKER_T && guy.idlePhase < 3 && awareness >= 1 && guy.grounded) {
-    guy.idlePhase = 3; guy.thinker = true; addSymbol('...'); updateTabTitle();
+    guy.idlePhase = 3; guy.thinker = true; addSymbol('🧠'); updateTabTitle();
   } else if (guy.idleTime > SIT_T && guy.idlePhase < 2 && guy.grounded) {
     guy.idlePhase = 2; guy.sitting = true; updateTabTitle();
   } else if (guy.idleTime > RESTLESS_T && guy.idlePhase < 1) {
