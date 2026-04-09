@@ -1610,6 +1610,33 @@ function resolveBody(body) {
   if (body.x < 0) { body.x = 0; body.vx = Math.abs(body.vx) * BOUNCE; body.rotV *= -0.5; }
   if (body.right > W) { body.x = W - body.w; body.vx = -Math.abs(body.vx) * BOUNCE; body.rotV *= -0.5; }
   if (body.grounded && Math.abs(body.vx) < 0.3) { body.rotation *= 0.9; body.rotV *= 0.8; }
+
+  // Body bounces off guy's head
+  if (!draggingGuy && !guy.inert && body.visible && body !== dragging) {
+    const hw = guy.w / 2;
+    const headTop = guy.y - guy.h;
+    // Landing on guy's head
+    if (body.right > guy.x - hw && body.x < guy.x + hw && body.bottom >= headTop && body.bottom <= headTop + 12 && body.vy > 0) {
+      body.y = headTop - body.h;
+      body.vy = -body.vy * BOUNCE * 0.6;
+      body.vx += (body.cx > guy.x ? 1 : -1) * 0.5; // deflect sideways
+      guy.squashTarget = 0.8;
+      const speed = Math.sqrt(body.vx ** 2 + body.vy ** 2);
+      if (speed > 2) { addSymbol('!'); playImpact(speed * 0.5); behavior.aggression += 0.5; }
+      else addSymbol('...');
+    }
+    // Side collision — body pushes guy or guy pushes body
+    else if (body.bottom > headTop + 8 && body.y < guy.y && body.right > guy.x - hw && body.x < guy.x + hw) {
+      const pushDir = guy.x < body.cx ? -1 : 1;
+      const bodySpeed = Math.abs(body.vx);
+      if (bodySpeed > 1) {
+        // Fast body pushes guy
+        guy.vx += pushDir * bodySpeed * 0.3;
+        body.vx *= 0.5;
+        if (bodySpeed > 3 && !guy.inert) addSymbol('!');
+      }
+    }
+  }
 }
 
 function resolveGuy() {
