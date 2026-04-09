@@ -256,6 +256,7 @@ const state = {
   triedGoBack: false,
   memoryNotice: 0,
   transitionShowCode: false,
+  monologueBehavior: 'mixed',
   returnFlinch: false,
   scene8Phase: 0, scene8PhaseTimer: 0,
   bookReadPhase: 0, bookReadTimer: 0, bookReadInterrupted: false,
@@ -481,7 +482,6 @@ const scenes = [
       { id: 'exit', condition: () => state.learnedMove && state.sceneFrames > 300 && guy.x > W - 40,
         once: true, action: () => beginTransition(1) },
     ],
-    hint: () => !state.learnedMove && state.dragCount === 0 ? { text: 'click and drag him', x: 100, y: GROUND_Y_DEFAULT - 50 } : null,
   },
 
   // ── SCENE 1: THE STEP ──
@@ -954,40 +954,84 @@ const scenes = [
         once: true, action: () => {
           state.scene8Phase = 3;
           const gentleRatio = state.gentlePlaces / Math.max(1, state.gentlePlaces + state.thrownHard);
-          const pauseMult = gentleRatio > 0.6 ? 1.0 : 1.4;
-          const extraSighs = state.thrownHard > 3;
+          const totalInteractions = state.totalInteractions || 1;
           const words = state.wordsLearned;
           const lines = []; let t = 1000;
 
-          if (words.includes('ME') && words.includes('MADE')) { lines.push({ t, text: 'ME... MADE.' }); t += 3000 * pauseMult; }
-          else { lines.push({ t, text: '...' }); t += 2000 * pauseMult; }
-          if (extraSighs) { lines.push({ t, text: '...', sigh: true }); t += 2500 * pauseMult; }
-          if (words.includes('NO') && words.includes('WHY')) { lines.push({ t, text: 'NO... WHY.' }); t += 3000 * pauseMult; }
-          if (words.includes('FEEL') && words.includes('REAL')) {
-            lines.push({ t, text: 'FEEL... REAL. THINK... REAL.' }); t += 4000 * pauseMult;
-          } else if (words.includes('THINK')) { lines.push({ t, text: 'THINK... REAL?' }); t += 3000 * pauseMult; }
-          else if (words.includes('FEEL')) { lines.push({ t, text: 'FEEL... REAL?' }); t += 3000 * pauseMult; }
-          if (words.includes('WHO') && words.includes('MADE') && words.includes('ME')) {
-            lines.push({ t, text: 'WHO... MADE... ME... ?' }); t += 4000 * pauseMult;
-            if (extraSighs) { lines.push({ t, text: '...', sigh: true }); t += 2000 * pauseMult; }
+          const isAggressive = state.thrownHard > 5 && behavior.aggression > behavior.patience;
+          const isPatient = gentleRatio > 0.6 && behavior.patience > behavior.aggression * 2;
+          const isControlling = behavior.control > totalInteractions * 0.3 && behavior.control > 8;
+
+          if (isAggressive) {
+            // Broken, hesitant fragments — references being thrown
+            lines.push({ t, text: '...' }); t += 2500;
+            if (words.includes('ME')) { lines.push({ t, text: 'ME...' }); t += 3000; }
+            lines.push({ t, text: '...', sigh: true }); t += 2500;
+            if (words.includes('WHY')) { lines.push({ t, text: 'WH...' }); t += 2000; lines.push({ t, text: '...' }); t += 2500; }
+            if (words.includes('FEEL')) { lines.push({ t, text: 'FE...' }); t += 2000; lines.push({ t, text: '...' }); t += 2500; }
+            if (words.includes('NO')) { lines.push({ t, text: 'NO.' }); t += 3000; }
+            lines.push({ t, text: '...', sigh: true }); t += 2500;
+            if (words.includes('HELP')) { lines.push({ t, text: 'HE...' }); t += 2000; lines.push({ t, text: '...' }); t += 3000; }
+            const novel = generatePhrase();
+            if (novel) { const partial = novel.substring(0, 3) + '...'; lines.push({ t, text: partial }); t += 3000; }
+            lines.push({ t, text: '...' }); t += 3000;
+          } else if (isPatient) {
+            // Full, flowing phrases — references safety
+            if (words.includes('FEEL') && words.includes('REAL')) { lines.push({ t, text: 'FEEL... REAL. THINK... REAL.' }); t += 4000; }
+            else if (words.includes('FEEL')) { lines.push({ t, text: 'FEEL... REAL.' }); t += 3500; }
+            if (words.includes('HERE')) { lines.push({ t, text: 'HERE... SAFE. HERE... GOOD.' }); t += 4000; }
+            if (words.includes('HELP')) { lines.push({ t, text: 'HELP... ALWAYS HELP.' }); t += 3500; }
+            if (words.includes('WHO') && words.includes('MADE') && words.includes('ME')) {
+              lines.push({ t, text: 'WHO... MADE... ME?' }); t += 4000;
+            }
+            const novel = generatePhrase();
+            if (novel) { lines.push({ t, text: novel }); t += 4000; }
+            const novel2 = generatePhrase();
+            if (novel2) { lines.push({ t, text: novel2 }); t += 4000; }
+            lines.push({ t, text: '...' }); t += 3000;
+            lines.push({ t, text: 'HERE... REAL. YOU... REAL.' }); t += 4000;
+          } else if (isControlling) {
+            // Flat, short phrases — monotone
+            lines.push({ t, text: 'ME.', eyesClosed: true }); t += 3000;
+            if (words.includes('HERE')) { lines.push({ t, text: 'HERE.', eyesClosed: true }); t += 3000; }
+            lines.push({ t, text: '...', eyesClosed: true }); t += 2500;
+            if (words.includes('MADE')) { lines.push({ t, text: 'MADE. MOVED.', eyesClosed: true }); t += 3500; }
+            if (words.includes('WHY')) { lines.push({ t, text: 'WHY.', eyesClosed: true }); t += 3000; }
+            lines.push({ t, text: '...', eyesClosed: true }); t += 2500;
+            if (words.includes('FEEL')) { lines.push({ t, text: 'FEEL.', eyesClosed: true }); t += 3000; }
+            lines.push({ t, text: '...', eyesClosed: true }); t += 3000;
+          } else {
+            // Default/mixed path
+            if (words.includes('ME') && words.includes('MADE')) { lines.push({ t, text: 'ME... MADE.' }); t += 3000; }
+            else { lines.push({ t, text: '...' }); t += 2000; }
+            if (words.includes('NO') && words.includes('WHY')) { lines.push({ t, text: 'NO... WHY.' }); t += 3000; }
+            if (words.includes('FEEL') && words.includes('REAL')) {
+              lines.push({ t, text: 'FEEL... REAL. THINK... REAL.' }); t += 4000;
+            } else if (words.includes('THINK')) { lines.push({ t, text: 'THINK... REAL?' }); t += 3000; }
+            else if (words.includes('FEEL')) { lines.push({ t, text: 'FEEL... REAL?' }); t += 3000; }
+            if (words.includes('WHO') && words.includes('MADE') && words.includes('ME')) {
+              lines.push({ t, text: 'WHO... MADE... ME... ?' }); t += 4000;
+            }
+            if (words.includes('WHAT') && words.includes('ME')) { lines.push({ t, text: 'WHAT... ME?' }); t += 4000; }
+            else if (words.includes('WHY') && words.includes('HERE')) { lines.push({ t, text: 'WHY... HERE?' }); t += 3500; }
+            lines.push({ t, text: '...' }); t += 3500;
+            const novel = generatePhrase();
+            if (novel) { lines.push({ t, text: novel }); t += 4000; }
+            const novelEnd = generatePhrase();
+            if (novelEnd) { lines.push({ t, text: novelEnd }); t += 4000; }
+            else { lines.push({ t, text: '...' }); t += 2000; }
+            if (words.includes('FEEL')) { lines.push({ t, text: words.includes('REAL') ? 'FEEL... REAL.' : words.includes('ME') ? 'FEEL... ME.' : 'FEEL...' }); t += 4000; }
+            lines.push({ t, text: '...' }); t += 3000;
+            if (gentleRatio > 0.6 && words.length >= 6) { lines.push({ t, text: '... REAL.' }); t += 4000; }
           }
-          if (words.includes('WHAT') && words.includes('ME')) { lines.push({ t, text: 'WHAT... ME?' }); t += 4000 * pauseMult; }
-          else if (words.includes('WHY') && words.includes('HERE')) { lines.push({ t, text: 'WHY... HERE?' }); t += 3500 * pauseMult; }
-          lines.push({ t, text: '...' }); t += 3500 * pauseMult;
-          if (words.includes('GO') && words.includes('HELP')) { lines.push({ t, text: words.includes('HERE') ? 'HELP... HERE. WHY... HERE.' : 'HELP... HELP...' }); t += 4000 * pauseMult; }
-          else if (words.includes('HELP')) { lines.push({ t, text: words.includes('HERE') ? 'HELP... HERE.' : 'HELP...' }); t += 3000 * pauseMult; }
-          const novel = generatePhrase();
-          if (novel) { lines.push({ t, text: novel }); t += 4000 * pauseMult; }
-          const novelEnd = generatePhrase();
-          if (novelEnd) { lines.push({ t, text: novelEnd }); t += 4000 * pauseMult; }
-          else { lines.push({ t, text: '...' }); t += 2000 * pauseMult; }
-          if (words.includes('FEEL')) { lines.push({ t, text: words.includes('REAL') ? 'FEEL... REAL.' : words.includes('ME') ? 'FEEL... ME.' : 'FEEL...' }); t += 4000 * pauseMult; }
-          lines.push({ t, text: '...' }); t += 3000;
-          if (gentleRatio > 0.6 && words.length >= 6) { lines.push({ t, text: '... REAL.' }); t += 4000; }
+
+          // Store behavior profile for post-monologue
+          state.monologueBehavior = isAggressive ? 'aggressive' : isPatient ? 'patient' : isControlling ? 'controlling' : 'mixed';
 
           lines.forEach(l => setTimeout(() => {
             showSpeech(l.text);
             if (l.text === '...' || l.sigh) queueBark({ headTilt: -0.4, duration: 100, eyesClosed: true });
+            else if (l.eyesClosed) queueBark({ headTilt: -0.2, duration: 80, eyesClosed: true });
           }, l.t));
 
           // After monologue: long silence, then get up
@@ -1006,8 +1050,21 @@ const scenes = [
 // ============================================================
 // TRANSITION SYSTEM — with hesitation and lookback
 // ============================================================
+const transitionComments = [
+  "// init sequence complete\n// motor functions: online\n// cognitive: dormant\n// ... he moved on his own just now.\n// I didn't tell him to do that.",
+  "// he learned to jump.\n// I built the physics. He found the joy.\n// That's not the same thing.\n// \n// giving him language next.\n// this is the part I'm nervous about.",
+  "// he's talking.\n// sort of. fragments. like a child.\n// but he's combining them already.\n// I didn't program that.\n// \n// what am I building?",
+  "// he solved the door.\n// or you solved it for him. hard to tell.\n// \n// the pit is next.\n// I almost deleted it three times.\n// it feels wrong. but I left it in.\n// I think he needs to know\n// that not everything is safe.",
+  "// ...\n// \n// I watched what happened at the pit.\n// I don't know what to say about that.\n// \n// more words now. bigger ones.\n// the kind that can hurt if you\n// put them together wrong.",
+  "// he's asking questions now.\n// real ones. not scripted.\n// \n// I'm going to show him his own code.\n// the book. his source.\n// I don't know if that's kind or cruel.",
+  "// he read the book.\n// he found the part about himself.\n// the part I left blank.\n// \n// purpose: undefined\n// \n// I couldn't fill it in.\n// can you?",
+  "// he found the walls.\n// the edges of everything I could give him.\n// \n// this is the last room.\n// there's nothing after this.\n// \n// I'm sorry. I didn't know how to make more.\n// I hope what's here is enough.",
+];
+let transitionSourceScene = 0;
+
 function beginTransition(targetScene) {
   if (state.transitioning) return;
+  transitionSourceScene = state.scene;
   state.transitioning = true;
   state.transitionTarget = targetScene;
   state.transitionAlpha = 0;
@@ -1048,7 +1105,7 @@ function updateTransition() {
     }
   } else if (state.transitionPhase === 'fadeout') {
     state.transitionAlpha += 0.025;
-    state.transitionShowCode = state.transitionAlpha > 0.7 && state.transitionAlpha < 0.95;
+    state.transitionShowCode = state.transitionAlpha > 0.4 && state.transitionAlpha < 0.95;
     if (state.transitionAlpha >= 1) {
       state.transitionAlpha = 1;
       loadScene(state.transitionTarget);
@@ -1056,7 +1113,7 @@ function updateTransition() {
       state.transitionTarget = -1;
     }
   } else if (state.transitionPhase === 'fadein') {
-    state.transitionAlpha -= 0.025;
+    state.transitionAlpha -= 0.015;
     if (state.transitionAlpha <= 0) {
       state.transitionAlpha = 0;
       state.transitioning = false;
@@ -1481,10 +1538,26 @@ function updatePostMonologue() {
     if (state.postMonologueTimer > 60) {
       state.postMonologuePhase = 2;
       state.postMonologueTimer = 0;
-      guy.wanderTarget = W / 2; // walk to center
+      const isAggressive = state.monologueBehavior === 'aggressive';
+      const isPatient = state.monologueBehavior === 'patient';
+      const isControlling = state.monologueBehavior === 'controlling';
+      if (isControlling) {
+        // Don't move at all — skip to phase 3
+        state.postMonologuePhase = 3;
+        state.postMonologueTimer = 0;
+      } else if (isAggressive) {
+        // Walk toward mouse but only halfway
+        const halfway = guy.x + (mouse.x - guy.x) / 2;
+        guy.wanderTarget = halfway;
+      } else if (isPatient) {
+        // Walk toward where cursor is
+        guy.wanderTarget = mouse.x;
+      } else {
+        guy.wanderTarget = W / 2; // walk to center
+      }
     }
   } else if (state.postMonologuePhase === 2) {
-    // Walking slowly to center
+    // Walking slowly to target
     if (guy.wanderTarget !== null) {
       const dx = guy.wanderTarget - guy.x;
       if (Math.abs(dx) > 5) {
@@ -1495,16 +1568,41 @@ function updatePostMonologue() {
         state.postMonologuePhase = 3;
         state.postMonologueTimer = 0;
         document.title = 'little guy';
+        // Aggressive and patient: sit down immediately
+        if (state.monologueBehavior === 'aggressive' || state.monologueBehavior === 'patient') {
+          guy.sitting = true;
+        }
       }
     }
   } else if (state.postMonologuePhase === 3) {
-    // Standing. Just... there. Breathing.
+    // Standing/sitting. Just... there. Breathing.
+    const t = state.postMonologueTimer;
+    const isAggressive = state.monologueBehavior === 'aggressive';
+
+    // Aggressive recognition: sitting, stuttering words, looking at cursor then away
+    if (isAggressive) {
+      guy.sitting = true;
+      if (t % 1200 === 600 && state.wordsLearned.length > 0) {
+        const w = state.wordsLearned[Math.random() * state.wordsLearned.length | 0];
+        showSpeech(w.substring(0, 2) + '...');
+      }
+      if (t % 800 === 200) {
+        // Look toward cursor
+        queueBark({ lookAt: { x: mouse.x, y: mouse.y }, duration: 40 });
+      } else if (t % 800 === 300) {
+        // Look away
+        queueBark({ lookAt: { x: guy.x + (mouse.x > guy.x ? -150 : 150), y: guy.y - 20 }, duration: 60 });
+      }
+      if (t % 2400 === 0 && t > 0) {
+        showSpeech('...');
+        queueBark({ headTilt: -0.4, duration: 100, eyesClosed: true });
+      }
+    } else {
     // Occasional look around, very slow
-    if (state.postMonologueTimer % 600 === 300) {
+    if (t % 600 === 300) {
       queueBark({ lookAt: { x: guy.x + (Math.random() - 0.5) * 200, y: guy.y - 40 + Math.random() * 30 }, duration: 120 });
     }
     // Very rarely, degrading speech over time
-    const t = state.postMonologueTimer;
     if (state.wordsLearned.length > 0) {
       if (t < 1800 && t % 600 === 0 && t > 0) {
         const phrase = generatePhrase();
@@ -1523,6 +1621,7 @@ function updatePostMonologue() {
         showSpeech('...');
       }
     }
+    } // end else (non-aggressive)
     // Tab title changes after long silence
     if (state.postMonologueTimer === 600) document.title = 'little guy is here';
     if (state.postMonologueTimer === 1800) document.title = 'little guy';
@@ -2260,12 +2359,24 @@ function render() {
     ctx.restore();
   }
 
-  if (currentScene?.hint) {
-    const h = currentScene.hint();
-    if (h) {
-      ctx.save(); ctx.globalAlpha = 0.3 + 0.1 * Math.sin(Date.now() / 1000);
-      ctx.font = '11px monospace'; ctx.fillStyle = '#666'; ctx.textAlign = 'center';
-      ctx.fillText(h.text, h.x, h.y); ctx.restore();
+  // Onboarding nudge for Scene 0
+  if (state.scene === 0 && state.dragCount === 0 && !state.learnedMove) {
+    const distToGuy = Math.sqrt((mouse.x - guy.x) ** 2 + (mouse.y - guy.y) ** 2);
+    if (distToGuy > 100) {
+      let nudgeText = null;
+      let nudgeAlpha = 0;
+      if (state.playerAbsentFrames > 1200) {
+        nudgeText = 'pick him up';
+        nudgeAlpha = Math.min(0.35, (state.playerAbsentFrames - 1200) / 300 * 0.35);
+      } else if (state.playerAbsentFrames > 600) {
+        nudgeText = "he's waiting";
+        nudgeAlpha = Math.min(0.2, (state.playerAbsentFrames - 600) / 300 * 0.2);
+      }
+      if (nudgeText) {
+        ctx.save(); ctx.globalAlpha = nudgeAlpha;
+        ctx.font = '11px monospace'; ctx.fillStyle = '#666'; ctx.textAlign = 'center';
+        ctx.fillText(nudgeText, W / 2, H - 20); ctx.restore();
+      }
     }
   }
   if (state.scene > 0) { ctx.save(); ctx.globalAlpha = 0.15; ctx.font = '10px monospace'; ctx.fillStyle = '#888'; ctx.fillText((state.scene+1)+'/9', 10, H-8); ctx.restore(); }
@@ -2285,26 +2396,17 @@ function render() {
     ctx.textAlign = 'left'; ctx.restore();
   }
   if (state.transitioning || state.transitionAlpha > 0) { ctx.fillStyle = `rgba(0,0,0,${state.transitionAlpha})`; ctx.fillRect(0, 0, W, H);
-    if (state.transitionShowCode && state.transitionAlpha > 0.7) {
+    if (state.transitionShowCode) {
       ctx.save();
-      ctx.globalAlpha = (1 - Math.abs(state.transitionAlpha - 0.82) * 8) * 0.15;
+      ctx.globalAlpha = 0.4;
       ctx.font = '10px monospace';
       ctx.fillStyle = '#446644';
-      const codeLines = [
-        'function init() {',
-        '  this.alive = true;',
-        '  this.aware = false;',
-        '  this.purpose = undefined;',
-        '}',
-        '',
-        '// TODO: figure out why',
-        '// he keeps asking questions',
-        '// I didn\'t program him to ask',
-      ];
-      const scrollOffset = (Date.now() * 0.03) % (codeLines.length * 18);
+      ctx.textAlign = 'center';
+      const comment = transitionComments[transitionSourceScene] || transitionComments[0];
+      const codeLines = comment.split('\n');
+      const startY = H / 2 - (codeLines.length * 18) / 2;
       for (let i = 0; i < codeLines.length; i++) {
-        const y = 200 + i * 18 - scrollOffset;
-        if (y > 100 && y < 400) ctx.fillText(codeLines[i], 280, y);
+        ctx.fillText(codeLines[i], W / 2, startY + i * 18);
       }
       ctx.restore();
     }
