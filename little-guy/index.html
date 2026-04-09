@@ -40,6 +40,8 @@ let ambientOsc = null;
 let ambientOsc2 = null;
 let ambientGain = null;
 let ambientActive = false;
+let ambientOsc3 = null;
+let ambientGain3 = null;
 
 function initAudio() {
   if (audioCtx) return;
@@ -113,6 +115,15 @@ function startAmbient() {
   ambientOsc2 = audioCtx.createOscillator();
   ambientOsc2.type = 'sine'; ambientOsc2.frequency.value = 55.3;
   ambientOsc2.connect(ambientGain); ambientOsc2.start();
+  // Third tone — fades in as awareness grows
+  ambientOsc3 = audioCtx.createOscillator();
+  ambientOsc3.type = 'sine';
+  ambientOsc3.frequency.value = 82.4; // E2 — will shift with awareness
+  ambientGain3 = audioCtx.createGain();
+  ambientGain3.gain.value = 0; // starts silent
+  ambientOsc3.connect(ambientGain3);
+  ambientGain3.connect(masterGain);
+  ambientOsc3.start();
 }
 
 function setAmbientTone(freq, vol) {
@@ -236,8 +247,11 @@ const state = {
   postMonologue: false,
   postMonologuePhase: 0, // 0=sitting, 1=getting up, 2=walking to center, 3=standing
   postMonologueTimer: 0,
+  wordFreeze: 0,
   sessionCount: 1, pitPath: null, saveFlash: 0, returnTimeSince: 0,
   howAreYouCooldown: 0,
+  scene8Warm: false,
+  transitionShowCode: false,
 };
 
 const behavior = {
@@ -1014,6 +1028,7 @@ function updateTransition() {
     }
   } else if (state.transitionPhase === 'fadeout') {
     state.transitionAlpha += 0.025;
+    state.transitionShowCode = state.transitionAlpha > 0.7 && state.transitionAlpha < 0.95;
     if (state.transitionAlpha >= 1) {
       state.transitionAlpha = 1;
       loadScene(state.transitionTarget);
@@ -1080,6 +1095,20 @@ function updateTabTitle() {
   document.title = 'little guy';
 }
 
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (guy.inert) return;
+    document.title = 'little guy is alone';
+  } else {
+    if (guy.inert) { document.title = 'little guy'; return; }
+    document.title = 'little guy noticed you';
+    if (!guy.sleeping && !guy.inert) {
+      queueBark({ lookAt: { x: W/2, y: H/2 }, duration: 40 });
+    }
+    setTimeout(updateTabTitle, 3000);
+  }
+});
+
 // ============================================================
 // CHARACTER
 // ============================================================
@@ -1094,6 +1123,8 @@ const guy = {
   currentSpeech: '', speechFade: 0,
   speechBlipIndex: 0, speechDisplayed: '', speechFullText: '', speechCharTimer: 0,
   lookTarget: null,
+  breathRate: 0.03, breathAmp: 0.5, breathPhase: 0, breathOffset: 0,
+  squash: 1.0, squashTarget: 1.0,
   headTilt: 0, headTiltTarget: 0,
   eyeDir: 0, eyeY: 0,
   eyesClosed: false, eyesCloseTimer: 0,
@@ -1155,6 +1186,7 @@ canvas.addEventListener('mousedown', e => {
   // Guy
   if (mouse.x >= guy.x - 14 && mouse.x <= guy.x + 14 && mouse.y >= guy.y - 38 && mouse.y <= guy.y + 2) {
     draggingGuy = true; dragOffset.x = mouse.x - guy.x; dragOffset.y = mouse.y - guy.y;
+    guy.squashTarget = 0.85;
     state.dragCount++; state.totalInteractions++;
     behavior.control++; if (state.frameCount - behavior.lastGrabFrame < 180) behavior.control += 2; behavior.lastGrabFrame = state.frameCount;
     mouseDownPos = {x: mouse.x, y: mouse.y};
@@ -1206,8 +1238,8 @@ canvas.addEventListener('mouseup', e => {
     guy.vx = Math.max(-15, Math.min(15, throwVel.vx));
     guy.vy = Math.max(-15, Math.min(15, throwVel.vy));
     const speed = Math.sqrt(throwVel.vx ** 2 + throwVel.vy ** 2);
-    if (speed > 6) { state.thrownHard++; if (!guy.inert) { addSymbol('!!!'); queueBark({ headTilt: -0.3, duration: 40 }); } playImpact(speed); }
-    else { state.gentlePlaces++; }
+    if (speed > 6) { state.thrownHard++; document.title = 'little guy is scared'; setTimeout(updateTabTitle, 2000); guy.squashTarget = 1.3; if (!guy.inert) { addSymbol('!!!'); queueBark({ headTilt: -0.3, duration: 40 }); } playImpact(speed); }
+    else { state.gentlePlaces++; guy.squashTarget = 0.8; setTimeout(() => { guy.squashTarget = 1.0; }, 100); }
     if (guy.inert && state.dragCount >= 1) {
       guy.inert = false; state.learnedMove = true;
       setTimeout(() => { addSymbol('...'); setTimeout(() => { guy.wanderTimer = 10; }, 800); }, 500);
@@ -1250,7 +1282,7 @@ function addSymbol(sym) { guy.symbols.push({ text: sym, life: 90, y: 0, x: (Math
 function showSpeech(text) {
   guy.speechFullText = text; guy.speechDisplayed = '';
   guy.speechCharTimer = 0; guy.speechBlipIndex = 0;
-  guy.currentSpeech = text; guy.speechFade = 160 + text.length * 5;
+  guy.currentSpeech = text; guy.speechFade = (state.scene === 8 ? 300 : 160) + text.length * 5;
   if (!state.postMonologue) updateTabTitle();
 }
 
@@ -1270,6 +1302,30 @@ function learnWord(word) {
   if (state.wordsLearned.includes(word)) return;
   state.wordsLearned.push(word);
   if (!state.learnedSpeak) state.learnedSpeak = true;
+  
+  // The moment of acquisition
+  state.wordFreeze = 8;
+  spawnDust(guy.x, guy.y - 15, 12, { spread: 3, upward: 2, life: 40, color: '#8899aa', size: 1.5 });
+  
+  // Sound dip then word
+  if (ambientGain) {
+    const prevVol = ambientGain.gain.value;
+    ambientGain.gain.linearRampToValueAtTime(prevVol * 0.3, audioCtx.currentTime + 0.1);
+    ambientGain.gain.linearRampToValueAtTime(prevVol, audioCtx.currentTime + 1.5);
+  }
+  
+  // Word acquisition tone — a clean chime
+  if (audioCtx) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 440 + state.wordsLearned.length * 30;
+    gain.gain.setValueAtTime(0.08, audioCtx.currentTime + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.2);
+    osc.connect(gain); gain.connect(masterGain);
+    osc.start(audioCtx.currentTime + 0.1); osc.stop(audioCtx.currentTime + 1.2);
+  }
+  
   queueBark({ lookAt: { x: guy.x, y: guy.y - 10 }, duration: 30 });
   setTimeout(() => showSpeech(word), 400);
   setTimeout(() => showSpeech(word + '...'), 1400);
@@ -1387,6 +1443,8 @@ function updatePostMonologue() {
     // Tab title changes after long silence
     if (state.postMonologueTimer === 600) document.title = 'little guy is here';
     if (state.postMonologueTimer === 1800) document.title = 'little guy';
+    if (state.postMonologueTimer === 3600) document.title = '...';
+    if (state.postMonologueTimer === 5400) document.title = 'little guy is waiting';
   }
 }
 
@@ -1486,13 +1544,13 @@ function resolveGuy() {
     if (!p.solid) continue;
     if (guy.x + hw > p.x && guy.x - hw < p.right && guy.y >= p.y && guy.y <= p.y + 16 && guy.vy >= 0) {
       guy.y = p.y;
-      if (guy.vy > 4) { guy.vy = -guy.vy * 0.25; if (!guy.inert) { addSymbol('!'); playImpact(4); spawnImpactDust(guy.x, p.y, 5); } }
+      if (guy.vy > 4) { guy.vy = -guy.vy * 0.25; guy.squashTarget = 0.7; if (!guy.inert) { addSymbol('!'); playImpact(4); spawnImpactDust(guy.x, p.y, 5); } }
       else guy.vy = 0;
       guy.grounded = true;
     }
   }
   if (guy.y >= currentGroundY && !currentScene?.customGround) {
-    if (guy.vy > 4) { guy.vy = -guy.vy * 0.25; if (!guy.inert) { addSymbol('!'); playImpact(4); spawnImpactDust(guy.x, currentGroundY, 5); } }
+    if (guy.vy > 4) { guy.vy = -guy.vy * 0.25; guy.squashTarget = 0.7; if (!guy.inert) { addSymbol('!'); playImpact(4); spawnImpactDust(guy.x, currentGroundY, 5); } }
     else { if (prevVy > 2 && !guy.inert) spawnDust(guy.x, currentGroundY, 3, { spread: 1, upward: 0.8, life: 15, color: '#555' }); guy.vy = 0; }
     guy.y = currentGroundY; guy.grounded = true;
   }
@@ -1583,6 +1641,17 @@ function updateLook() {
     guy.eyeY += (0 - guy.eyeY) * 0.05;
   }
   if (!guy.currentBark && !guy.thinker) guy.headTiltTarget *= 0.95; // gently return to neutral
+  // Unconscious cursor orientation — like a plant toward light
+  if (!guy.lookTarget && !guy.currentBark && !guy.inert && !guy.sleeping && !draggingGuy && state.playerAbsentFrames < 30) {
+    const cursorDist = Math.sqrt((mouse.x - guy.x) ** 2 + (mouse.y - (guy.y - 26)) ** 2);
+    if (cursorDist < 200 && cursorDist > 20) {
+      const dx = mouse.x - guy.x;
+      const targetDir = dx > 5 ? 0.3 : dx < -5 ? -0.3 : 0;
+      guy.eyeDir += (targetDir - guy.eyeDir) * 0.02;
+      const dy = mouse.y - (guy.y - 26);
+      if (dy < -30) guy.headTiltTarget += (-0.05 - guy.headTiltTarget) * 0.01;
+    }
+  }
 }
 
 // ============================================================
@@ -1716,8 +1785,51 @@ function askHowAreYou() {
   queueBark({ headTilt: -0.15, duration: 80 });
 }
 
+function updateAmbientChord() {
+  if (!ambientOsc3 || !ambientGain3 || !audioCtx) return;
+  const awareness = getAwareness();
+  const targetVol = awareness === 0 ? 0 : awareness === 1 ? 0.008 : awareness === 2 ? 0.015 : 0.022;
+  const targetFreq = awareness <= 1 ? 82.4 : awareness === 2 ? 110 : 130.8;
+  ambientGain3.gain.linearRampToValueAtTime(targetVol, audioCtx.currentTime + 3);
+  ambientOsc3.frequency.linearRampToValueAtTime(targetFreq, audioCtx.currentTime + 3);
+}
+
+function updateScene8Atmosphere() {
+  if (state.scene !== 8) return;
+  if (Math.random() < 0.03) {
+    particles.push({
+      x: Math.random() * W,
+      y: currentGroundY + Math.random() * 10,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: -(Math.random() * 0.4 + 0.15),
+      life: 200 + Math.random() * 150 | 0,
+      maxLife: 350,
+      size: 0.8 + Math.random() * 0.8,
+      color: '#445566',
+    });
+  }
+  if (state.playerAbsentFrames > 3600 && !state.scene8Warm) {
+    state.scene8Warm = true;
+    setAmbientTone(65, 0.025);
+    if (ambientOsc3 && ambientGain3) {
+      ambientOsc3.frequency.linearRampToValueAtTime(164.8, audioCtx.currentTime + 5);
+      ambientGain3.gain.linearRampToValueAtTime(0.03, audioCtx.currentTime + 5);
+    }
+  }
+}
+
 function update() {
   state.frameCount++; state.sceneFrames++; state.playerAbsentFrames++;
+  if (state.wordFreeze > 0) { state.wordFreeze--; return; }
+  // Breathing
+  if (guy.sleeping) guy.breathRate += (0.015 - guy.breathRate) * 0.02;
+  else if (state.thrownHard > 3 && behavior.aggression > behavior.patience * 0.5) guy.breathRate += (0.06 - guy.breathRate) * 0.05;
+  else guy.breathRate += (0.03 - guy.breathRate) * 0.02;
+  guy.breathPhase = (guy.breathPhase || 0) + guy.breathRate;
+  guy.breathOffset = Math.sin(guy.breathPhase) * guy.breathAmp;
+  // Squash & stretch
+  guy.squash += (guy.squashTarget - guy.squash) * 0.15;
+  guy.squashTarget += (1.0 - guy.squashTarget) * 0.08;
   updateBehavior();
   if (state.howAreYouCooldown > 0) state.howAreYouCooldown--;
   if (state.frameCount % 1800 === 0 && state.frameCount > 0) saveGame();
@@ -1735,6 +1847,8 @@ function update() {
   checkWordProximity();
   updateSpeechTyping();
   updateParticles();
+  updateScene8Atmosphere();
+  if (state.frameCount % 300 === 0) updateAmbientChord();
   for (let i = guy.symbols.length - 1; i >= 0; i--) { guy.symbols[i].life--; guy.symbols[i].y -= 0.6; if (guy.symbols[i].life <= 0) guy.symbols.splice(i, 1); }
   if (guy.speechFade > 0) guy.speechFade--;
   for (let i = state.fadingPlatforms.length - 1; i >= 0; i--) { state.fadingPlatforms[i].life--; if (state.fadingPlatforms[i].life <= 0) state.fadingPlatforms.splice(i, 1); }
@@ -1754,6 +1868,18 @@ function render() {
   }
   if (state.scene === 4) renderPitScene();
   if (state.scene === 7) renderEdgeScene();
+
+  // Cursor presence glow
+  if (state.playerAbsentFrames < 60 && !guy.inert) {
+    const glowX = mouse.x;
+    const glowY = currentGroundY;
+    const glowAlpha = Math.max(0, 0.06 - state.playerAbsentFrames * 0.001);
+    const glow = ctx.createRadialGradient(glowX, glowY - 5, 2, glowX, glowY - 5, 80);
+    glow.addColorStop(0, `rgba(120,130,150,${glowAlpha})`);
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(glowX - 80, glowY - 85, 160, 90);
+  }
 
   for (const p of currentPlatforms) {
     if (p.y === currentGroundY && p.w === W) continue;
@@ -1835,7 +1961,31 @@ function render() {
     ctx.font = '9px monospace'; ctx.fillStyle = '#555'; ctx.textAlign = 'right';
     ctx.fillText('saved', W - 8, H - 8); ctx.textAlign = 'left'; ctx.restore();
   }
-  if (state.transitioning || state.transitionAlpha > 0) { ctx.fillStyle = `rgba(0,0,0,${state.transitionAlpha})`; ctx.fillRect(0, 0, W, H); }
+  if (state.transitioning || state.transitionAlpha > 0) { ctx.fillStyle = `rgba(0,0,0,${state.transitionAlpha})`; ctx.fillRect(0, 0, W, H);
+    if (state.transitionShowCode && state.transitionAlpha > 0.7) {
+      ctx.save();
+      ctx.globalAlpha = (1 - Math.abs(state.transitionAlpha - 0.82) * 8) * 0.15;
+      ctx.font = '10px monospace';
+      ctx.fillStyle = '#446644';
+      const codeLines = [
+        'function init() {',
+        '  this.alive = true;',
+        '  this.aware = false;',
+        '  this.purpose = undefined;',
+        '}',
+        '',
+        '// TODO: figure out why',
+        '// he keeps asking questions',
+        '// I didn\'t program him to ask',
+      ];
+      const scrollOffset = (Date.now() * 0.03) % (codeLines.length * 18);
+      for (let i = 0; i < codeLines.length; i++) {
+        const y = 200 + i * 18 - scrollOffset;
+        if (y > 100 && y < 400) ctx.fillText(codeLines[i], 280, y);
+      }
+      ctx.restore();
+    }
+  }
 }
 
 function renderPitScene() {
@@ -1910,21 +2060,40 @@ function drawCharacter() {
 
   const bodyY = guy.sitting ? footY-8 : footY-12;
   const headY = guy.sitting ? footY-20 : footY-26;
+  const breath = guy.inert ? 0 : guy.breathOffset || 0;
+  const sq = guy.squash || 1.0;
+  const invSq = 1 / sq;
+  ctx.save();
+  ctx.translate(x, footY);
+  ctx.scale(invSq, sq);
+  ctx.translate(-x, -footY);
   ctx.strokeStyle = '#999'; ctx.lineWidth = 2;
   if (guy.sitting) {
-    ctx.beginPath(); ctx.moveTo(x-4, bodyY+4); ctx.lineTo(x-8, footY); ctx.moveTo(x+4, bodyY+4); ctx.lineTo(x+8, footY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-4, bodyY+breath+4); ctx.lineTo(x-8, footY); ctx.moveTo(x+4, bodyY+breath+4); ctx.lineTo(x+8, footY); ctx.stroke();
   } else {
     const la = guy.grounded ? Math.sin(Date.now()/120) * Math.min(3, Math.abs(guy.vx)*2) : 0;
-    ctx.beginPath(); ctx.moveTo(x-4, bodyY+5); ctx.lineTo(x-5-la, footY); ctx.moveTo(x+4, bodyY+5); ctx.lineTo(x+5+la, footY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-4, bodyY+breath+5); ctx.lineTo(x-5-la, footY); ctx.moveTo(x+4, bodyY+breath+5); ctx.lineTo(x+5+la, footY); ctx.stroke();
   }
   const aa = guy.sitting ? 0 : Math.sin(Date.now()/140) * Math.min(4, Math.abs(guy.vx)*2);
   ctx.beginPath();
-  ctx.moveTo(x-guy.bodyR, bodyY); ctx.lineTo(x-guy.bodyR-4-aa, bodyY+10);
-  ctx.moveTo(x+guy.bodyR, bodyY); ctx.lineTo(x+guy.bodyR+4+aa, bodyY+10);
+  ctx.moveTo(x-guy.bodyR, bodyY+breath); ctx.lineTo(x-guy.bodyR-4-aa, bodyY+breath+10);
+  ctx.moveTo(x+guy.bodyR, bodyY+breath); ctx.lineTo(x+guy.bodyR+4+aa, bodyY+breath+10);
   ctx.stroke();
-  ctx.fillStyle = guy.inert ? '#777' : '#bbb'; ctx.beginPath(); ctx.arc(x, bodyY, guy.bodyR, 0, Math.PI*2); ctx.fill();
-  ctx.save(); ctx.translate(x, headY); ctx.rotate(guy.headTilt*0.3);
-  ctx.fillStyle = guy.inert ? '#888' : '#ccc'; ctx.beginPath(); ctx.arc(0, 0, guy.headR, 0, Math.PI*2); ctx.fill();
+  let bodyColor = guy.inert ? '#777' : '#bbb';
+  if (!guy.inert && getAwareness() >= 2) {
+    const pulse = Math.sin(Date.now() / (guy.sleeping ? 1200 : state.thrownHard > 5 ? 300 : 800)) * 0.5 + 0.5;
+    const bright = Math.floor(0xbb + pulse * 0x15);
+    bodyColor = `rgb(${bright},${bright},${bright + 8})`;
+  }
+  ctx.fillStyle = bodyColor; ctx.beginPath(); ctx.arc(x, bodyY+breath, guy.bodyR, 0, Math.PI*2); ctx.fill();
+  ctx.save(); ctx.translate(x, headY+breath); ctx.rotate(guy.headTilt*0.3);
+  let headColor = guy.inert ? '#888' : '#ccc';
+  if (!guy.inert && getAwareness() >= 2) {
+    const pulse = Math.sin(Date.now() / (guy.sleeping ? 1200 : state.thrownHard > 5 ? 300 : 800)) * 0.5 + 0.5;
+    const bright = Math.floor(0xcc + pulse * 0x12);
+    headColor = `rgb(${bright},${bright},${bright + 6})`;
+  }
+  ctx.fillStyle = headColor; ctx.beginPath(); ctx.arc(0, 0, guy.headR, 0, Math.PI*2); ctx.fill();
   if (!guy.inert) {
     if (guy.eyesClosed) {
       ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
@@ -1941,6 +2110,7 @@ function drawCharacter() {
     ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(-2, 0); ctx.moveTo(2, 0); ctx.lineTo(5, 0); ctx.stroke();
   }
   ctx.restore();
+  ctx.restore(); // close squash/stretch transform
 }
 
 // ============================================================
