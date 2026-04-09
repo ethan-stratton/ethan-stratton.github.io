@@ -1621,6 +1621,25 @@ function resolveGuy() {
   guy.x += guy.vx; guy.y += guy.vy; guy.grounded = false;
   const allPlats = [...currentPlatforms, ...drawnPlatforms];
   const hw = guy.w / 2;
+  // Collide with bodies (boxes, words, books) — stand on top, bump sideways
+  for (const b of currentBodies) {
+    if (!b.visible || b === dragging) continue;
+    if (b.type === 'key') continue; // keys are small, skip
+    const bTop = b.y;
+    const bBot = b.y + b.h;
+    // Landing on top
+    if (guy.x + hw > b.x && guy.x - hw < b.right && guy.y >= bTop && guy.y <= bTop + 12 && guy.vy >= 0 && b.grounded) {
+      guy.y = bTop;
+      if (guy.vy > 4) { guy.vy = -guy.vy * 0.25; guy.squashTarget = 0.7; if (!guy.inert) { addSymbol('!'); playImpact(3); } }
+      else guy.vy = 0;
+      guy.grounded = true;
+    }
+    // Horizontal bump (only when not landing on top)
+    else if (guy.y > bTop + 6 && guy.y - guy.h < bBot && guy.x + hw > b.x && guy.x - hw < b.right) {
+      if (guy.x < b.cx) { guy.x = b.x - hw; if (guy.vx > 0) guy.vx *= -0.3; }
+      else { guy.x = b.right + hw; if (guy.vx < 0) guy.vx *= -0.3; }
+    }
+  }
   for (const p of allPlats) {
     if (!p.solid) continue;
     if (guy.x + hw > p.x && guy.x - hw < p.right && guy.y >= p.y && guy.y <= p.y + 16 && guy.vy >= 0) {
