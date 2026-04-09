@@ -252,6 +252,9 @@ const state = {
   howAreYouCooldown: 0,
   scene8Warm: false,
   transitionShowCode: false,
+  returnFlinch: false,
+  scene8Phase: 0, scene8PhaseTimer: 0,
+  bookReadPhase: 0, bookReadTimer: 0, bookReadInterrupted: false,
 };
 
 const behavior = {
@@ -807,16 +810,8 @@ const scenes = [
           const b = findBody('his_book');
           if (b) queueBark({ lookAt: { x: b.cx, y: b.cy }, duration: 120 });
           playBookTone();
-          const seq = [
-            { t: 500, speech: '...' },
-            { t: 1800, speech: 'walk... speed... 3...' },
-            { t: 3500, speech: 'created... by...' },
-            { t: 5500, speech: state.wordsLearned.includes('WHO') ? 'WHO?' : '...' },
-            { t: 7000, speech: state.wordsLearned.includes('MADE') && state.wordsLearned.includes('ME') ? 'SOMEONE... MADE... ME.' : 'SOMEONE...' },
-            { t: 9500, speech: state.wordsLearned.includes('WHY') ? 'WHY?' : '...' },
-          ];
-          seq.forEach(s => setTimeout(() => showSpeech(s.speech), s.t));
-          setTimeout(() => queueBark({ headTilt: -0.4, duration: 120, symbol: '...' }), 11000);
+          state.bookReadPhase = 1;
+          state.bookReadTimer = 0;
         }
       },
       { id: 'exit', condition: () => hasFired(6, 'book_near_guy') && state.sceneFrames > 800 && guy.x > W - 40,
@@ -860,7 +855,7 @@ const scenes = [
     ],
     ambientFreq: 45, ambientVol: 0.015,
     triggers: [
-      { id: 'hit_right', condition: () => guy.x > W - 30 && !hasFired(7, 'hit_right'), once: true, action: () => {
+      { id: 'hit_right', condition: () => guy.x > W - 30 && !hasFired(7, 'hit_right') && guy.wallTouchTimer === 0, once: true, delay: 130, action: () => {
           guy.wanderTarget = null;
           const w = state.wordsLearned;
           if (w.includes('NO') && w.includes('GO')) showSpeech('NO... GO.'); else addSymbol('...');
@@ -868,7 +863,7 @@ const scenes = [
           queueBark({ headTilt: -0.3, duration: 60 });
         }
       },
-      { id: 'hit_left', condition: () => guy.x < 30 && !hasFired(7, 'hit_left'), once: true, action: () => {
+      { id: 'hit_left', condition: () => guy.x < 30 && !hasFired(7, 'hit_left') && guy.wallTouchTimer === 0, once: true, delay: 130, action: () => {
           const w = state.wordsLearned;
           if (w.includes('WHAT') && w.includes('HERE')) showSpeech('WHAT... HERE?');
           queueBark({ lookAt: { x: -50, y: guy.y }, duration: 60, symbol: '?' });
@@ -933,10 +928,26 @@ const scenes = [
     ],
     ambientFreq: 50, ambientVol: 0.01,
     triggers: [
-      { id: 'sit_down', condition: () => state.sceneFrames > 120 && Math.abs(guy.vx) < 0.2 && guy.grounded && !state.postMonologue,
-        once: true, delay: 90, action: () => {
-          guy.wanderTarget = null; guy.sitting = true;
+      { id: 'sit_down', condition: () => state.sceneFrames > 120 && Math.abs(guy.vx) < 0.2 && guy.grounded && !state.postMonologue && state.scene8Phase === 0,
+        once: true, delay: 900, action: () => {
+          // Phase 1: walk slowly to center
+          state.scene8Phase = 1;
+          state.scene8PhaseTimer = 0;
+          guy.wanderTarget = W / 2;
           setAmbientTone(45, 0.008);
+        }
+      },
+      { id: 'scene8_sit', condition: () => state.scene8Phase === 1 && (Math.abs(guy.x - W / 2) < 20 || state.scene8PhaseTimer > 600),
+        once: true, action: () => {
+          guy.wanderTarget = null; guy.vx = 0;
+          guy.sitting = true;
+          state.scene8Phase = 2;
+          state.scene8PhaseTimer = 0;
+        }
+      },
+      { id: 'scene8_speak', condition: () => state.scene8Phase === 2 && state.scene8PhaseTimer > 300,
+        once: true, action: () => {
+          state.scene8Phase = 3;
           const gentleRatio = state.gentlePlaces / Math.max(1, state.gentlePlaces + state.thrownHard);
           const pauseMult = gentleRatio > 0.6 ? 1.0 : 1.4;
           const extraSighs = state.thrownHard > 3;
@@ -1078,6 +1089,9 @@ function loadScene(idx) {
   guy.idleTime = 0; guy.eyesClosed = false; guy.eyesCloseTimer = 0; guy.idlePhase = 0;
   state.guyReadingWriting = null; state.guyReadTimer = 0; state.guyReadCooldown = 0;
   state.postMonologue = false; state.postMonologuePhase = 0; state.postMonologueTimer = 0;
+  guy.touchingWall = false; guy.wallTouchTimer = 0; guy.wallSide = null;
+  state.scene8Phase = 0; state.scene8PhaseTimer = 0;
+  state.bookReadPhase = 0; state.bookReadTimer = 0; state.bookReadInterrupted = false;
   if (s.bookPage && idx > 0) state.bookPagesUnlocked = idx + 1;
   if (s.ambientFreq && ambientActive) setAmbientTone(s.ambientFreq, s.ambientVol || 0.02);
   updateTabTitle();
@@ -1136,6 +1150,7 @@ const guy = {
   wanderTarget: null, wanderTimer: 60,
   idleTime: 0, idlePhase: 0,
   energy: 1.0,
+  touchingWall: false, wallTouchTimer: 0, wallSide: null,
 };
 
 // ============================================================
@@ -1598,6 +1613,35 @@ function updateGuyAI() {
     }
   }
 
+  // Return flinch — one-shot on first cursor approach after aggressive return
+  if (state.returnFlinch && state.playerAbsentFrames < 10) {
+    const cursorDist = Math.sqrt((mouse.x - guy.x) ** 2 + (mouse.y - guy.y) ** 2);
+    if (cursorDist < 150) {
+      const away = guy.x < mouse.x ? -1 : 1;
+      guy.vx += away * 0.5;
+      addSymbol('...');
+      state.returnFlinch = false;
+    }
+  }
+
+  // Scene 7 wall-touching behavior
+  if (state.scene === 7 && !guy.touchingWall && guy.grounded) {
+    const speed = Math.abs(guy.vx);
+    if (speed < 4) { // walking, not thrown
+      if (guy.x < 40 && guy.vx < 0) { if (guy.x < 25) guy.vx *= 0.5; }
+      if (guy.x > W - 40 && guy.vx > 0) { if (guy.x > W - 25) guy.vx *= 0.5; }
+      if (guy.x < 22) {
+        guy.touchingWall = true; guy.wallSide = 'left'; guy.wallTouchTimer = 0;
+        guy.vx = 0; guy.wanderTarget = null;
+        guy.eyeDir = -1; guy.headTiltTarget = -0.15;
+      } else if (guy.x > W - 22) {
+        guy.touchingWall = true; guy.wallSide = 'right'; guy.wallTouchTimer = 0;
+        guy.vx = 0; guy.wanderTarget = null;
+        guy.eyeDir = 1; guy.headTiltTarget = -0.15;
+      }
+    }
+  }
+
   // Reading wall writing — don't wander
   if (state.guyReadingWriting !== null) return;
 
@@ -1613,9 +1657,10 @@ function updateGuyAI() {
   }
   if (guy.wanderTarget !== null) {
     const dx = guy.wanderTarget - guy.x;
+    const accel = (state.scene === 8 && state.scene8Phase === 1) ? 0.03 : 0.15;
     if (Math.abs(dx) > 8) {
-      guy.vx += (dx > 0 ? 0.15 : -0.15) * guy.energy;
-      if (state.learnedJump && guy.grounded && Math.abs(guy.vx) < 0.3 && Math.abs(dx) > 15) guy.vy = -7;
+      guy.vx += (dx > 0 ? accel : -accel) * guy.energy;
+      if (state.learnedJump && guy.grounded && Math.abs(guy.vx) < 0.3 && Math.abs(dx) > 15 && state.scene8Phase !== 1) guy.vy = -7;
     } else guy.wanderTarget = null;
   }
 }
@@ -1739,11 +1784,54 @@ function loadGame() {
     loadScene(d.scene || 0);
     if ((d.scene || 0) > 0) { initAudio(); startAmbient(); }
     if (timeSince > 300000) {
-      guy.sitting = true;
-      setTimeout(() => {
-        guy.sitting = false;
-        if (state.wordsLearned.length > 0) setTimeout(() => showSpeech('... BACK?'), 1000);
-      }, 2000);
+      const isAggReturn = behavior.aggression > behavior.patience * 0.5 && behavior.aggression > 5;
+      const isGentleReturn = behavior.patience > behavior.aggression * 2 && state.gentlePlaces > 3;
+      const isControlReturn = behavior.control > state.totalInteractions * 0.3 && behavior.control > 5;
+      const isLongAbsence = timeSince > 86400000;
+
+      if (isLongAbsence) {
+        // Confused look-around before sitting
+        queueBark({ lookAt: { x: guy.x + 200, y: guy.y - 40 }, duration: 50, symbol: '?' });
+        queueBark({ lookAt: { x: guy.x - 150, y: guy.y - 20 }, duration: 50 });
+        queueBark({ lookAt: { x: guy.x + 100, y: guy.y - 60 }, duration: 50, symbol: '...' });
+        setTimeout(() => { guy.sitting = true; }, 3000);
+        if (state.wordsLearned.length > 0) {
+          const w = state.wordsLearned[Math.random() * state.wordsLearned.length | 0];
+          setTimeout(() => showSpeech(w + '...?'), 4000);
+        }
+        setTimeout(() => { guy.sitting = false; }, 6000);
+      } else if (isAggReturn) {
+        // Scared — start far from cursor
+        guy.x = W - 60;
+        state.returnFlinch = true;
+        guy.sitting = true;
+        setTimeout(() => {
+          guy.sitting = false;
+          if (state.wordsLearned.length > 0) {
+            setTimeout(() => showSpeech(state.wordsLearned.includes('WHY') ? 'WHY... BACK?' : 'NO...'), 3000);
+          }
+        }, 2000);
+      } else if (isControlReturn) {
+        // Stays sitting until picked up
+        guy.sitting = true;
+        if (state.wordsLearned.length > 1) setTimeout(() => showSpeech(state.wordsLearned.includes('ME') ? 'ME... WAIT.' : '...'), 1500);
+        // Don't auto-unsit
+      } else if (isGentleReturn) {
+        guy.sitting = true;
+        setTimeout(() => {
+          guy.sitting = false;
+          guy.wanderTarget = mouse.x || W / 2;
+          if (state.wordsLearned.length > 0) {
+            setTimeout(() => showSpeech(state.wordsLearned.includes('HERE') ? 'BACK... HERE.' : 'HERE...'), 1000);
+          }
+        }, 2000);
+      } else {
+        guy.sitting = true;
+        setTimeout(() => {
+          guy.sitting = false;
+          if (state.wordsLearned.length > 0) setTimeout(() => showSpeech('... BACK?'), 1000);
+        }, 2000);
+      }
     }
     if (state.sessionCount > 3) {
       setTimeout(() => queueBark({ lookAt: { x: mouse.x || W/2, y: mouse.y || H/2 }, duration: 80 }), 500);
@@ -1798,6 +1886,54 @@ function updateAmbientChord() {
   ambientOsc3.frequency.linearRampToValueAtTime(targetFreq, audioCtx.currentTime + 3);
 }
 
+// ============================================================
+// BOOK READING STATE MACHINE (Scene 6)
+// ============================================================
+function updateBookReading() {
+  if (state.bookReadPhase === 0) return;
+  if (state.scene !== 6) return;
+  if (draggingGuy) {
+    state.bookReadInterrupted = true;
+    state.bookReadPhase = 0;
+    state.bookReadTimer = 0;
+    return;
+  }
+  state.bookReadTimer++;
+  const words = state.wordsLearned;
+  const t = state.bookReadTimer;
+  const interrupted = state.bookReadInterrupted;
+
+  if (state.bookReadPhase === 1 && t === 30) { showSpeech('...'); }
+  if (state.bookReadPhase === 1 && t >= 90) { state.bookReadPhase = 2; }
+  if (state.bookReadPhase === 2 && t === 95) {
+    if (interrupted) { showSpeech('... ...'); }
+    else showSpeech('walk... speed... 3...');
+  }
+  if (state.bookReadPhase === 2 && t >= 200) { state.bookReadPhase = 3; }
+  if (state.bookReadPhase === 3 && t === 205) {
+    if (interrupted) showSpeech('... created...');
+    else showSpeech('created... by...');
+  }
+  if (state.bookReadPhase === 3 && t >= 380) { state.bookReadPhase = 4; }
+  if (state.bookReadPhase === 4 && t === 385) {
+    showSpeech(words.includes('WHO') ? 'WHO?' : '...');
+  }
+  if (state.bookReadPhase === 4 && t >= 520) { state.bookReadPhase = 5; }
+  if (state.bookReadPhase === 5 && t === 525) {
+    showSpeech(words.includes('MADE') && words.includes('ME') ? 'SOMEONE... MADE... ME.' : 'SOMEONE...');
+  }
+  if (state.bookReadPhase === 5 && t >= 700) { state.bookReadPhase = 6; }
+  if (state.bookReadPhase === 6 && t === 705) {
+    showSpeech(words.includes('WHY') ? 'WHY?' : '...');
+  }
+  if (state.bookReadPhase === 6 && t >= 850) {
+    state.bookReadPhase = 0;
+    state.bookReadTimer = 0;
+    state.bookReadInterrupted = false;
+    queueBark({ headTilt: -0.4, duration: 120, symbol: '...' });
+  }
+}
+
 function updateScene8Atmosphere() {
   if (state.scene !== 8) return;
   if (Math.random() < 0.03) {
@@ -1835,6 +1971,15 @@ function update() {
   guy.squash += (guy.squashTarget - guy.squash) * 0.15;
   guy.squashTarget += (1.0 - guy.squashTarget) * 0.08;
   updateBehavior();
+  // Wall touch timer
+  if (guy.touchingWall) {
+    guy.wallTouchTimer++;
+    if (guy.wallTouchTimer > 120) { guy.touchingWall = false; guy.wallTouchTimer = 0; guy.wallSide = null; guy.headTiltTarget = 0.1; }
+  }
+  // Scene 8 phase timer
+  if (state.scene8Phase > 0 && state.scene8Phase < 3) state.scene8PhaseTimer++;
+  // Book reading state machine
+  updateBookReading();
   if (state.howAreYouCooldown > 0) state.howAreYouCooldown--;
   if (state.frameCount % 1800 === 0 && state.frameCount > 0) saveGame();
   updateTransition();
@@ -2079,10 +2224,28 @@ function drawCharacter() {
     ctx.beginPath(); ctx.moveTo(x-4, bodyY+breath+5); ctx.lineTo(x-5-la, footY); ctx.moveTo(x+4, bodyY+breath+5); ctx.lineTo(x+5+la, footY); ctx.stroke();
   }
   const aa = guy.sitting ? 0 : Math.sin(Date.now()/140) * Math.min(4, Math.abs(guy.vx)*2);
+  if (guy.touchingWall && !guy.sitting) {
+    // Lean toward wall
+    const leanDir = guy.wallSide === 'left' ? -2 : 2;
+    ctx.save(); ctx.translate(leanDir, 0);
+    // Arm reaching to wall
+    const wallX = guy.wallSide === 'left' ? (20 - x) : (W - 20 - x);
+    ctx.beginPath();
+    if (guy.wallSide === 'left') {
+      ctx.moveTo(x - guy.bodyR, bodyY + breath); ctx.lineTo(x + wallX, bodyY + breath - 3);
+      ctx.moveTo(x + guy.bodyR, bodyY + breath); ctx.lineTo(x + guy.bodyR + 4, bodyY + breath + 10);
+    } else {
+      ctx.moveTo(x + guy.bodyR, bodyY + breath); ctx.lineTo(x + wallX, bodyY + breath - 3);
+      ctx.moveTo(x - guy.bodyR, bodyY + breath); ctx.lineTo(x - guy.bodyR - 4, bodyY + breath + 10);
+    }
+    ctx.stroke();
+    ctx.restore();
+  } else {
   ctx.beginPath();
   ctx.moveTo(x-guy.bodyR, bodyY+breath); ctx.lineTo(x-guy.bodyR-4-aa, bodyY+breath+10);
   ctx.moveTo(x+guy.bodyR, bodyY+breath); ctx.lineTo(x+guy.bodyR+4+aa, bodyY+breath+10);
   ctx.stroke();
+  }
   let bodyColor = guy.inert ? '#777' : '#bbb';
   if (!guy.inert && getAwareness() >= 2) {
     const pulse = Math.sin(Date.now() / (guy.sleeping ? 1200 : state.thrownHard > 5 ? 300 : 800)) * 0.5 + 0.5;
