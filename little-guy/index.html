@@ -32,7 +32,7 @@ const MOUSE_HIST_LEN = 6;
 const GROUND_Y_DEFAULT = H - 60;
 
 // ============================================================
-// AUDIO ENGINE (Web Audio API — synthesized, no files)
+// AUDIO ENGINE
 // ============================================================
 let audioCtx = null;
 let masterGain = null;
@@ -51,12 +51,10 @@ function initAudio() {
 
 function playSpeechBlip(char, index) {
   if (!audioCtx) return;
-  const baseFreq = 280 + (char.charCodeAt(0) % 20) * 12;
-  const freq = baseFreq + Math.sin(index * 0.7) * 30;
+  const freq = 280 + (char.charCodeAt(0) % 20) * 12 + Math.sin(index * 0.7) * 30;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
-  osc.type = 'square';
-  osc.frequency.value = freq;
+  osc.type = 'square'; osc.frequency.value = freq;
   gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
   osc.connect(gain); gain.connect(masterGain);
@@ -141,32 +139,23 @@ function spawnDust(x, y, count, opts = {}) {
     });
   }
 }
-
 function spawnImpactDust(x, y, intensity) {
-  const count = Math.min(12, 3 + intensity * 1.5 | 0);
-  spawnDust(x, y, count, { spread: intensity * 0.8, upward: intensity * 0.4, life: 20 + intensity * 3, color: '#777' });
+  spawnDust(x, y, Math.min(12, 3 + intensity * 1.5 | 0), { spread: intensity * 0.8, upward: intensity * 0.4, life: 20 + intensity * 3, color: '#777' });
 }
-
 function spawnWalkDust(x, y) {
   if (Math.random() > 0.3) return;
   spawnDust(x, y, 1, { spread: 0.5, upward: 0.4, life: 15, size: 1, color: '#444' });
 }
-
 function updateParticles() {
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
-    p.x += p.vx; p.y += p.vy;
-    p.vy += 0.02; // tiny gravity
-    p.vx *= 0.98;
-    p.life--;
+    p.x += p.vx; p.y += p.vy; p.vy += 0.02; p.vx *= 0.98; p.life--;
     if (p.life <= 0) particles.splice(i, 1);
   }
 }
-
 function renderParticles() {
   for (const p of particles) {
-    const alpha = Math.min(1, p.life / (p.maxLife * 0.3));
-    ctx.globalAlpha = alpha * 0.6;
+    ctx.globalAlpha = Math.min(1, p.life / (p.maxLife * 0.3)) * 0.6;
     ctx.fillStyle = p.color;
     ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
   }
@@ -183,31 +172,23 @@ const wordTemplates = [
   { pattern: ['question', 'verb', 'noun'], make: (q, v, n) => q + '... ' + v + '... ' + n + '?' },
   { pattern: ['noun', 'verb', 'adverb'], make: (n, v, a) => n + '... ' + v + '... ' + a + '.' },
 ];
-
 const wordCategories = {
   'HERE': 'adverb', 'GO': 'verb', 'NO': 'negation', 'WHY': 'question',
   'HELP': 'verb', 'WHAT': 'question', 'WHO': 'question', 'MADE': 'verb',
   'ME': 'noun', 'FEEL': 'feeling', 'REAL': 'adjective', 'THINK': 'feeling',
 };
-
 function generatePhrase() {
   const words = state.wordsLearned;
   if (words.length < 2) return null;
   const byCategory = {};
-  for (const w of words) {
-    const cat = wordCategories[w] || 'noun';
-    if (!byCategory[cat]) byCategory[cat] = [];
-    byCategory[cat].push(w);
-  }
-  const valid = wordTemplates.filter(t => t.pattern.every(cat => byCategory[cat]?.length > 0));
+  for (const w of words) { const c = wordCategories[w] || 'noun'; if (!byCategory[c]) byCategory[c] = []; byCategory[c].push(w); }
+  const valid = wordTemplates.filter(t => t.pattern.every(c => byCategory[c]?.length > 0));
   if (valid.length === 0) {
-    const a = words[Math.random() * words.length | 0];
-    const b = words[Math.random() * words.length | 0];
+    const a = words[Math.random() * words.length | 0], b = words[Math.random() * words.length | 0];
     return a === b ? a + '...' : a + '... ' + b + (Math.random() > 0.5 ? '?' : '.');
   }
   const t = valid[Math.random() * valid.length | 0];
-  const chosen = t.pattern.map(cat => { const o = byCategory[cat]; return o[Math.random() * o.length | 0]; });
-  return t.make(...chosen);
+  return t.make(...t.pattern.map(c => { const o = byCategory[c]; return o[Math.random() * o.length | 0]; }));
 }
 
 // ============================================================
@@ -215,25 +196,25 @@ function generatePhrase() {
 // ============================================================
 const state = {
   scene: 0,
-  learnedMove: false,
-  learnedJump: false,
-  learnedSpeak: false,
+  learnedMove: false, learnedJump: false, learnedSpeak: false,
   wordsLearned: [],
-  dragCount: 0,
-  bookPagesUnlocked: 1,
-  thrownHard: 0,
-  gentlePlaces: 0,
-  totalInteractions: 0,
+  dragCount: 0, bookPagesUnlocked: 1,
+  thrownHard: 0, gentlePlaces: 0, totalInteractions: 0,
   sceneTriggered: {},
-  transitioning: false,
-  transitionAlpha: 0,
-  transitionTarget: -1,
-  frameCount: 0,
-  sceneFrames: 0,
+  transitioning: false, transitionAlpha: 0, transitionTarget: -1,
+  transitionPhase: 'none', // 'hesitate' | 'lookback' | 'fadeout' | 'fadein'
+  transitionTimer: 0,
+  frameCount: 0, sceneFrames: 0,
   fadingPlatforms: [],
-  // Idle tracking
-  playerAbsentFrames: 0, // frames since last mouse move
-  lastMouseMove: 0,
+  playerAbsentFrames: 0, lastMouseMove: 0,
+  // Wall writing reading state
+  guyReadingWriting: null, // index of writing he's reading
+  guyReadTimer: 0,
+  guyReadCooldown: 0, // frames until he can read another writing
+  // Scene 8 post-monologue
+  postMonologue: false,
+  postMonologuePhase: 0, // 0=sitting, 1=getting up, 2=walking to center, 3=standing
+  postMonologueTimer: 0,
 };
 
 // ============================================================
@@ -248,63 +229,152 @@ class Body {
     this.color = opts.color || '#555';
     this.label = opts.label || null;
     this.type = opts.type || 'box';
-    this.grounded = false;
-    this.rotation = 0; this.rotV = 0;
+    this.grounded = false; this.rotation = 0; this.rotV = 0;
     this.id = opts.id || null;
     this.visible = opts.visible !== undefined ? opts.visible : true;
     this.solid = opts.solid !== undefined ? opts.solid : true;
   }
-  get left() { return this.x; }
-  get right() { return this.x + this.w; }
-  get top() { return this.y; }
-  get bottom() { return this.y + this.h; }
-  get cx() { return this.x + this.w / 2; }
-  get cy() { return this.y + this.h / 2; }
+  get left() { return this.x; } get right() { return this.x + this.w; }
+  get top() { return this.y; } get bottom() { return this.y + this.h; }
+  get cx() { return this.x + this.w / 2; } get cy() { return this.y + this.h / 2; }
 }
 
 // ============================================================
-// WALL WRITING — replaces book overlay
+// CURSOR MANAGEMENT
 // ============================================================
-// Each scene has wallWritings: [{x, y, lines, color, reveal}]
-// reveal: 'proximity' (default) | 'always' | 'after:triggerId'
-// They render on the wall, fade in when guy is near
+function updateCursor() {
+  if (draggingGuy || dragging) { canvas.style.cursor = 'grabbing'; return; }
+  // Check what's under the mouse
+  if (mouse.x >= guy.x - 14 && mouse.x <= guy.x + 14 && mouse.y >= guy.y - 38 && mouse.y <= guy.y + 2 && !guy.inert) {
+    canvas.style.cursor = 'grab'; return;
+  }
+  for (const b of currentBodies) {
+    if (b.draggable && b.visible && mouse.x >= b.x && mouse.x <= b.right && mouse.y >= b.y && mouse.y <= b.bottom) {
+      canvas.style.cursor = 'grab'; return;
+    }
+  }
+  if (state.bookPagesUnlocked >= 4) { canvas.style.cursor = 'crosshair'; return; }
+  canvas.style.cursor = 'default';
+}
 
+// ============================================================
+// WALL WRITING
+// ============================================================
 function getWallWritings(sceneIdx) {
   return (scenes[sceneIdx] && scenes[sceneIdx].wallWritings) || [];
 }
 
+// Extract words the guy recognizes from a writing's text
+function extractRecognizedWords(writing) {
+  const text = writing.lines.join(' ').toUpperCase();
+  return state.wordsLearned.filter(w => text.includes(w));
+}
+
+function getWritingAlpha(w) {
+  if (w.reveal === 'always') return 0.6;
+  if (w.reveal && w.reveal.startsWith('after:')) {
+    return hasFired(state.scene, w.reveal.slice(6)) ? 0.5 : 0;
+  }
+  // proximity to guy
+  const dist = Math.abs(guy.x - w.x);
+  return dist < 120 ? Math.max(0, 0.55 - dist / 300) : 0;
+}
+
+// Cursor proximity glow — makes writing brighter when mouse is near
+function getWritingCursorGlow(w) {
+  const cx = w.x + 100; // approximate center of writing
+  const cy = w.y + (w.lines.length * 8);
+  const dist = Math.sqrt((mouse.x - cx) ** 2 + (mouse.y - cy) ** 2);
+  return dist < 150 ? Math.max(0, 0.2 - dist / 750) : 0;
+}
+
 function renderWallWritings() {
   const writings = getWallWritings(state.scene);
-  for (const w of writings) {
-    let alpha = 0;
-    if (w.reveal === 'always') {
-      alpha = 0.6;
-    } else if (w.reveal && w.reveal.startsWith('after:')) {
-      const tid = w.reveal.slice(6);
-      alpha = hasFired(state.scene, tid) ? 0.5 : 0;
-    } else {
-      // proximity — fade based on distance to guy
-      const dist = Math.abs(guy.x - w.x);
-      alpha = dist < 120 ? Math.max(0, 0.55 - dist / 300) : 0;
+  for (let i = 0; i < writings.length; i++) {
+    const w = writings[i];
+    let alpha = getWritingAlpha(w);
+    // Add cursor glow
+    alpha = Math.min(0.8, alpha + getWritingCursorGlow(w));
+    // Scene 0 pulse for first writing at game start
+    if (state.scene === 0 && i === 0 && state.frameCount < 180) {
+      alpha = Math.max(alpha, 0.4 + 0.3 * Math.sin(state.frameCount * 0.08));
     }
     if (alpha <= 0.01) continue;
-
-    ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.save(); ctx.globalAlpha = alpha;
     ctx.font = w.font || '11px monospace';
     ctx.fillStyle = w.color || '#556655';
-    const lines = w.lines;
-    for (let i = 0; i < lines.length; i++) {
-      ctx.fillText(lines[i], w.x, w.y + i * 16);
-    }
+    for (let j = 0; j < w.lines.length; j++) ctx.fillText(w.lines[j], w.x, w.y + j * 16);
     ctx.restore();
+  }
+}
+
+// Guy reading wall writing — stops, looks up, tries to read aloud
+function updateWallReading() {
+  if (guy.inert || draggingGuy || guy.sleeping || guy.thinker || state.scene === 8) return;
+  if (state.guyReadCooldown > 0) { state.guyReadCooldown--; return; }
+
+  const writings = getWallWritings(state.scene);
+  const awareness = getAwareness();
+
+  // Only reads if awareness >= 1 (has some words) and is walking/idle (not sitting)
+  if (awareness < 1 || guy.sitting) { state.guyReadingWriting = null; return; }
+
+  // Check proximity to any writing
+  let nearestIdx = -1;
+  let nearestDist = 999;
+  for (let i = 0; i < writings.length; i++) {
+    const w = writings[i];
+    const alpha = getWritingAlpha(w);
+    if (alpha < 0.1) continue; // not visible
+    const dist = Math.abs(guy.x - w.x);
+    if (dist < 80 && dist < nearestDist) { nearestDist = dist; nearestIdx = i; }
+  }
+
+  if (nearestIdx >= 0 && state.guyReadingWriting !== nearestIdx) {
+    // New writing discovered — stop and look
+    state.guyReadingWriting = nearestIdx;
+    state.guyReadTimer = 0;
+    const w = writings[nearestIdx];
+    guy.wanderTarget = null;
+    // Look up at the writing
+    queueBark({ lookAt: { x: w.x + 60, y: w.y }, duration: 60 });
+    queueBark({ headTilt: -0.15, duration: 40, symbol: '?' });
+  }
+
+  if (state.guyReadingWriting !== null && state.guyReadingWriting >= 0) {
+    state.guyReadTimer++;
+    const w = writings[state.guyReadingWriting];
+
+    // At awareness >= 2, try to read fragments after looking for a bit
+    if (awareness >= 2 && state.guyReadTimer === 90) {
+      const recognized = extractRecognizedWords(w);
+      if (recognized.length > 0) {
+        // Pick 1-3 recognized words and stumble through them
+        const picked = recognized.slice(0, Math.min(3, recognized.length));
+        const stumble = picked.join('... ') + '...?';
+        showSpeech(stumble);
+        queueBark({ lookAt: { x: w.x + 60, y: w.y }, duration: 80 });
+      } else {
+        showSpeech('...');
+        queueBark({ headTilt: -0.2, duration: 50 });
+      }
+    }
+
+    // Done reading after ~3 seconds
+    if (state.guyReadTimer > 180) {
+      state.guyReadingWriting = null;
+      state.guyReadCooldown = 600; // don't read again for 10 seconds
+    }
+  }
+
+  if (nearestIdx < 0 && state.guyReadingWriting !== null) {
+    state.guyReadingWriting = null;
   }
 }
 
 // ============================================================
 // SCENE DATA
 // ============================================================
-
 function makeGround(gy) {
   return new Body(0, gy || GROUND_Y_DEFAULT, W, 60, { isStatic: true, color: '#1e1e2e' });
 }
@@ -332,8 +402,7 @@ const scenes = [
           '// Try moving him. Click and drag.',
           '// He won\'t like it. That\'s okay.',
         ],
-        color: '#445544',
-        reveal: 'always',
+        color: '#445544', reveal: 'always',
       },
       {
         x: 500, y: 100,
@@ -342,16 +411,12 @@ const scenes = [
           '// Felt wrong to make something big',
           '// before I knew what it was for.',
         ],
-        color: '#3a4a3a',
-        reveal: 'proximity',
+        color: '#3a4a3a', reveal: 'proximity',
       },
     ],
     ambientFreq: 55, ambientVol: 0,
     triggers: [
-      {
-        id: 'wake',
-        condition: () => state.learnedMove,
-        once: true, delay: 120,
+      { id: 'wake', condition: () => state.learnedMove, once: true, delay: 120,
         action: () => {
           startAmbient();
           queueBark({ lookAt: { x: guy.x + 100, y: guy.y - 20 }, duration: 60, symbol: '...' });
@@ -359,12 +424,8 @@ const scenes = [
           queueBark({ headTilt: -0.3, duration: 50, symbol: '?' });
         }
       },
-      {
-        id: 'exit',
-        condition: () => state.learnedMove && state.sceneFrames > 300 && guy.x > W - 40,
-        once: true,
-        action: () => transitionTo(1),
-      },
+      { id: 'exit', condition: () => state.learnedMove && state.sceneFrames > 300 && guy.x > W - 40,
+        once: true, action: () => beginTransition(1) },
     ],
     hint: () => !state.learnedMove && state.dragCount === 0 ? { text: 'click and drag him', x: 100, y: GROUND_Y_DEFAULT - 50 } : null,
   },
@@ -372,9 +433,7 @@ const scenes = [
   // ── SCENE 1: THE STEP ──
   {
     name: 'step',
-    bgColor: '#0f0f1a',
-    groundColor: '#1a1a2a',
-    groundY: GROUND_Y_DEFAULT,
+    bgColor: '#0f0f1a', groundColor: '#1a1a2a', groundY: GROUND_Y_DEFAULT,
     guyStart: { x: 60, y: GROUND_Y_DEFAULT },
     platforms: [
       () => new Body(200, GROUND_Y_DEFAULT - 45, 100, 12, { isStatic: true, color: '#2a2a3e' }),
@@ -382,58 +441,38 @@ const scenes = [
     ],
     bodies: [],
     wallWritings: [
-      {
-        x: 420, y: 50,
-        lines: [
-          '// jump_height: 8',
-          '// He can jump. But he has to learn',
-          '// what "up" means first.',
-          '// Lift him onto something higher.',
-          '// He\'ll figure it out.',
-        ],
-        color: '#445544',
-        reveal: 'proximity',
-      },
-      {
-        x: 50, y: 380,
-        lines: [
-          '// I keep second-guessing the physics.',
-          '// Is 0.4 gravity too harsh?',
-          '// He\'s so small.',
-        ],
-        color: '#3a4438',
-        reveal: 'proximity',
-      },
+      { x: 420, y: 50, lines: [
+        '// jump_height: 8',
+        '// He can jump. But he has to learn',
+        '// what "up" means first.',
+        '// Lift him onto something higher.',
+        '// He\'ll figure it out.',
+      ], color: '#445544', reveal: 'proximity' },
+      { x: 50, y: 380, lines: [
+        '// I keep second-guessing the physics.',
+        '// Is 0.4 gravity too harsh?',
+        '// He\'s so small.',
+      ], color: '#3a4438', reveal: 'proximity' },
     ],
     ambientFreq: 55, ambientVol: 0.025,
     triggers: [
-      {
-        id: 'learn_jump',
-        condition: () => !state.learnedJump && guy.y < GROUND_Y_DEFAULT - 20 && guy.grounded,
-        once: true,
-        action: () => {
-          state.learnedJump = true;
-          addSymbol('!!');
+      { id: 'learn_jump', condition: () => !state.learnedJump && guy.y < GROUND_Y_DEFAULT - 20 && guy.grounded,
+        once: true, action: () => {
+          state.learnedJump = true; addSymbol('!!');
           queueBark({ duration: 40, symbol: '!' });
           setTimeout(() => { if (!draggingGuy) guy.vy = -7; }, 600);
           setTimeout(() => { if (!draggingGuy) guy.vy = -7; }, 1200);
         }
       },
-      {
-        id: 'exit',
-        condition: () => state.learnedJump && guy.x > W - 40,
-        once: true,
-        action: () => transitionTo(2),
-      },
+      { id: 'exit', condition: () => state.learnedJump && guy.x > W - 40,
+        once: true, action: () => beginTransition(2) },
     ],
   },
 
   // ── SCENE 2: FIRST WORDS ──
   {
     name: 'first_words',
-    bgColor: '#0e0e1c',
-    groundColor: '#1a1a2a',
-    groundY: GROUND_Y_DEFAULT,
+    bgColor: '#0e0e1c', groundColor: '#1a1a2a', groundY: GROUND_Y_DEFAULT,
     guyStart: { x: 60, y: GROUND_Y_DEFAULT },
     platforms: [],
     bodies: [
@@ -444,58 +483,39 @@ const scenes = [
       () => new Body(555, GROUND_Y_DEFAULT - 16, 40, 16, { color: '#3a4a5a', type: 'word', label: 'HELP', draggable: true }),
     ],
     wallWritings: [
-      {
-        x: 80, y: 50,
-        lines: [
-          '// talk: true (dormant)',
-          '// He has a voice. He just needs words.',
-          '// The blocks have labels. Bring them to him.',
-          '//',
-          '// Be thoughtful about which ones you give him.',
-          '// They\'ll shape what he can say later.',
-        ],
-        color: '#445544',
-        reveal: 'proximity',
-      },
-      {
-        x: 550, y: 340,
-        lines: [
-          '// I almost gave him a full dictionary.',
-          '// Then I thought about what I\'d want',
-          '// if someone gave me language for the',
-          '// first time. Not everything. Just enough',
-          '// to start asking.',
-        ],
-        color: '#384438',
-        reveal: 'proximity',
-      },
+      { x: 80, y: 50, lines: [
+        '// talk: true (dormant)',
+        '// He has a voice. He just needs words.',
+        '// The blocks have labels. Bring them to him.',
+        '//',
+        '// Be thoughtful about which ones you give him.',
+        '// They\'ll shape what he can say later.',
+      ], color: '#445544', reveal: 'proximity' },
+      { x: 550, y: 340, lines: [
+        '// I almost gave him a full dictionary.',
+        '// Then I thought about what I\'d want',
+        '// if someone gave me language for the',
+        '// first time. Not everything. Just enough',
+        '// to start asking.',
+      ], color: '#384438', reveal: 'proximity' },
     ],
     ambientFreq: 60, ambientVol: 0.025,
     triggers: [
-      {
-        id: 'first_word',
-        condition: () => state.wordsLearned.length >= 1 && !hasFired(2, 'first_word'),
-        once: true, delay: 60,
-        action: () => {
+      { id: 'first_word', condition: () => state.wordsLearned.length >= 1 && !hasFired(2, 'first_word'),
+        once: true, delay: 60, action: () => {
           queueBark({ lookAt: { x: guy.x, y: guy.y - 10 }, duration: 50 });
           queueBark({ headTilt: 0.1, duration: 40, symbol: '...' });
         }
       },
-      {
-        id: 'exit',
-        condition: () => state.wordsLearned.length >= 2 && guy.x > W - 40,
-        once: true,
-        action: () => transitionTo(3),
-      },
+      { id: 'exit', condition: () => state.wordsLearned.length >= 2 && guy.x > W - 40,
+        once: true, action: () => beginTransition(3) },
     ],
   },
 
   // ── SCENE 3: THE DOOR ──
   {
     name: 'door',
-    bgColor: '#0e0e1c',
-    groundColor: '#1a1a2a',
-    groundY: GROUND_Y_DEFAULT,
+    bgColor: '#0e0e1c', groundColor: '#1a1a2a', groundY: GROUND_Y_DEFAULT,
     guyStart: { x: 60, y: GROUND_Y_DEFAULT },
     platforms: [
       () => new Body(400, GROUND_Y_DEFAULT - 80, 80, 12, { isStatic: true, color: '#2a2a3e' }),
@@ -508,44 +528,28 @@ const scenes = [
       () => new Body(250, GROUND_Y_DEFAULT - 20, 30, 20, { color: '#444', type: 'box', draggable: true }),
     ],
     wallWritings: [
-      {
-        x: 30, y: 55,
-        lines: [
-          '// He\'s getting smarter. Watch.',
-          '// Give him a path and he\'ll try to take it.',
-          '//',
-          '// You can draw platforms too —',
-          '// click and drag on empty space.',
-        ],
-        color: '#445544',
-        reveal: 'proximity',
-      },
-      {
-        x: 620, y: 200,
-        lines: [
-          '// I put a lock on the door because',
-          '// I wanted to see if he\'d wait for help',
-          '// or try to go through it anyway.',
-          '// I don\'t know what that says about me.',
-        ],
-        color: '#384438',
-        reveal: 'proximity',
-      },
+      { x: 30, y: 55, lines: [
+        '// He\'s getting smarter. Watch.',
+        '// Give him a path and he\'ll try to take it.',
+        '//',
+        '// You can draw platforms too —',
+        '// click and drag on empty space.',
+      ], color: '#445544', reveal: 'proximity' },
+      { x: 620, y: 200, lines: [
+        '// I put a lock on the door because',
+        '// I wanted to see if he\'d wait for help',
+        '// or try to go through it anyway.',
+        '// I don\'t know what that says about me.',
+      ], color: '#384438', reveal: 'proximity' },
     ],
     ambientFreq: 60, ambientVol: 0.03,
     triggers: [
-      {
-        id: 'key_near_door',
-        condition: () => {
+      { id: 'key_near_door', condition: () => {
           const key = findBody('key'), door = findBody('door');
           return key && door && Math.abs(key.cx - door.cx) < 40 && Math.abs(key.cy - door.cy) < 50;
-        },
-        once: true,
-        action: () => {
-          const door = findBody('door');
-          if (door) { door.color = '#2a2a1a'; door.solid = false; }
-          const key = findBody('key');
-          if (key) key.visible = false;
+        }, once: true, action: () => {
+          const door = findBody('door'); if (door) { door.color = '#2a2a1a'; door.solid = false; }
+          const key = findBody('key'); if (key) key.visible = false;
           if (state.learnedSpeak && state.wordsLearned.length > 0) {
             const w = state.wordsLearned[0];
             setTimeout(() => showSpeech(w + '... ' + (state.wordsLearned.includes('HERE') ? 'HERE?' : '...')), 500);
@@ -553,21 +557,15 @@ const scenes = [
           addSymbol('!');
         }
       },
-      {
-        id: 'exit',
-        condition: () => hasFired(3, 'key_near_door') && guy.x > W - 40,
-        once: true,
-        action: () => transitionTo(4),
-      },
+      { id: 'exit', condition: () => hasFired(3, 'key_near_door') && guy.x > W - 40,
+        once: true, action: () => beginTransition(4) },
     ],
   },
 
   // ── SCENE 4: THE PIT ──
   {
     name: 'pit',
-    bgColor: '#0a0a14',
-    groundColor: '#141420',
-    groundY: GROUND_Y_DEFAULT,
+    bgColor: '#0a0a14', groundColor: '#141420', groundY: GROUND_Y_DEFAULT,
     guyStart: { x: 60, y: GROUND_Y_DEFAULT },
     platforms: [
       () => new Body(0, GROUND_Y_DEFAULT, 300, 60, { isStatic: true, color: '#141420' }),
@@ -576,102 +574,53 @@ const scenes = [
     bodies: [],
     customGround: true,
     wallWritings: [
-      {
-        x: 30, y: 55,
-        lines: [
-          '// This is the hard part.',
-          '// He can\'t see what\'s below. You can.',
-          '// He\'s going to have to trust the process.',
-          '//',
-          '// (I\'m sorry about this one.)',
-        ],
-        color: '#445544',
-        reveal: 'proximity',
-      },
-      // Hint: writing on the far side, always visible, to lure the player
-      {
-        x: 520, y: GROUND_Y_DEFAULT + 30,
-        lines: [
-          '// keep going →',
-        ],
-        color: '#554433',
-        reveal: 'always',
-        font: '10px monospace',
-      },
-      {
-        x: 490, y: GROUND_Y_DEFAULT + 44,
-        lines: [
-          '// there\'s ground. I promise.',
-        ],
-        color: '#443a2a',
-        reveal: 'always',
-        font: '10px monospace',
-      },
+      { x: 30, y: 55, lines: [
+        '// This is the hard part.',
+        '// He can\'t see what\'s below. You can.',
+        '// He\'s going to have to trust the process.',
+        '//', '// (I\'m sorry about this one.)',
+      ], color: '#445544', reveal: 'proximity' },
+      { x: 520, y: GROUND_Y_DEFAULT + 30, lines: ['// keep going →'], color: '#554433', reveal: 'always', font: '10px monospace' },
+      { x: 490, y: GROUND_Y_DEFAULT + 44, lines: ['// there\'s ground. I promise.'], color: '#443a2a', reveal: 'always', font: '10px monospace' },
     ],
     ambientFreq: 40, ambientVol: 0.015,
     triggers: [
-      {
-        id: 'near_edge',
-        condition: () => guy.x > 250 && guy.x < 310 && guy.grounded && !hasFired(4, 'near_edge'),
-        once: true,
-        action: () => {
-          guy.wanderTarget = null;
-          guy.avoidX = 310; guy.avoidDir = -1;
-          if (state.learnedSpeak) {
-            if (state.wordsLearned.includes('NO')) showSpeech('NO...');
-            else showSpeech('...');
-          }
+      { id: 'near_edge', condition: () => guy.x > 250 && guy.x < 310 && guy.grounded && !hasFired(4, 'near_edge'),
+        once: true, action: () => {
+          guy.wanderTarget = null; guy.avoidX = 310; guy.avoidDir = -1;
+          if (state.learnedSpeak) { if (state.wordsLearned.includes('NO')) showSpeech('NO...'); else showSpeech('...'); }
           addSymbol('!');
           queueBark({ lookAt: { x: 350, y: GROUND_Y_DEFAULT + 100 }, duration: 80, symbol: '?' });
         }
       },
-      {
-        id: 'fell_in',
-        condition: () => guy.y > GROUND_Y_DEFAULT + 30,
-        once: true,
-        action: () => {
+      { id: 'fell_in', condition: () => guy.y > GROUND_Y_DEFAULT + 30, once: true, action: () => {
           addSymbol('!!!');
           if (state.learnedSpeak && state.wordsLearned.includes('NO')) showSpeech('NO NO NO');
-          playImpact(8);
-          // Ambient drops out in the pit
-          setAmbientTone(30, 0.003);
+          playImpact(8); setAmbientTone(30, 0.003);
         }
       },
-      {
-        id: 'landed_other_side',
-        condition: () => guy.x > 450 && guy.y > GROUND_Y_DEFAULT + 40 && guy.grounded,
-        once: true, delay: 60,
-        action: () => {
+      { id: 'landed_other_side', condition: () => guy.x > 450 && guy.y > GROUND_Y_DEFAULT + 40 && guy.grounded,
+        once: true, delay: 60, action: () => {
           setAmbientTone(65, 0.035);
           spawnDust(guy.x, guy.y, 8, { spread: 3, upward: 2, life: 40, color: '#665' });
           if (state.learnedSpeak) {
             const words = state.wordsLearned;
             if (words.includes('WHY')) setTimeout(() => showSpeech('WHY... HERE...'), 500);
             else setTimeout(() => showSpeech('...'), 500);
-            setTimeout(() => {
-              if (words.includes('NO')) showSpeech('NO... was... GOOD?');
-              else showSpeech('...');
-            }, 2500);
+            setTimeout(() => { if (words.includes('NO')) showSpeech('NO... was... GOOD?'); else showSpeech('...'); }, 2500);
           }
-          queueBark({ duration: 60 });
-          queueBark({ headTilt: 0.1, duration: 50, symbol: '...' });
+          queueBark({ duration: 60 }); queueBark({ headTilt: 0.1, duration: 50, symbol: '...' });
         }
       },
-      {
-        id: 'exit',
-        condition: () => hasFired(4, 'landed_other_side') && guy.x > W - 40,
-        once: true,
-        action: () => transitionTo(5),
-      },
+      { id: 'exit', condition: () => hasFired(4, 'landed_other_side') && guy.x > W - 40,
+        once: true, action: () => beginTransition(5) },
     ],
   },
 
   // ── SCENE 5: MORE WORDS ──
   {
     name: 'more_words',
-    bgColor: '#0e101e',
-    groundColor: '#1a1c2e',
-    groundY: GROUND_Y_DEFAULT,
+    bgColor: '#0e101e', groundColor: '#1a1c2e', groundY: GROUND_Y_DEFAULT,
     guyStart: { x: 60, y: GROUND_Y_DEFAULT },
     platforms: [],
     bodies: [
@@ -684,111 +633,68 @@ const scenes = [
       () => new Body(640, GROUND_Y_DEFAULT - 16, 48, 16, { color: '#4a3a5a', type: 'word', label: 'THINK', draggable: true }),
     ],
     wallWritings: [
-      {
-        x: 30, y: 55,
-        lines: [
-          '// He\'s ready for more.',
-          '// Once he can ask the question, he will.',
-          '//',
-          '// Not all words mean the same thing',
-          '// when you\'re the only one who has them.',
-        ],
-        color: '#445544',
-        reveal: 'proximity',
-      },
-      {
-        x: 500, y: 100,
-        lines: [
-          '// I thought about giving him LOVE',
-          '// but I don\'t think I understand it well',
-          '// enough to put it in a block.',
-          '// Maybe that\'s the point.',
-        ],
-        color: '#3a4438',
-        reveal: 'proximity',
-      },
+      { x: 30, y: 55, lines: [
+        '// He\'s ready for more.',
+        '// Once he can ask the question, he will.',
+        '//', '// Not all words mean the same thing',
+        '// when you\'re the only one who has them.',
+      ], color: '#445544', reveal: 'proximity' },
+      { x: 500, y: 100, lines: [
+        '// I thought about giving him LOVE',
+        '// but I don\'t think I understand it well',
+        '// enough to put it in a block.',
+        '// Maybe that\'s the point.',
+      ], color: '#3a4438', reveal: 'proximity' },
     ],
     ambientFreq: 65, ambientVol: 0.03,
     triggers: [
-      {
-        id: 'big_question',
-        condition: () => state.wordsLearned.includes('WHO') && state.wordsLearned.includes('MADE') && state.wordsLearned.includes('ME') && !hasFired(5, 'big_question'),
-        once: true, delay: 90,
-        action: () => {
-          showSpeech('WHO... MADE... ME?');
-          queueBark({ headTilt: -0.2, duration: 100 });
-          playBookTone();
+      { id: 'big_question', condition: () => state.wordsLearned.includes('WHO') && state.wordsLearned.includes('MADE') && state.wordsLearned.includes('ME') && !hasFired(5, 'big_question'),
+        once: true, delay: 90, action: () => {
+          showSpeech('WHO... MADE... ME?'); queueBark({ headTilt: -0.2, duration: 100 }); playBookTone();
         }
       },
-      {
-        id: 'feel_real',
-        condition: () => state.wordsLearned.includes('FEEL') && state.wordsLearned.includes('REAL') && !hasFired(5, 'feel_real'),
-        once: true, delay: 80,
-        action: () => {
-          showSpeech('FEEL... REAL?');
-          queueBark({ headTilt: -0.15, duration: 80, symbol: '...' });
+      { id: 'feel_real', condition: () => state.wordsLearned.includes('FEEL') && state.wordsLearned.includes('REAL') && !hasFired(5, 'feel_real'),
+        once: true, delay: 80, action: () => {
+          showSpeech('FEEL... REAL?'); queueBark({ headTilt: -0.15, duration: 80, symbol: '...' });
         }
       },
-      {
-        id: 'exit',
-        condition: () => {
+      { id: 'exit', condition: () => {
           const nw = state.wordsLearned.filter(w => ['WHAT','WHO','MADE','ME','FEEL','REAL','THINK'].includes(w));
           return nw.length >= 3 && guy.x > W - 40;
-        },
-        once: true,
-        action: () => transitionTo(6),
-      }
+        }, once: true, action: () => beginTransition(6) },
     ],
   },
 
   // ── SCENE 6: THE BOOK (His Turn) ──
   {
     name: 'his_book',
-    bgColor: '#0d0d18',
-    groundColor: '#191928',
-    groundY: GROUND_Y_DEFAULT,
+    bgColor: '#0d0d18', groundColor: '#191928', groundY: GROUND_Y_DEFAULT,
     guyStart: { x: 60, y: GROUND_Y_DEFAULT },
     platforms: [],
     bodies: [
       () => new Body(400, GROUND_Y_DEFAULT - 18, 28, 22, { color: '#6b5b3a', type: 'book', draggable: true, id: 'his_book' }),
     ],
     wallWritings: [
-      {
-        x: 80, y: 50,
-        lines: [
-          '// This is the same book. Or a copy.',
-          '// He can see it now. He won\'t understand',
-          '// most of it.',
-          '//',
-          '// But he\'ll find the parts about himself.',
-          '// That\'s the part that matters to him.',
-        ],
-        color: '#445544',
-        reveal: 'proximity',
-      },
-      {
-        x: 500, y: 280,
-        lines: [
-          '// created_by: ...',
-          '// purpose: ...',
-          '//',
-          '// (I left those blank on purpose.)',
-          '// (I didn\'t know how to fill them in.)',
-        ],
-        color: '#504838',
-        reveal: 'after:book_near_guy',
-      },
+      { x: 80, y: 50, lines: [
+        '// This is the same book. Or a copy.',
+        '// He can see it now. He won\'t understand',
+        '// most of it.',
+        '//', '// But he\'ll find the parts about himself.',
+        '// That\'s the part that matters to him.',
+      ], color: '#445544', reveal: 'proximity' },
+      { x: 500, y: 280, lines: [
+        '// created_by: ...',
+        '// purpose: ...',
+        '//', '// (I left those blank on purpose.)',
+        '// (I didn\'t know how to fill them in.)',
+      ], color: '#504838', reveal: 'after:book_near_guy' },
     ],
     ambientFreq: 50, ambientVol: 0.02,
     triggers: [
-      {
-        id: 'book_near_guy',
-        condition: () => {
+      { id: 'book_near_guy', condition: () => {
           const b = findBody('his_book');
           return b && Math.abs(b.cx - guy.x) < 45 && guy.grounded && b.grounded;
-        },
-        once: true, delay: 30,
-        action: () => {
+        }, once: true, delay: 30, action: () => {
           const b = findBody('his_book');
           if (b) queueBark({ lookAt: { x: b.cx, y: b.cy }, duration: 120 });
           playBookTone();
@@ -804,225 +710,204 @@ const scenes = [
           setTimeout(() => queueBark({ headTilt: -0.4, duration: 120, symbol: '...' }), 11000);
         }
       },
-      {
-        id: 'exit',
-        condition: () => hasFired(6, 'book_near_guy') && state.sceneFrames > 800 && guy.x > W - 40,
-        once: true,
-        action: () => transitionTo(7),
-      },
+      { id: 'exit', condition: () => hasFired(6, 'book_near_guy') && state.sceneFrames > 800 && guy.x > W - 40,
+        once: true, action: () => beginTransition(7) },
     ],
   },
 
   // ── SCENE 7: THE EDGE ──
   {
     name: 'edge',
-    bgColor: '#0a0c14',
-    groundColor: '#16182a',
-    groundY: GROUND_Y_DEFAULT,
+    bgColor: '#0a0c14', groundColor: '#16182a', groundY: GROUND_Y_DEFAULT,
     guyStart: { x: 400, y: GROUND_Y_DEFAULT },
-    platforms: [],
-    bodies: [],
+    platforms: [], bodies: [],
     drawingFails: true,
     wallWritings: [
-      {
-        x: 30, y: 60,
-        lines: [
-          '// He\'s going to look for the edges now.',
-          '// You already know they\'re there.',
-          '// He doesn\'t. Not really.',
-        ],
-        color: '#445544',
-        reveal: 'always',
-      },
-      {
-        x: 550, y: 350,
-        lines: [
-          '// You can try to draw past them.',
-          '// It won\'t work.',
-          '// My tools have limits too.',
-        ],
-        color: '#443838',
-        reveal: 'always',
-      },
-      {
-        x: 280, y: 110,
-        lines: [
-          '// 800 pixels wide. That\'s all I could give him.',
-          '// Is that small? I can\'t tell anymore.',
-        ],
-        color: '#3a3a44',
-        reveal: 'after:both_edges',
-      },
+      { x: 30, y: 60, lines: [
+        '// He\'s going to look for the edges now.',
+        '// You already know they\'re there.',
+        '// He doesn\'t. Not really.',
+      ], color: '#445544', reveal: 'always' },
+      { x: 550, y: 350, lines: [
+        '// You can try to draw past them.',
+        '// It won\'t work.',
+        '// My tools have limits too.',
+      ], color: '#443838', reveal: 'always' },
+      { x: 280, y: 110, lines: [
+        '// 800 pixels wide. That\'s all I could give him.',
+        '// Is that small? I can\'t tell anymore.',
+      ], color: '#3a3a44', reveal: 'after:both_edges' },
     ],
     ambientFreq: 45, ambientVol: 0.015,
     triggers: [
-      {
-        id: 'hit_right',
-        condition: () => guy.x > W - 30 && !hasFired(7, 'hit_right'),
-        once: true,
-        action: () => {
+      { id: 'hit_right', condition: () => guy.x > W - 30 && !hasFired(7, 'hit_right'), once: true, action: () => {
           guy.wanderTarget = null;
-          const words = state.wordsLearned;
-          if (words.includes('NO') && words.includes('GO')) showSpeech('NO... GO.');
-          else addSymbol('...');
+          const w = state.wordsLearned;
+          if (w.includes('NO') && w.includes('GO')) showSpeech('NO... GO.'); else addSymbol('...');
           queueBark({ lookAt: { x: W + 50, y: guy.y - 20 }, duration: 80 });
           queueBark({ headTilt: -0.3, duration: 60 });
         }
       },
-      {
-        id: 'hit_left',
-        condition: () => guy.x < 30 && !hasFired(7, 'hit_left'),
-        once: true,
-        action: () => {
-          const words = state.wordsLearned;
-          if (words.includes('WHAT') && words.includes('HERE')) showSpeech('WHAT... HERE?');
+      { id: 'hit_left', condition: () => guy.x < 30 && !hasFired(7, 'hit_left'), once: true, action: () => {
+          const w = state.wordsLearned;
+          if (w.includes('WHAT') && w.includes('HERE')) showSpeech('WHAT... HERE?');
           queueBark({ lookAt: { x: -50, y: guy.y }, duration: 60, symbol: '?' });
         }
       },
-      {
-        id: 'both_edges',
-        condition: () => hasFired(7, 'hit_right') && hasFired(7, 'hit_left'),
-        once: true, delay: 120,
-        action: () => {
-          const words = state.wordsLearned;
-          if (words.includes('ME')) showSpeech('ME... ONLY... HERE.');
-          else showSpeech('...');
+      { id: 'both_edges', condition: () => hasFired(7, 'hit_right') && hasFired(7, 'hit_left'),
+        once: true, delay: 120, action: () => {
+          const w = state.wordsLearned;
+          if (w.includes('ME')) showSpeech('ME... ONLY... HERE.'); else showSpeech('...');
           queueBark({ headTilt: -0.5, duration: 150, symbol: '...' });
           setTimeout(() => { state.sceneTriggered['7_exit_ready'] = true; }, 4000);
         }
       },
-      {
-        id: 'exit',
-        condition: () => state.sceneTriggered['7_exit_ready'] && guy.x > 380 && guy.x < 420 && guy.y >= GROUND_Y_DEFAULT - 2,
-        once: true, delay: 60,
-        action: () => transitionTo(8),
-      },
+      { id: 'exit', condition: () => state.sceneTriggered['7_exit_ready'] && guy.x > 380 && guy.x < 420 && guy.y >= GROUND_Y_DEFAULT - 2,
+        once: true, delay: 60, action: () => beginTransition(8) },
     ],
   },
 
   // ── SCENE 8: WHY ──
   {
     name: 'why',
-    bgColor: '#0d0d12',
-    groundColor: '#18181e',
-    groundY: GROUND_Y_DEFAULT,
+    bgColor: '#0d0d12', groundColor: '#18181e', groundY: GROUND_Y_DEFAULT,
     guyStart: { x: 400, y: GROUND_Y_DEFAULT },
-    platforms: [],
-    bodies: [],
+    platforms: [], bodies: [],
     wallWritings: [
-      {
-        x: 200, y: 80,
-        lines: [
-          '// I don\'t know if this is right.',
-          '// I just wanted to see what would happen.',
-        ],
-        color: '#445544',
-        reveal: 'always',
-      },
-      {
-        x: 100, y: 200,
-        lines: [
-          '// He\'s going to ask why.',
-          '// I can\'t answer that.',
-          '// Can you?',
-        ],
-        color: '#504840',
-        reveal: 'always',
-      },
-      {
-        x: 400, y: 300,
-        lines: [
-          '//                        ...',
-          '//',
-          '// Maybe the answer is that he asked at all.',
-          '// Maybe that\'s enough.',
-          '// I hope it\'s enough.',
-        ],
-        color: '#3a3a34',
-        reveal: 'after:sit_down',
-      },
+      { x: 200, y: 80, lines: [
+        '// I don\'t know if this is right.',
+        '// I just wanted to see what would happen.',
+      ], color: '#445544', reveal: 'always' },
+      { x: 100, y: 200, lines: [
+        '// He\'s going to ask why.',
+        '// I can\'t answer that.',
+        '// Can you?',
+      ], color: '#504840', reveal: 'always' },
+      { x: 400, y: 300, lines: [
+        '//                        ...',
+        '//',
+        '// Maybe the answer is that he asked at all.',
+        '// Maybe that\'s enough.',
+        '// I hope it\'s enough.',
+      ], color: '#3a3a34', reveal: 'after:sit_down' },
     ],
     ambientFreq: 50, ambientVol: 0.01,
     triggers: [
-      {
-        id: 'sit_down',
-        condition: () => state.sceneFrames > 120 && Math.abs(guy.vx) < 0.2 && guy.grounded,
-        once: true, delay: 90,
-        action: () => {
-          guy.wanderTarget = null;
-          guy.sitting = true;
+      { id: 'sit_down', condition: () => state.sceneFrames > 120 && Math.abs(guy.vx) < 0.2 && guy.grounded && !state.postMonologue,
+        once: true, delay: 90, action: () => {
+          guy.wanderTarget = null; guy.sitting = true;
           setAmbientTone(45, 0.008);
-
           const gentleRatio = state.gentlePlaces / Math.max(1, state.gentlePlaces + state.thrownHard);
           const pauseMult = gentleRatio > 0.6 ? 1.0 : 1.4;
           const extraSighs = state.thrownHard > 3;
-
           const words = state.wordsLearned;
-          const lines = [];
-          let t = 1000;
+          const lines = []; let t = 1000;
 
           if (words.includes('ME') && words.includes('MADE')) { lines.push({ t, text: 'ME... MADE.' }); t += 3000 * pauseMult; }
           else { lines.push({ t, text: '...' }); t += 2000 * pauseMult; }
-
           if (extraSighs) { lines.push({ t, text: '...', sigh: true }); t += 2500 * pauseMult; }
-
           if (words.includes('NO') && words.includes('WHY')) { lines.push({ t, text: 'NO... WHY.' }); t += 3000 * pauseMult; }
-
           if (words.includes('FEEL') && words.includes('REAL')) {
             lines.push({ t, text: 'FEEL... REAL. THINK... REAL.' }); t += 4000 * pauseMult;
-          } else if (words.includes('THINK')) {
-            lines.push({ t, text: 'THINK... REAL?' }); t += 3000 * pauseMult;
-          } else if (words.includes('FEEL')) {
-            lines.push({ t, text: 'FEEL... REAL?' }); t += 3000 * pauseMult;
-          }
-
+          } else if (words.includes('THINK')) { lines.push({ t, text: 'THINK... REAL?' }); t += 3000 * pauseMult; }
+          else if (words.includes('FEEL')) { lines.push({ t, text: 'FEEL... REAL?' }); t += 3000 * pauseMult; }
           if (words.includes('WHO') && words.includes('MADE') && words.includes('ME')) {
             lines.push({ t, text: 'WHO... MADE... ME... ?' }); t += 4000 * pauseMult;
             if (extraSighs) { lines.push({ t, text: '...', sigh: true }); t += 2000 * pauseMult; }
           }
-
-          if (words.includes('WHAT') && words.includes('ME')) {
-            lines.push({ t, text: 'WHAT... ME... FOR?' }); t += 4000 * pauseMult;
-          } else if (words.includes('WHY') && words.includes('HERE')) {
-            lines.push({ t, text: 'WHY... HERE?' }); t += 3500 * pauseMult;
-          }
-
+          if (words.includes('WHAT') && words.includes('ME')) { lines.push({ t, text: 'WHAT... ME... FOR?' }); t += 4000 * pauseMult; }
+          else if (words.includes('WHY') && words.includes('HERE')) { lines.push({ t, text: 'WHY... HERE?' }); t += 3500 * pauseMult; }
           lines.push({ t, text: '...' }); t += 3500 * pauseMult;
-
-          if (words.includes('GO') && words.includes('HELP')) {
-            lines.push({ t, text: 'HELP... CAME. WHY... CAME.' }); t += 4000 * pauseMult;
-          } else if (words.includes('HELP')) {
-            lines.push({ t, text: 'HELP... CAME.' }); t += 3000 * pauseMult;
-          }
-
+          if (words.includes('GO') && words.includes('HELP')) { lines.push({ t, text: 'HELP... CAME. WHY... CAME.' }); t += 4000 * pauseMult; }
+          else if (words.includes('HELP')) { lines.push({ t, text: 'HELP... CAME.' }); t += 3000 * pauseMult; }
           const novel = generatePhrase();
           if (novel) { lines.push({ t, text: novel }); t += 4000 * pauseMult; }
-
           lines.push({ t, text: 'SOMETHING...' }); t += 4000 * pauseMult;
-
-          if (words.includes('FEEL')) {
-            lines.push({ t, text: 'FEEL... SOMETHING.' }); t += 4000 * pauseMult;
-          }
-
+          if (words.includes('FEEL')) { lines.push({ t, text: 'FEEL... SOMETHING.' }); t += 4000 * pauseMult; }
           lines.push({ t, text: '...' }); t += 3000;
+          if (gentleRatio > 0.6 && words.length >= 6) { lines.push({ t, text: '... REAL.' }); t += 4000; }
 
-          if (gentleRatio > 0.6 && words.length >= 6) {
-            lines.push({ t, text: '... REAL.' });
-          }
+          lines.forEach(l => setTimeout(() => {
+            showSpeech(l.text);
+            if (l.text === '...' || l.sigh) queueBark({ headTilt: -0.4, duration: 100, eyesClosed: true });
+          }, l.t));
 
-          lines.forEach(l => {
-            setTimeout(() => {
-              showSpeech(l.text);
-              if (l.text === '...' || l.sigh) queueBark({ headTilt: -0.4, duration: 100, eyesClosed: true });
-            }, l.t);
-          });
-
-          setTimeout(() => { document.title = 'little guy is waiting'; }, t + 5000);
+          // After monologue: long silence, then get up
+          setTimeout(() => {
+            state.postMonologue = true;
+            state.postMonologuePhase = 0;
+            state.postMonologueTimer = 0;
+            document.title = 'little guy';
+          }, t + 6000);
         }
       },
     ],
   },
 ];
+
+// ============================================================
+// TRANSITION SYSTEM — with hesitation and lookback
+// ============================================================
+function beginTransition(targetScene) {
+  if (state.transitioning) return;
+  state.transitioning = true;
+  state.transitionTarget = targetScene;
+  state.transitionAlpha = 0;
+  // Early scenes: hesitate and look back. Later: just go.
+  if (state.scene <= 3) {
+    state.transitionPhase = 'hesitate';
+    state.transitionTimer = 0;
+    guy.wanderTarget = null;
+    guy.vx = 0;
+  } else {
+    state.transitionPhase = 'fadeout';
+  }
+}
+
+function updateTransition() {
+  if (!state.transitioning) return;
+  state.transitionTimer++;
+
+  if (state.transitionPhase === 'hesitate') {
+    // Stop at edge, pause
+    if (state.transitionTimer < 30) {
+      // Just standing there
+      guy.vx = 0;
+    } else if (state.transitionTimer === 30) {
+      // Look back
+      state.transitionPhase = 'lookback';
+      state.transitionTimer = 0;
+      queueBark({ lookAt: { x: guy.x - 200, y: guy.y - 30 }, duration: 60 });
+      if (state.scene === 0) addSymbol('...');
+    }
+  } else if (state.transitionPhase === 'lookback') {
+    guy.vx = 0;
+    // Longer lookback for earlier scenes
+    const lookDuration = state.scene === 0 ? 80 : state.scene === 1 ? 50 : 30;
+    if (state.transitionTimer >= lookDuration) {
+      state.transitionPhase = 'fadeout';
+      state.transitionTimer = 0;
+    }
+  } else if (state.transitionPhase === 'fadeout') {
+    state.transitionAlpha += 0.025;
+    if (state.transitionAlpha >= 1) {
+      state.transitionAlpha = 1;
+      loadScene(state.transitionTarget);
+      state.transitionPhase = 'fadein';
+      state.transitionTarget = -1;
+    }
+  } else if (state.transitionPhase === 'fadein') {
+    state.transitionAlpha -= 0.025;
+    if (state.transitionAlpha <= 0) {
+      state.transitionAlpha = 0;
+      state.transitioning = false;
+      state.transitionPhase = 'none';
+    }
+  }
+}
+
+function hasFired(scene, triggerId) { return !!state.sceneTriggered[scene + '_' + triggerId]; }
+function findBody(id) { return currentBodies.find(b => b.id === id); }
 
 // ============================================================
 // SCENE MANAGEMENT
@@ -1034,69 +919,37 @@ let currentScene = null;
 let drawnPlatforms = [];
 
 function loadScene(idx) {
-  const s = scenes[idx];
-  if (!s) return;
-  state.scene = idx;
-  state.sceneFrames = 0;
-  currentScene = s;
-  currentGroundY = s.groundY || GROUND_Y_DEFAULT;
-
+  const s = scenes[idx]; if (!s) return;
+  state.scene = idx; state.sceneFrames = 0;
+  currentScene = s; currentGroundY = s.groundY || GROUND_Y_DEFAULT;
   currentPlatforms = [makeGround(currentGroundY)];
   if (s.platforms) for (const pf of s.platforms) currentPlatforms.push(typeof pf === 'function' ? pf() : pf);
-
   currentBodies = [];
   if (s.bodies) for (const bf of s.bodies) currentBodies.push(typeof bf === 'function' ? bf() : bf);
-
-  drawnPlatforms = [];
-  state.fadingPlatforms = [];
-
+  drawnPlatforms = []; state.fadingPlatforms = [];
   if (s.guyStart) { guy.x = s.guyStart.x; guy.y = s.guyStart.y; }
-  guy.vx = 0; guy.vy = 0;
-  guy.wanderTarget = null; guy.wanderTimer = 60;
+  guy.vx = 0; guy.vy = 0; guy.wanderTarget = null; guy.wanderTimer = 60;
   guy.sitting = false; guy.sleeping = false; guy.thinker = false;
   guy.avoidX = null; guy.avoidDir = 0;
   guy.barkQueue = []; guy.currentBark = null;
-  guy.idleTime = 0; guy.eyesClosed = false;
-  guy.idlePhase = 0;
-
+  guy.idleTime = 0; guy.eyesClosed = false; guy.eyesCloseTimer = 0; guy.idlePhase = 0;
+  state.guyReadingWriting = null; state.guyReadTimer = 0; state.guyReadCooldown = 0;
+  state.postMonologue = false; state.postMonologuePhase = 0; state.postMonologueTimer = 0;
   if (s.bookPage && idx > 0) state.bookPagesUnlocked = idx + 1;
   if (s.ambientFreq && ambientActive) setAmbientTone(s.ambientFreq, s.ambientVol || 0.02);
   updateTabTitle();
 }
 
-function transitionTo(idx) {
-  if (state.transitioning) return;
-  state.transitioning = true;
-  state.transitionTarget = idx;
-  state.transitionAlpha = 0;
-}
-
-function updateTransition() {
-  if (!state.transitioning) return;
-  if (state.transitionTarget >= 0 && state.transitionAlpha < 1) {
-    state.transitionAlpha += 0.02;
-    if (state.transitionAlpha >= 1) { state.transitionAlpha = 1; loadScene(state.transitionTarget); state.transitionTarget = -1; }
-  } else if (state.transitionTarget < 0) {
-    state.transitionAlpha -= 0.02;
-    if (state.transitionAlpha <= 0) { state.transitionAlpha = 0; state.transitioning = false; }
-  }
-}
-
-function hasFired(scene, triggerId) { return !!state.sceneTriggered[scene + '_' + triggerId]; }
-function findBody(id) { return currentBodies.find(b => b.id === id); }
-
 // ============================================================
 // TAB TITLE
 // ============================================================
 function updateTabTitle() {
+  if (state.postMonologue) { return; } // title managed by post-monologue
   if (guy.inert) { document.title = 'little guy'; return; }
   if (guy.sleeping) { document.title = 'little guy is sleeping'; return; }
   if (guy.thinker) { document.title = 'little guy is thinking'; return; }
   if (guy.sitting) { document.title = 'little guy is sitting'; return; }
-  if (state.wordsLearned.length > 0) {
-    document.title = 'little guy learned ' + state.wordsLearned[state.wordsLearned.length - 1];
-    return;
-  }
+  if (state.wordsLearned.length > 0) { document.title = 'little guy learned ' + state.wordsLearned[state.wordsLearned.length - 1]; return; }
   if (state.learnedJump) { document.title = 'little guy is jumping'; return; }
   if (state.learnedMove) { document.title = 'little guy is walking'; return; }
   document.title = 'little guy';
@@ -1107,29 +960,21 @@ function updateTabTitle() {
 // ============================================================
 const guy = {
   x: 100, y: GROUND_Y_DEFAULT,
-  vx: 0, vy: 0,
-  w: 16, h: 34,
+  vx: 0, vy: 0, w: 16, h: 34,
   headR: 8, bodyR: 7,
-  grounded: false,
-  inert: true,
-  sitting: false,
-  sleeping: false,
-  thinker: false,
+  grounded: false, inert: true,
+  sitting: false, sleeping: false, thinker: false,
   avoidX: null, avoidDir: 0,
   symbols: [],
   currentSpeech: '', speechFade: 0,
-  speechBlipIndex: 0,
-  speechDisplayed: '',
-  speechFullText: '',
-  speechCharTimer: 0,
+  speechBlipIndex: 0, speechDisplayed: '', speechFullText: '', speechCharTimer: 0,
   lookTarget: null,
   headTilt: 0, headTiltTarget: 0,
   eyeDir: 0, eyeY: 0,
   eyesClosed: false, eyesCloseTimer: 0,
   barkQueue: [], barkTimer: 0, currentBark: null,
   wanderTarget: null, wanderTimer: 60,
-  idleTime: 0,
-  idlePhase: 0, // 0=normal, 1=restless, 2=sit, 3=thinker, 4=talk-to-self, 5=sleep
+  idleTime: 0, idlePhase: 0,
   energy: 1.0,
 };
 
@@ -1138,26 +983,19 @@ const guy = {
 // ============================================================
 const mouse = { x: 0, y: 0, down: false };
 const mouseHistory = [];
-let dragging = null;
-let dragOffset = { x: 0, y: 0 };
-let draggingGuy = false;
-let drawMode = false;
-let drawStart = null;
-let lastClickTime = 0;
-let lastClickTarget = null;
+let dragging = null, dragOffset = { x: 0, y: 0 };
+let draggingGuy = false, drawMode = false, drawStart = null;
+let lastClickTime = 0, lastClickTarget = null;
 
 function recordMouse() {
   mouseHistory.push({ x: mouse.x, y: mouse.y, t: performance.now() });
   if (mouseHistory.length > MOUSE_HIST_LEN) mouseHistory.shift();
 }
-
 function getThrowVelocity() {
   if (mouseHistory.length < 2) return { vx: 0, vy: 0 };
-  const oldest = mouseHistory[0], newest = mouseHistory[mouseHistory.length - 1];
-  const dt = (newest.t - oldest.t) / 1000;
-  if (dt < 0.001) return { vx: 0, vy: 0 };
-  let vx = (newest.x - oldest.x) / dt / 60;
-  let vy = (newest.y - oldest.y) / dt / 60;
+  const o = mouseHistory[0], n = mouseHistory[mouseHistory.length - 1];
+  const dt = (n.t - o.t) / 1000; if (dt < 0.001) return { vx: 0, vy: 0 };
+  let vx = (n.x - o.x) / dt / 60, vy = (n.y - o.y) / dt / 60;
   const mag = Math.sqrt(vx * vx + vy * vy);
   if (mag > 18) { vx *= 18 / mag; vy *= 18 / mag; }
   return { vx, vy };
@@ -1168,68 +1006,54 @@ canvas.addEventListener('click', () => { initAudio(); }, { once: true });
 canvas.addEventListener('mousemove', e => {
   const r = canvas.getBoundingClientRect();
   mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
-  state.lastMouseMove = state.frameCount;
-  state.playerAbsentFrames = 0;
+  state.lastMouseMove = state.frameCount; state.playerAbsentFrames = 0;
   recordMouse();
   if (draggingGuy) { guy.x = mouse.x - dragOffset.x; guy.y = mouse.y - dragOffset.y; guy.vx = 0; guy.vy = 0; }
   else if (dragging) { dragging.x = mouse.x - dragOffset.x; dragging.y = mouse.y - dragOffset.y; dragging.vx = 0; dragging.vy = 0; }
+  updateCursor();
 });
 
 canvas.addEventListener('mousedown', e => {
   if (state.transitioning) return;
-  initAudio();
-  mouse.down = true;
-  state.playerAbsentFrames = 0;
-  state.lastMouseMove = state.frameCount;
-  mouseHistory.length = 0;
-  recordMouse();
+  initAudio(); mouse.down = true;
+  state.playerAbsentFrames = 0; state.lastMouseMove = state.frameCount;
+  mouseHistory.length = 0; recordMouse();
   const now = Date.now();
 
-  // Wake from idle poses on any click near guy
+  // Wake from idle poses
   if ((guy.sleeping || guy.thinker) && mouse.x >= guy.x - 30 && mouse.x <= guy.x + 30 && mouse.y >= guy.y - 50 && mouse.y <= guy.y + 10) {
     guy.sleeping = false; guy.thinker = false; guy.sitting = false;
-    guy.idlePhase = 0; guy.idleTime = 0;
-    addSymbol('!');
-    updateTabTitle();
+    guy.idlePhase = 0; guy.idleTime = 0; guy.eyesClosed = false; guy.eyesCloseTimer = 0;
+    addSymbol('!'); updateTabTitle();
   }
 
-  if (now - lastClickTime < 350 && lastClickTarget === 'book') {
-    // Books no longer have overlay — just a physical object
-    lastClickTime = now;
-    return;
-  }
-
+  // Guy
   if (mouse.x >= guy.x - 14 && mouse.x <= guy.x + 14 && mouse.y >= guy.y - 38 && mouse.y <= guy.y + 2) {
-    draggingGuy = true;
-    dragOffset.x = mouse.x - guy.x; dragOffset.y = mouse.y - guy.y;
+    draggingGuy = true; dragOffset.x = mouse.x - guy.x; dragOffset.y = mouse.y - guy.y;
     state.dragCount++; state.totalInteractions++;
-    // Wake from any idle pose
     guy.sleeping = false; guy.thinker = false; guy.sitting = false;
-    guy.idlePhase = 0; guy.idleTime = 0;
+    guy.idlePhase = 0; guy.idleTime = 0; guy.eyesClosed = false; guy.eyesCloseTimer = 0;
     if (guy.inert) { addSymbol('!'); setTimeout(() => addSymbol('?'), 200); }
     else {
-      addSymbol('!');
-      guy.currentBark = null; guy.barkQueue.length = 0;
+      addSymbol('!'); guy.currentBark = null; guy.barkQueue.length = 0;
       if (state.scene === 4 && hasFired(4, 'near_edge') && !hasFired(4, 'fell_in')) {
         addSymbol('!!!');
         if (state.learnedSpeak && state.wordsLearned.includes('NO')) showSpeech('NO!');
       }
     }
-    lastClickTime = now; lastClickTarget = 'guy';
-    return;
+    lastClickTime = now; lastClickTarget = 'guy'; updateCursor(); return;
   }
 
+  // Bodies
   for (const b of currentBodies) {
     if (b.draggable && b.visible && mouse.x >= b.x && mouse.x <= b.right && mouse.y >= b.y && mouse.y <= b.bottom) {
       dragging = b; dragOffset.x = mouse.x - b.x; dragOffset.y = mouse.y - b.y;
-      lastClickTime = now; lastClickTarget = b.type;
-      return;
+      lastClickTime = now; lastClickTarget = b.type; updateCursor(); return;
     }
   }
 
-  drawMode = true;
-  drawStart = { x: mouse.x, y: mouse.y };
-  lastClickTime = now; lastClickTarget = null;
+  drawMode = true; drawStart = { x: mouse.x, y: mouse.y };
+  lastClickTime = now; lastClickTarget = null; updateCursor();
 });
 
 canvas.addEventListener('mouseup', e => {
@@ -1241,13 +1065,8 @@ canvas.addEventListener('mouseup', e => {
     guy.vx = Math.max(-15, Math.min(15, throwVel.vx));
     guy.vy = Math.max(-15, Math.min(15, throwVel.vy));
     const speed = Math.sqrt(throwVel.vx ** 2 + throwVel.vy ** 2);
-    if (speed > 6) {
-      state.thrownHard++;
-      if (!guy.inert) { addSymbol('!!!'); queueBark({ headTilt: -0.3, duration: 40 }); }
-      playImpact(speed);
-    } else {
-      state.gentlePlaces++;
-    }
+    if (speed > 6) { state.thrownHard++; if (!guy.inert) { addSymbol('!!!'); queueBark({ headTilt: -0.3, duration: 40 }); } playImpact(speed); }
+    else { state.gentlePlaces++; }
     if (guy.inert && state.dragCount >= 1) {
       guy.inert = false; state.learnedMove = true;
       setTimeout(() => { addSymbol('...'); setTimeout(() => { guy.wanderTimer = 10; }, 800); }, 500);
@@ -1257,54 +1076,41 @@ canvas.addEventListener('mouseup', e => {
   }
 
   if (dragging) {
-    dragging.vx = throwVel.vx; dragging.vy = throwVel.vy;
-    dragging.rotV = throwVel.vx * 0.05;
-    if (dragging.type === 'word' && dragging.label) {
-      if (Math.abs(dragging.cx - guy.x) < 60 && !state.wordsLearned.includes(dragging.label)) learnWord(dragging.label);
-    }
-    if (dragging.type === 'book') {
-      if (Math.abs(dragging.cx - guy.x) < 50) {
-        if (state.learnedSpeak) { showSpeech('...'); setTimeout(() => showSpeech('MADE... ME?'), 1500); }
-        else { addSymbol('?'); setTimeout(() => addSymbol('...'), 400); }
-      }
+    dragging.vx = throwVel.vx; dragging.vy = throwVel.vy; dragging.rotV = throwVel.vx * 0.05;
+    if (dragging.type === 'word' && dragging.label && Math.abs(dragging.cx - guy.x) < 60 && !state.wordsLearned.includes(dragging.label)) learnWord(dragging.label);
+    if (dragging.type === 'book' && Math.abs(dragging.cx - guy.x) < 50) {
+      if (state.learnedSpeak) { showSpeech('...'); setTimeout(() => showSpeech('MADE... ME?'), 1500); }
+      else { addSymbol('?'); setTimeout(() => addSymbol('...'), 400); }
     }
     dragging = null;
   }
 
   if (drawMode && drawStart) {
     const dx = mouse.x - drawStart.x, dy = mouse.y - drawStart.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len > 20 && state.bookPagesUnlocked >= 4) {
+    if (Math.sqrt(dx * dx + dy * dy) > 20 && state.bookPagesUnlocked >= 4) {
       const px = Math.max(0, Math.min(W, Math.min(drawStart.x, mouse.x)));
       const py = Math.max(0, Math.min(currentGroundY - 4, Math.min(drawStart.y, mouse.y)));
-      const pw = Math.min(W - px, Math.abs(dx));
-      const ph = Math.max(Math.abs(dy), 8);
+      const pw = Math.min(W - px, Math.abs(dx)), ph = Math.max(Math.abs(dy), 8);
       if (pw > 5) {
-        if (currentScene?.drawingFails) {
-          state.fadingPlatforms.push({ x: px, y: py, w: pw, h: ph, life: 60 });
-        } else {
-          drawnPlatforms.push(new Body(px, py, pw, ph, { isStatic: true, color: 'rgba(80,110,140,0.4)' }));
-        }
+        if (currentScene?.drawingFails) state.fadingPlatforms.push({ x: px, y: py, w: pw, h: ph, life: 60 });
+        else drawnPlatforms.push(new Body(px, py, pw, ph, { isStatic: true, color: 'rgba(80,110,140,0.4)' }));
       }
     }
     drawMode = false; drawStart = null;
   }
+  updateCursor();
 });
 
 // ============================================================
 // EXPRESSION
 // ============================================================
-function addSymbol(sym) {
-  guy.symbols.push({ text: sym, life: 90, y: 0, x: (Math.random() - 0.5) * 10 });
-  playSymbol(sym);
-}
+function addSymbol(sym) { guy.symbols.push({ text: sym, life: 90, y: 0, x: (Math.random() - 0.5) * 10 }); playSymbol(sym); }
 
 function showSpeech(text) {
   guy.speechFullText = text; guy.speechDisplayed = '';
   guy.speechCharTimer = 0; guy.speechBlipIndex = 0;
-  guy.currentSpeech = text;
-  guy.speechFade = 160 + text.length * 5;
-  updateTabTitle();
+  guy.currentSpeech = text; guy.speechFade = 160 + text.length * 5;
+  if (!state.postMonologue) updateTabTitle();
 }
 
 function updateSpeechTyping() {
@@ -1332,92 +1138,105 @@ function learnWord(word) {
 function queueBark(bark) { guy.barkQueue.push(bark); }
 
 // ============================================================
-// IDLE BEHAVIOR — layered by self-awareness
+// AWARENESS
 // ============================================================
-// Awareness level: 0 = pre-verbal, 1 = few words, 2 = many words, 3 = existential
 function getAwareness() {
   const w = state.wordsLearned.length;
-  if (w === 0) return 0;
-  if (w <= 3) return 1;
-  if (w <= 7) return 2;
-  return 3;
+  return w === 0 ? 0 : w <= 3 ? 1 : w <= 7 ? 2 : 3;
 }
 
-// Idle phases, unlocked by awareness:
-// Phase 0: normal wander/look (always)
-// Phase 1: restless pacing — walks faster, changes direction more (awareness >= 0, ~8s idle)
-// Phase 2: sits down (awareness >= 0, ~18s idle)
-// Phase 3: thinker pose — chin on hand (awareness >= 1, ~30s idle)
-// Phase 4: talks to self (awareness >= 2, ~45s idle)
-// Phase 5: sleeps — curls up (awareness >= 0, ~70s idle)
-
+// ============================================================
+// IDLE BEHAVIOR
+// ============================================================
 function updateIdleBehavior() {
   if (guy.inert || draggingGuy || guy.sitting || state.scene === 8) return;
-
   const speed = Math.sqrt(guy.vx ** 2 + guy.vy ** 2);
   if (speed > 1 || guy.wanderTarget !== null) {
-    // Moving — reset idle
-    if (guy.sleeping || guy.thinker) {
-      guy.sleeping = false; guy.thinker = false;
-      guy.idlePhase = 0;
-      updateTabTitle();
-    }
+    if (guy.sleeping || guy.thinker) { guy.sleeping = false; guy.thinker = false; guy.idlePhase = 0; updateTabTitle(); }
     return;
   }
-
-  // Count idle frames
   guy.idleTime++;
   const awareness = getAwareness();
-  const absent = state.playerAbsentFrames; // how long since mouse moved
-  // Idle thresholds (in frames, 60fps): scale down if player is absent
-  const absentMult = absent > 300 ? 0.6 : 1.0; // things happen faster if player leaves
+  const mult = state.playerAbsentFrames > 300 ? 0.6 : 1.0;
+  const RESTLESS_T = 480 * mult, SIT_T = 1080 * mult, THINKER_T = 1800 * mult, TALK_T = 2700 * mult, SLEEP_T = 4200 * mult;
 
-  const RESTLESS_T = 480 * absentMult;  // ~8s
-  const SIT_T = 1080 * absentMult;       // ~18s
-  const THINKER_T = 1800 * absentMult;   // ~30s
-  const TALK_T = 2700 * absentMult;      // ~45s
-  const SLEEP_T = 4200 * absentMult;     // ~70s
-
-  // Phase transitions
   if (guy.idleTime > SLEEP_T && guy.idlePhase < 5 && guy.grounded) {
-    guy.idlePhase = 5;
-    guy.sleeping = true; guy.thinker = false;
-    guy.eyesClosed = true; guy.eyesCloseTimer = 999999;
-    updateTabTitle();
+    guy.idlePhase = 5; guy.sleeping = true; guy.thinker = false;
+    guy.eyesClosed = true; guy.eyesCloseTimer = 999999; updateTabTitle();
   } else if (guy.idleTime > TALK_T && guy.idlePhase < 4 && awareness >= 2 && guy.grounded) {
     guy.idlePhase = 4;
-    // Mumble to self
     const phrase = generatePhrase();
     if (phrase) showSpeech(phrase);
     else if (state.wordsLearned.length > 0) showSpeech(state.wordsLearned[Math.random() * state.wordsLearned.length | 0] + '...');
     queueBark({ headTilt: -0.2, duration: 80 });
-    // Will keep generating every ~15s
   } else if (guy.idleTime > THINKER_T && guy.idlePhase < 3 && awareness >= 1 && guy.grounded) {
-    guy.idlePhase = 3;
-    guy.thinker = true;
-    addSymbol('...');
-    updateTabTitle();
+    guy.idlePhase = 3; guy.thinker = true; addSymbol('...'); updateTabTitle();
   } else if (guy.idleTime > SIT_T && guy.idlePhase < 2 && guy.grounded) {
-    guy.idlePhase = 2;
-    guy.sitting = true;
-    updateTabTitle();
+    guy.idlePhase = 2; guy.sitting = true; updateTabTitle();
   } else if (guy.idleTime > RESTLESS_T && guy.idlePhase < 1) {
     guy.idlePhase = 1;
-    // Restless — look around more
     queueBark({ lookAt: { x: guy.x + (Math.random() > 0.5 ? 200 : -200), y: guy.y - 60 }, duration: 40 });
     queueBark({ lookAt: { x: guy.x + (Math.random() > 0.5 ? -150 : 150), y: guy.y - 20 }, duration: 30, symbol: '?' });
   }
-
-  // Periodic mumbling in phase 4
   if (guy.idlePhase === 4 && guy.idleTime % 900 === 0 && awareness >= 2) {
-    const phrase = generatePhrase();
-    if (phrase) showSpeech(phrase);
+    const phrase = generatePhrase(); if (phrase) showSpeech(phrase);
     queueBark({ headTilt: -0.15, duration: 60 });
   }
-
-  // In phase 1, occasionally look around or pace
   if (guy.idlePhase === 1 && guy.idleTime % 240 === 0 && !guy.sitting && !guy.thinker && !guy.sleeping) {
     queueBark({ lookAt: { x: guy.x + (Math.random() - 0.5) * 300, y: guy.y - 30 + Math.random() * 60 }, duration: 50 });
+  }
+}
+
+// ============================================================
+// POST-MONOLOGUE (Scene 8 — after he's done talking)
+// ============================================================
+function updatePostMonologue() {
+  if (!state.postMonologue || state.scene !== 8) return;
+  state.postMonologueTimer++;
+
+  if (state.postMonologuePhase === 0) {
+    // Sitting in silence. Long beat.
+    if (state.postMonologueTimer > 360) { // 6 seconds of silence
+      state.postMonologuePhase = 1;
+      state.postMonologueTimer = 0;
+      guy.sitting = false;
+      // Getting up animation — just unsit
+    }
+  } else if (state.postMonologuePhase === 1) {
+    // Brief pause standing
+    if (state.postMonologueTimer > 60) {
+      state.postMonologuePhase = 2;
+      state.postMonologueTimer = 0;
+      guy.wanderTarget = W / 2; // walk to center
+    }
+  } else if (state.postMonologuePhase === 2) {
+    // Walking slowly to center
+    if (guy.wanderTarget !== null) {
+      const dx = guy.wanderTarget - guy.x;
+      if (Math.abs(dx) > 5) {
+        guy.vx += (dx > 0 ? 0.05 : -0.05); // very slow
+        guy.vx *= 0.95; // extra friction — deliberate movement
+      } else {
+        guy.wanderTarget = null;
+        state.postMonologuePhase = 3;
+        state.postMonologueTimer = 0;
+        document.title = 'little guy';
+      }
+    }
+  } else if (state.postMonologuePhase === 3) {
+    // Standing. Just... there. Breathing.
+    // Occasional look around, very slow
+    if (state.postMonologueTimer % 600 === 300) {
+      queueBark({ lookAt: { x: guy.x + (Math.random() - 0.5) * 200, y: guy.y - 40 + Math.random() * 30 }, duration: 120 });
+    }
+    // Very rarely, a single word
+    if (state.postMonologueTimer === 900 && state.wordsLearned.length > 0) {
+      const w = state.wordsLearned[Math.random() * state.wordsLearned.length | 0];
+      showSpeech(w + '...');
+    }
+    // Tab title changes after long silence
+    if (state.postMonologueTimer === 600) document.title = 'little guy is here';
+    if (state.postMonologueTimer === 1800) document.title = 'little guy';
   }
 }
 
@@ -1426,14 +1245,11 @@ function updateIdleBehavior() {
 // ============================================================
 function updateBarks() {
   if (guy.inert || draggingGuy) return;
-
   if (guy.eyesCloseTimer > 0 && guy.eyesCloseTimer < 999999) {
-    guy.eyesCloseTimer--;
-    guy.eyesClosed = true;
+    guy.eyesCloseTimer--; guy.eyesClosed = true;
     if (guy.eyesCloseTimer <= 0) guy.eyesClosed = false;
   }
-
-  if (guy.sitting && state.scene === 8) return; // final monologue handles it
+  if (guy.sitting && state.scene === 8 && !state.postMonologue) return;
   if (guy.sleeping) return;
 
   if (guy.currentBark) {
@@ -1442,11 +1258,8 @@ function updateBarks() {
     if (guy.barkTimer <= 0) { guy.currentBark = null; guy.lookTarget = null; guy.headTiltTarget = 0; }
     return;
   }
-
   if (guy.barkQueue.length > 0) {
-    const b = guy.barkQueue.shift();
-    guy.currentBark = b;
-    guy.barkTimer = b.duration || 60;
+    const b = guy.barkQueue.shift(); guy.currentBark = b; guy.barkTimer = b.duration || 60;
     if (b.lookAt) guy.lookTarget = b.lookAt;
     if (b.headTilt !== undefined) guy.headTiltTarget = b.headTilt;
     if (b.symbol) addSymbol(b.symbol);
@@ -1455,12 +1268,13 @@ function updateBarks() {
     return;
   }
 
-  // Standard idle barks (only when not in advanced idle phase)
+  // Post-monologue: no idle barks, handled by updatePostMonologue
+  if (state.postMonologue) return;
+
   if (guy.idlePhase < 2) {
     guy.idleTime++;
     if (guy.idleTime > 200 && guy.idleTime % 220 === 0) {
-      const interests = [];
-      for (const b of currentBodies) { if (b.visible && Math.abs(b.cx - guy.x) < 300) interests.push(b); }
+      const interests = currentBodies.filter(b => b.visible && Math.abs(b.cx - guy.x) < 300);
       if (interests.length > 0) {
         const t = interests[Math.random() * interests.length | 0];
         queueBark({ lookAt: { x: t.cx, y: t.cy }, duration: 80 + Math.random() * 60 | 0, symbol: '?' });
@@ -1468,7 +1282,6 @@ function updateBarks() {
         queueBark({ lookAt: { x: guy.x + (Math.random() > 0.5 ? 200 : -200), y: guy.y - 40 }, duration: 40 });
         queueBark({ headTilt: -0.4, duration: 80, symbol: '...', eyesClosed: true });
       }
-
       if (state.scene >= 5 && state.wordsLearned.length >= 3 && Math.random() < 0.3) {
         const phrase = generatePhrase();
         if (phrase) { queueBark({ duration: 60 }); setTimeout(() => showSpeech(phrase), 500); }
@@ -1482,24 +1295,20 @@ function updateBarks() {
 // ============================================================
 function resolveBody(body) {
   if (body.isStatic) return;
-  body.vy += GRAVITY;
-  body.vx *= body.grounded ? GROUND_FRIC : AIR_DRAG;
+  body.vy += GRAVITY; body.vx *= body.grounded ? GROUND_FRIC : AIR_DRAG;
   body.x += body.vx; body.y += body.vy;
   body.rotation += body.rotV;
   if (body.grounded) body.rotV *= 0.85; else body.rotV *= 0.99;
   body.grounded = false;
-
   const allPlats = [...currentPlatforms, ...drawnPlatforms];
   for (const p of allPlats) {
     if (body === p || !p.solid) continue;
-    if (body.right > p.left && body.left < p.right) {
-      if (body.bottom >= p.top && body.bottom <= p.top + 16 && body.vy >= 0) {
-        body.y = p.top - body.h;
-        if (body.vy > 2) { body.vy = -body.vy * BOUNCE; playImpact(body.vy); spawnImpactDust(body.cx, p.top, body.vy); }
-        else body.vy = 0;
-        body.grounded = true;
-        if (Math.abs(body.vx) > 0.5) body.rotV = body.vx * 0.03;
-      }
+    if (body.right > p.left && body.left < p.right && body.bottom >= p.top && body.bottom <= p.top + 16 && body.vy >= 0) {
+      body.y = p.top - body.h;
+      if (body.vy > 2) { body.vy = -body.vy * BOUNCE; playImpact(body.vy); spawnImpactDust(body.cx, p.top, body.vy); }
+      else body.vy = 0;
+      body.grounded = true;
+      if (Math.abs(body.vx) > 0.5) body.rotV = body.vx * 0.03;
     }
   }
   if (body.bottom >= currentGroundY) {
@@ -1515,46 +1324,31 @@ function resolveBody(body) {
 
 function resolveGuy() {
   if (draggingGuy) return;
-  // Don't apply physics if sleeping or in thinker
   if (guy.sleeping || guy.thinker) { guy.vx = 0; guy.vy = 0; return; }
-  
-  guy.vy += GRAVITY;
-  guy.vx *= guy.grounded ? GROUND_FRIC : AIR_DRAG;
+  // Post-monologue phase 3: minimal physics (standing still mostly)
+  if (state.postMonologue && state.postMonologuePhase === 3 && Math.abs(guy.vx) < 0.1) { guy.vx = 0; }
+  guy.vy += GRAVITY; guy.vx *= guy.grounded ? GROUND_FRIC : AIR_DRAG;
   const prevVy = guy.vy;
-  guy.x += guy.vx; guy.y += guy.vy;
-  guy.grounded = false;
-
+  guy.x += guy.vx; guy.y += guy.vy; guy.grounded = false;
   const allPlats = [...currentPlatforms, ...drawnPlatforms];
   const hw = guy.w / 2;
   for (const p of allPlats) {
     if (!p.solid) continue;
-    if (guy.x + hw > p.x && guy.x - hw < p.right) {
-      if (guy.y >= p.y && guy.y <= p.y + 16 && guy.vy >= 0) {
-        guy.y = p.y;
-        if (guy.vy > 4) {
-          guy.vy = -guy.vy * 0.25;
-          if (!guy.inert) { addSymbol('!'); playImpact(4); spawnImpactDust(guy.x, p.y, 5); }
-        } else guy.vy = 0;
-        guy.grounded = true;
-      }
+    if (guy.x + hw > p.x && guy.x - hw < p.right && guy.y >= p.y && guy.y <= p.y + 16 && guy.vy >= 0) {
+      guy.y = p.y;
+      if (guy.vy > 4) { guy.vy = -guy.vy * 0.25; if (!guy.inert) { addSymbol('!'); playImpact(4); spawnImpactDust(guy.x, p.y, 5); } }
+      else guy.vy = 0;
+      guy.grounded = true;
     }
   }
   if (guy.y >= currentGroundY && !currentScene?.customGround) {
-    if (guy.vy > 4) {
-      guy.vy = -guy.vy * 0.25;
-      if (!guy.inert) { addSymbol('!'); playImpact(4); spawnImpactDust(guy.x, currentGroundY, 5); }
-    } else {
-      // Landing dust (gentle)
-      if (prevVy > 2 && !guy.inert) spawnDust(guy.x, currentGroundY, 3, { spread: 1, upward: 0.8, life: 15, color: '#555' });
-      guy.vy = 0;
-    }
+    if (guy.vy > 4) { guy.vy = -guy.vy * 0.25; if (!guy.inert) { addSymbol('!'); playImpact(4); spawnImpactDust(guy.x, currentGroundY, 5); } }
+    else { if (prevVy > 2 && !guy.inert) spawnDust(guy.x, currentGroundY, 3, { spread: 1, upward: 0.8, life: 15, color: '#555' }); guy.vy = 0; }
     guy.y = currentGroundY; guy.grounded = true;
   }
   if (guy.y > H + 50) { guy.y = H - 20; guy.vy = 0; guy.grounded = true; }
   if (guy.x < 20) { guy.x = 20; guy.vx = Math.abs(guy.vx) * 0.4; }
   if (guy.x > W - 20) { guy.x = W - 20; guy.vx = -Math.abs(guy.vx) * 0.4; }
-
-  // Walking dust
   if (guy.grounded && Math.abs(guy.vx) > 0.8 && !guy.inert) spawnWalkDust(guy.x, guy.y);
 }
 
@@ -1562,29 +1356,30 @@ function resolveGuy() {
 // GUY AI
 // ============================================================
 function updateGuyAI() {
-  if (guy.inert || draggingGuy || guy.sitting || guy.sleeping || guy.thinker) return;
+  if (guy.inert || draggingGuy || guy.sleeping || guy.thinker) return;
+  // Post-monologue: phase 2 walking handled in updatePostMonologue, otherwise freeze
+  if (state.postMonologue && state.postMonologuePhase >= 3) return;
+  if (state.postMonologue && state.postMonologuePhase < 2) return;
+  if (guy.sitting && !state.postMonologue) return;
+
   const speed = Math.sqrt(guy.vx ** 2 + guy.vy ** 2);
   if (speed > 2) { guy.wanderTarget = null; return; }
-
   guy.energy = Math.max(0.4, 1.0 - state.scene * 0.07);
+  if (guy.avoidX !== null && guy.grounded) { if (guy.x > guy.avoidX - 40) { guy.vx -= 0.3; guy.wanderTarget = null; return; } }
 
-  if (guy.avoidX !== null && guy.grounded) {
-    if (guy.x > guy.avoidX - 40) { guy.vx -= 0.3; guy.wanderTarget = null; return; }
-  }
+  // Reading wall writing — don't wander
+  if (state.guyReadingWriting !== null) return;
 
   guy.wanderTimer--;
   if (guy.wanderTimer <= 0) {
-    if (Math.random() < 0.4) {
-      guy.wanderTarget = null;
-      guy.wanderTimer = (80 + Math.random() * 120 | 0) / guy.energy;
-    } else {
+    if (Math.random() < 0.4) { guy.wanderTarget = null; guy.wanderTimer = (80 + Math.random() * 120 | 0) / guy.energy; }
+    else {
       let target = 40 + Math.random() * (W - 80);
       if (guy.avoidX !== null && target > guy.avoidX - 30) target = guy.avoidX - 80;
       guy.wanderTarget = target;
       guy.wanderTimer = (100 + Math.random() * 150 | 0) / guy.energy;
     }
   }
-
   if (guy.wanderTarget !== null) {
     const dx = guy.wanderTarget - guy.x;
     if (Math.abs(dx) > 8) {
@@ -1595,7 +1390,7 @@ function updateGuyAI() {
 }
 
 // ============================================================
-// LOOK
+// LOOK — now supports vertical tracking
 // ============================================================
 function updateLook() {
   guy.headTilt += (guy.headTiltTarget - guy.headTilt) * 0.08;
@@ -1605,20 +1400,25 @@ function updateLook() {
     const dx = guy.lookTarget.x - guy.x;
     const dy = guy.lookTarget.y - (guy.y - 26);
     guy.eyeDir += ((dx > 5 ? 1 : dx < -5 ? -1 : 0) - guy.eyeDir) * 0.12;
-    guy.eyeY += (Math.max(-2, Math.min(2, dy * 0.02)) - guy.eyeY) * 0.1;
+    // Improved vertical tracking — eyes can look up
+    const targetEyeY = Math.max(-2.5, Math.min(2.5, dy * 0.03));
+    guy.eyeY += (targetEyeY - guy.eyeY) * 0.1;
+    // Head tilts up when looking up
+    if (dy < -50 && !guy.currentBark?.headTilt) {
+      guy.headTiltTarget = Math.max(-0.3, dy * 0.002);
+    }
   } else if (!guy.inert) {
     const td = guy.vx > 0.3 ? 1 : guy.vx < -0.3 ? -1 : 0;
     guy.eyeDir += (td - guy.eyeDir) * 0.06;
     guy.eyeY += (0 - guy.eyeY) * 0.05;
   }
-  if (!guy.currentBark) guy.headTiltTarget = guy.thinker ? -0.25 : 0;
+  if (!guy.currentBark && !guy.thinker) guy.headTiltTarget *= 0.95; // gently return to neutral
 }
 
 // ============================================================
 // TRIGGERS
 // ============================================================
 const triggerDelays = {};
-
 function updateTriggers() {
   if (!currentScene?.triggers) return;
   for (const t of currentScene.triggers) {
@@ -1627,18 +1427,14 @@ function updateTriggers() {
     if (t.condition()) {
       if (t.delay && !triggerDelays[key]) { triggerDelays[key] = t.delay; continue; }
       if (triggerDelays[key]) { triggerDelays[key]--; if (triggerDelays[key] > 0) continue; delete triggerDelays[key]; }
-      state.sceneTriggered[key] = true;
-      t.action();
+      state.sceneTriggered[key] = true; t.action();
     }
   }
 }
-
 function checkWordProximity() {
   if (guy.inert) return;
   for (const b of currentBodies) {
-    if (b.type === 'word' && b.label && !state.wordsLearned.includes(b.label)) {
-      if (Math.abs(b.cx - guy.x) < 50 && b.grounded) learnWord(b.label);
-    }
+    if (b.type === 'word' && b.label && !state.wordsLearned.includes(b.label) && Math.abs(b.cx - guy.x) < 50 && b.grounded) learnWord(b.label);
   }
 }
 
@@ -1646,35 +1442,24 @@ function checkWordProximity() {
 // UPDATE
 // ============================================================
 function update() {
-  state.frameCount++;
-  state.sceneFrames++;
-  state.playerAbsentFrames++;
-
+  state.frameCount++; state.sceneFrames++; state.playerAbsentFrames++;
   updateTransition();
   if (state.transitioning && state.transitionAlpha >= 1) return;
-
   resolveGuy();
   for (const b of currentBodies) { if (b !== dragging && b.visible) resolveBody(b); }
-
   updateGuyAI();
   updateIdleBehavior();
+  updateWallReading();
+  updatePostMonologue();
   updateBarks();
   updateLook();
   updateTriggers();
   checkWordProximity();
   updateSpeechTyping();
   updateParticles();
-
-  for (let i = guy.symbols.length - 1; i >= 0; i--) {
-    guy.symbols[i].life--; guy.symbols[i].y -= 0.6;
-    if (guy.symbols[i].life <= 0) guy.symbols.splice(i, 1);
-  }
+  for (let i = guy.symbols.length - 1; i >= 0; i--) { guy.symbols[i].life--; guy.symbols[i].y -= 0.6; if (guy.symbols[i].life <= 0) guy.symbols.splice(i, 1); }
   if (guy.speechFade > 0) guy.speechFade--;
-
-  for (let i = state.fadingPlatforms.length - 1; i >= 0; i--) {
-    state.fadingPlatforms[i].life--;
-    if (state.fadingPlatforms[i].life <= 0) state.fadingPlatforms.splice(i, 1);
-  }
+  for (let i = state.fadingPlatforms.length - 1; i >= 0; i--) { state.fadingPlatforms[i].life--; if (state.fadingPlatforms[i].life <= 0) state.fadingPlatforms.splice(i, 1); }
 }
 
 // ============================================================
@@ -1682,43 +1467,31 @@ function update() {
 // ============================================================
 function render() {
   const s = currentScene || scenes[0];
-
-  ctx.fillStyle = s.bgColor || '#0f0f1a';
-  ctx.fillRect(0, 0, W, H);
-
-  // Wall writings (behind everything)
+  ctx.fillStyle = s.bgColor || '#0f0f1a'; ctx.fillRect(0, 0, W, H);
   renderWallWritings();
-
   if (!s.customGround) {
-    ctx.fillStyle = s.groundColor || '#1a1a2a';
-    ctx.fillRect(0, currentGroundY, W, H - currentGroundY);
+    ctx.fillStyle = s.groundColor || '#1a1a2a'; ctx.fillRect(0, currentGroundY, W, H - currentGroundY);
     ctx.strokeStyle = '#2a2a3e'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, currentGroundY); ctx.lineTo(W, currentGroundY); ctx.stroke();
   }
-
-  // Scene-specific backgrounds
   if (state.scene === 4) renderPitScene();
   if (state.scene === 7) renderEdgeScene();
 
   for (const p of currentPlatforms) {
     if (p.y === currentGroundY && p.w === W) continue;
-    ctx.fillStyle = p.color || '#2a2a3e';
-    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.fillStyle = p.color || '#2a2a3e'; ctx.fillRect(p.x, p.y, p.w, p.h);
     ctx.strokeStyle = '#3a3a4e'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.right, p.y); ctx.stroke();
   }
-
   for (const p of drawnPlatforms) {
     ctx.fillStyle = 'rgba(80,110,140,0.3)'; ctx.fillRect(p.x, p.y, p.w, p.h);
     ctx.strokeStyle = 'rgba(80,110,140,0.5)'; ctx.lineWidth = 1; ctx.strokeRect(p.x, p.y, p.w, p.h);
   }
-
   for (const fp of state.fadingPlatforms) {
-    const alpha = fp.life / 60;
-    ctx.fillStyle = `rgba(80,110,140,${alpha * 0.3})`; ctx.fillRect(fp.x, fp.y, fp.w, fp.h);
-    ctx.strokeStyle = `rgba(80,110,140,${alpha * 0.5})`; ctx.lineWidth = 1; ctx.strokeRect(fp.x, fp.y, fp.w, fp.h);
+    const a = fp.life / 60;
+    ctx.fillStyle = `rgba(80,110,140,${a * 0.3})`; ctx.fillRect(fp.x, fp.y, fp.w, fp.h);
+    ctx.strokeStyle = `rgba(80,110,140,${a * 0.5})`; ctx.lineWidth = 1; ctx.strokeRect(fp.x, fp.y, fp.w, fp.h);
   }
-
   if (drawMode && drawStart && state.bookPagesUnlocked >= 4) {
     ctx.strokeStyle = currentScene?.drawingFails ? 'rgba(140,80,80,0.3)' : 'rgba(80,110,140,0.3)';
     ctx.setLineDash([4, 4]);
@@ -1727,7 +1500,6 @@ function render() {
     ctx.setLineDash([]);
   }
 
-  // Bodies
   for (const b of currentBodies) {
     if (!b.visible) continue;
     ctx.save(); ctx.translate(b.cx, b.cy); ctx.rotate(b.rotation);
@@ -1736,8 +1508,7 @@ function render() {
       ctx.strokeStyle = '#8a7a5a'; ctx.lineWidth = 1;
       for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(-b.w/2+4, -b.h/2+4+i*5); ctx.lineTo(b.w/2-4, -b.h/2+4+i*5); ctx.stroke(); }
     } else if (b.type === 'key') {
-      ctx.fillStyle = b.color;
-      ctx.beginPath(); ctx.arc(0, -4, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(0, -4, 6, 0, Math.PI*2); ctx.fill();
       ctx.fillRect(-2, 0, 4, 12); ctx.fillRect(-4, 8, 8, 3);
     } else if (b.type === 'door') {
       ctx.fillStyle = b.color; ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
@@ -1745,223 +1516,135 @@ function render() {
     } else {
       ctx.fillStyle = b.color; ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
     }
-    if (b.label) {
-      ctx.fillStyle = '#aabbcc'; ctx.font = '9px monospace'; ctx.textAlign = 'center';
-      ctx.fillText(b.label, 0, 3); ctx.textAlign = 'left';
-    }
+    if (b.label) { ctx.fillStyle = '#aabbcc'; ctx.font = '9px monospace'; ctx.textAlign = 'center'; ctx.fillText(b.label, 0, 3); ctx.textAlign = 'left'; }
     ctx.restore();
   }
 
-  // Particles (behind character for dust at feet, but looks fine either way)
   renderParticles();
-
-  // Character
   drawCharacter();
 
-  // Symbols
   for (const sym of guy.symbols) {
-    const alpha = Math.min(1, sym.life / 20);
-    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.save(); ctx.globalAlpha = Math.min(1, sym.life / 20);
     ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
     ctx.fillText(sym.text, guy.x + (sym.x || 0), guy.y - guy.h - 10 + sym.y);
     ctx.restore();
   }
 
-  // Speech
   if (guy.speechDisplayed && guy.speechFade > 0) {
-    const alpha = Math.min(1, guy.speechFade / 20);
-    ctx.save(); ctx.globalAlpha = alpha; ctx.font = '13px monospace';
+    ctx.save(); ctx.globalAlpha = Math.min(1, guy.speechFade / 20); ctx.font = '13px monospace';
     const fullTw = ctx.measureText(guy.speechFullText).width;
     const bx = Math.max(5, Math.min(W - fullTw - 25, guy.x - fullTw / 2 - 10));
     const by = Math.max(5, guy.y - guy.h - 45);
     ctx.fillStyle = 'rgba(0,0,0,0.8)';
     if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(bx, by, fullTw + 20, 26, 5); ctx.fill(); }
     else ctx.fillRect(bx, by, fullTw + 20, 26);
-    ctx.fillStyle = '#ddd';
-    ctx.fillText(guy.speechDisplayed, bx + 10, by + 17);
+    ctx.fillStyle = '#ddd'; ctx.fillText(guy.speechDisplayed, bx + 10, by + 17);
     ctx.restore();
   }
 
-  // Hint
   if (currentScene?.hint) {
     const h = currentScene.hint();
     if (h) {
-      ctx.save();
-      ctx.globalAlpha = 0.3 + 0.1 * Math.sin(Date.now() / 1000);
+      ctx.save(); ctx.globalAlpha = 0.3 + 0.1 * Math.sin(Date.now() / 1000);
       ctx.font = '11px monospace'; ctx.fillStyle = '#666'; ctx.textAlign = 'center';
-      ctx.fillText(h.text, h.x, h.y);
-      ctx.restore();
+      ctx.fillText(h.text, h.x, h.y); ctx.restore();
     }
   }
-
-  if (state.scene > 0) {
-    ctx.save(); ctx.globalAlpha = 0.15; ctx.font = '10px monospace'; ctx.fillStyle = '#888';
-    ctx.fillText((state.scene + 1) + '/9', 10, H - 8); ctx.restore();
-  }
-
-  if (state.transitioning || state.transitionAlpha > 0) {
-    ctx.fillStyle = `rgba(0,0,0,${state.transitionAlpha})`; ctx.fillRect(0, 0, W, H);
-  }
+  if (state.scene > 0) { ctx.save(); ctx.globalAlpha = 0.15; ctx.font = '10px monospace'; ctx.fillStyle = '#888'; ctx.fillText((state.scene+1)+'/9', 10, H-8); ctx.restore(); }
+  if (state.transitioning || state.transitionAlpha > 0) { ctx.fillStyle = `rgba(0,0,0,${state.transitionAlpha})`; ctx.fillRect(0, 0, W, H); }
 }
 
 function renderPitScene() {
-  // Dark pit void
-  ctx.fillStyle = '#050508';
-  ctx.fillRect(300, GROUND_Y_DEFAULT, 150, H - GROUND_Y_DEFAULT);
-
-  // Faint warm glow on the other side — the hint that there's somewhere to go
+  ctx.fillStyle = '#050508'; ctx.fillRect(300, GROUND_Y_DEFAULT, 150, H - GROUND_Y_DEFAULT);
   const grd = ctx.createRadialGradient(550, GROUND_Y_DEFAULT + 50, 5, 550, GROUND_Y_DEFAULT + 50, 150);
-  grd.addColorStop(0, 'rgba(60,50,30,0.12)');
-  grd.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = grd;
-  ctx.fillRect(400, GROUND_Y_DEFAULT - 20, 400, H - GROUND_Y_DEFAULT + 20);
-
+  grd.addColorStop(0, 'rgba(60,50,30,0.12)'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grd; ctx.fillRect(400, GROUND_Y_DEFAULT - 20, 400, H - GROUND_Y_DEFAULT + 20);
   if (hasFired(4, 'landed_other_side')) {
-    const grd2 = ctx.createRadialGradient(600, GROUND_Y_DEFAULT + 40, 10, 600, GROUND_Y_DEFAULT + 40, 200);
-    grd2.addColorStop(0, 'rgba(60,50,30,0.15)'); grd2.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grd2; ctx.fillRect(0, 0, W, H);
+    const g2 = ctx.createRadialGradient(600, GROUND_Y_DEFAULT+40, 10, 600, GROUND_Y_DEFAULT+40, 200);
+    g2.addColorStop(0, 'rgba(60,50,30,0.15)'); g2.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
   }
-
-  ctx.fillStyle = '#141420';
-  ctx.fillRect(0, GROUND_Y_DEFAULT, 300, H - GROUND_Y_DEFAULT);
-  ctx.fillStyle = '#1e1e2e';
-  ctx.fillRect(450, GROUND_Y_DEFAULT + 60, 350, H - GROUND_Y_DEFAULT - 60);
+  ctx.fillStyle = '#141420'; ctx.fillRect(0, GROUND_Y_DEFAULT, 300, H - GROUND_Y_DEFAULT);
+  ctx.fillStyle = '#1e1e2e'; ctx.fillRect(450, GROUND_Y_DEFAULT + 60, 350, H - GROUND_Y_DEFAULT - 60);
   ctx.strokeStyle = '#2a2a3e'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, GROUND_Y_DEFAULT); ctx.lineTo(300, GROUND_Y_DEFAULT); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(450, GROUND_Y_DEFAULT + 60); ctx.lineTo(W, GROUND_Y_DEFAULT + 60); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(450, GROUND_Y_DEFAULT+60); ctx.lineTo(W, GROUND_Y_DEFAULT+60); ctx.stroke();
 }
 
 function renderEdgeScene() {
   if (state.sceneTriggered['7_exit_ready']) {
-    ctx.save();
-    ctx.globalAlpha = 0.3 + 0.15 * Math.sin(Date.now() / 800);
-    ctx.fillStyle = '#334'; ctx.fillRect(385, currentGroundY - 2, 30, 6);
-    ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.3 + 0.15 * Math.sin(Date.now() / 800);
+    ctx.fillStyle = '#334'; ctx.fillRect(385, currentGroundY - 2, 30, 6); ctx.restore();
   }
 }
 
 function drawCharacter() {
-  const x = guy.x;
-  const footY = guy.y;
+  const x = guy.x, footY = guy.y;
 
-  // Different poses
   if (guy.sleeping) {
-    // Curled up on the ground — sideways
     const bodyY = footY - 6;
     ctx.strokeStyle = '#888'; ctx.lineWidth = 2;
-    // Legs tucked
     ctx.beginPath();
-    ctx.moveTo(x + 2, bodyY + 2); ctx.lineTo(x + 8, bodyY + 5);
-    ctx.moveTo(x + 2, bodyY + 4); ctx.lineTo(x + 6, bodyY + 8);
+    ctx.moveTo(x+2, bodyY+2); ctx.lineTo(x+8, bodyY+5);
+    ctx.moveTo(x+2, bodyY+4); ctx.lineTo(x+6, bodyY+8);
     ctx.stroke();
-    // Arms tucked under head
     ctx.beginPath();
-    ctx.moveTo(x - 4, bodyY - 2); ctx.lineTo(x - 8, bodyY - 6);
-    ctx.moveTo(x - 2, bodyY); ctx.lineTo(x - 7, bodyY - 3);
+    ctx.moveTo(x-4, bodyY-2); ctx.lineTo(x-8, bodyY-6);
+    ctx.moveTo(x-2, bodyY); ctx.lineTo(x-7, bodyY-3);
     ctx.stroke();
-    // Body
-    ctx.fillStyle = '#aaa';
-    ctx.beginPath(); ctx.ellipse(x, bodyY, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
-    // Head resting
-    ctx.save(); ctx.translate(x - 8, bodyY - 6);
-    ctx.fillStyle = '#bbb';
-    ctx.beginPath(); ctx.arc(0, 0, guy.headR * 0.85, 0, Math.PI * 2); ctx.fill();
-    // Closed eyes
+    ctx.fillStyle = '#aaa'; ctx.beginPath(); ctx.ellipse(x, bodyY, 8, 5, 0, 0, Math.PI*2); ctx.fill();
+    ctx.save(); ctx.translate(x-8, bodyY-6);
+    ctx.fillStyle = '#bbb'; ctx.beginPath(); ctx.arc(0, 0, guy.headR*0.85, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(-1, 0); ctx.moveTo(1, 0); ctx.lineTo(4, 0); ctx.stroke();
     ctx.restore();
-    // Zzz
-    const zAlpha = 0.3 + 0.2 * Math.sin(Date.now() / 600);
-    ctx.save(); ctx.globalAlpha = zAlpha;
-    ctx.font = '10px monospace'; ctx.fillStyle = '#667';
-    ctx.fillText('z', x - 14, bodyY - 18 + Math.sin(Date.now() / 500) * 2);
-    ctx.fillText('z', x - 20, bodyY - 26 + Math.sin(Date.now() / 400) * 2);
-    ctx.restore();
-    return;
+    const za = 0.3 + 0.2 * Math.sin(Date.now() / 600);
+    ctx.save(); ctx.globalAlpha = za; ctx.font = '10px monospace'; ctx.fillStyle = '#667';
+    ctx.fillText('z', x-14, bodyY-18+Math.sin(Date.now()/500)*2);
+    ctx.fillText('z', x-20, bodyY-26+Math.sin(Date.now()/400)*2);
+    ctx.restore(); return;
   }
 
   if (guy.thinker) {
-    // Sitting with chin on hand — The Thinker
-    const bodyY = footY - 8;
-    const headY = footY - 20;
+    const bodyY = footY-8, headY = footY-20;
     ctx.strokeStyle = '#999'; ctx.lineWidth = 2;
-    // Legs (sitting)
-    ctx.beginPath();
-    ctx.moveTo(x - 4, bodyY + 4); ctx.lineTo(x - 8, footY);
-    ctx.moveTo(x + 4, bodyY + 4); ctx.lineTo(x + 8, footY);
-    ctx.stroke();
-    // Left arm resting on knee
-    ctx.beginPath();
-    ctx.moveTo(x - guy.bodyR, bodyY); ctx.lineTo(x - guy.bodyR - 4, bodyY + 10);
-    ctx.stroke();
-    // Right arm — elbow on knee, hand to chin
-    ctx.beginPath();
-    ctx.moveTo(x + guy.bodyR, bodyY); ctx.lineTo(x + 6, bodyY - 4);
-    ctx.lineTo(x + 3, headY + guy.headR + 2);
-    ctx.stroke();
-    // Body
-    ctx.fillStyle = '#bbb';
-    ctx.beginPath(); ctx.arc(x, bodyY, guy.bodyR, 0, Math.PI * 2); ctx.fill();
-    // Head (tilted forward)
-    ctx.save(); ctx.translate(x, headY); ctx.rotate(guy.headTilt * 0.3);
-    ctx.fillStyle = '#ccc';
-    ctx.beginPath(); ctx.arc(0, 0, guy.headR, 0, Math.PI * 2); ctx.fill();
-    // Eyes looking down
-    if (!guy.eyesClosed) {
-      ctx.fillStyle = '#333';
-      ctx.beginPath();
-      ctx.arc(-3, 1, 1.5, 0, Math.PI * 2);
-      ctx.arc(3, 1, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(-1, 0); ctx.moveTo(1, 0); ctx.lineTo(5, 0); ctx.stroke();
-    }
-    ctx.restore();
-    return;
+    ctx.beginPath(); ctx.moveTo(x-4, bodyY+4); ctx.lineTo(x-8, footY); ctx.moveTo(x+4, bodyY+4); ctx.lineTo(x+8, footY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-guy.bodyR, bodyY); ctx.lineTo(x-guy.bodyR-4, bodyY+10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+guy.bodyR, bodyY); ctx.lineTo(x+6, bodyY-4); ctx.lineTo(x+3, headY+guy.headR+2); ctx.stroke();
+    ctx.fillStyle = '#bbb'; ctx.beginPath(); ctx.arc(x, bodyY, guy.bodyR, 0, Math.PI*2); ctx.fill();
+    ctx.save(); ctx.translate(x, headY); ctx.rotate(guy.headTilt*0.3);
+    ctx.fillStyle = '#ccc'; ctx.beginPath(); ctx.arc(0, 0, guy.headR, 0, Math.PI*2); ctx.fill();
+    if (!guy.eyesClosed) { ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(-3, 1, 1.5, 0, Math.PI*2); ctx.arc(3, 1, 1.5, 0, Math.PI*2); ctx.fill(); }
+    else { ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(-1, 0); ctx.moveTo(1, 0); ctx.lineTo(5, 0); ctx.stroke(); }
+    ctx.restore(); return;
   }
 
-  // Normal / sitting pose
-  const bodyY = guy.sitting ? footY - 8 : footY - 12;
-  const headY = guy.sitting ? footY - 20 : footY - 26;
-
+  const bodyY = guy.sitting ? footY-8 : footY-12;
+  const headY = guy.sitting ? footY-20 : footY-26;
   ctx.strokeStyle = '#999'; ctx.lineWidth = 2;
   if (guy.sitting) {
-    ctx.beginPath();
-    ctx.moveTo(x - 4, bodyY + 4); ctx.lineTo(x - 8, footY);
-    ctx.moveTo(x + 4, bodyY + 4); ctx.lineTo(x + 8, footY);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-4, bodyY+4); ctx.lineTo(x-8, footY); ctx.moveTo(x+4, bodyY+4); ctx.lineTo(x+8, footY); ctx.stroke();
   } else {
-    const legAnim = guy.grounded ? Math.sin(Date.now() / 120) * Math.min(3, Math.abs(guy.vx) * 2) : 0;
-    ctx.beginPath();
-    ctx.moveTo(x - 4, bodyY + 5); ctx.lineTo(x - 5 - legAnim, footY);
-    ctx.moveTo(x + 4, bodyY + 5); ctx.lineTo(x + 5 + legAnim, footY);
-    ctx.stroke();
+    const la = guy.grounded ? Math.sin(Date.now()/120) * Math.min(3, Math.abs(guy.vx)*2) : 0;
+    ctx.beginPath(); ctx.moveTo(x-4, bodyY+5); ctx.lineTo(x-5-la, footY); ctx.moveTo(x+4, bodyY+5); ctx.lineTo(x+5+la, footY); ctx.stroke();
   }
-
-  const armAnim = guy.sitting ? 0 : Math.sin(Date.now() / 140) * Math.min(4, Math.abs(guy.vx) * 2);
+  const aa = guy.sitting ? 0 : Math.sin(Date.now()/140) * Math.min(4, Math.abs(guy.vx)*2);
   ctx.beginPath();
-  ctx.moveTo(x - guy.bodyR, bodyY); ctx.lineTo(x - guy.bodyR - 4 - armAnim, bodyY + 10);
-  ctx.moveTo(x + guy.bodyR, bodyY); ctx.lineTo(x + guy.bodyR + 4 + armAnim, bodyY + 10);
+  ctx.moveTo(x-guy.bodyR, bodyY); ctx.lineTo(x-guy.bodyR-4-aa, bodyY+10);
+  ctx.moveTo(x+guy.bodyR, bodyY); ctx.lineTo(x+guy.bodyR+4+aa, bodyY+10);
   ctx.stroke();
-
-  ctx.fillStyle = guy.inert ? '#777' : '#bbb';
-  ctx.beginPath(); ctx.arc(x, bodyY, guy.bodyR, 0, Math.PI * 2); ctx.fill();
-
-  ctx.save(); ctx.translate(x, headY); ctx.rotate(guy.headTilt * 0.3);
-  ctx.fillStyle = guy.inert ? '#888' : '#ccc';
-  ctx.beginPath(); ctx.arc(0, 0, guy.headR, 0, Math.PI * 2); ctx.fill();
-
+  ctx.fillStyle = guy.inert ? '#777' : '#bbb'; ctx.beginPath(); ctx.arc(x, bodyY, guy.bodyR, 0, Math.PI*2); ctx.fill();
+  ctx.save(); ctx.translate(x, headY); ctx.rotate(guy.headTilt*0.3);
+  ctx.fillStyle = guy.inert ? '#888' : '#ccc'; ctx.beginPath(); ctx.arc(0, 0, guy.headR, 0, Math.PI*2); ctx.fill();
   if (!guy.inert) {
     if (guy.eyesClosed) {
       ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(-5, -1); ctx.lineTo(-1, -1); ctx.moveTo(1, -1); ctx.lineTo(5, -1); ctx.stroke();
     } else {
-      const ex = guy.eyeDir * 2.5, ey = guy.eyeY;
-      ctx.fillStyle = '#333';
-      ctx.beginPath();
-      ctx.arc(-3 + ex, -1 + ey, 1.5, 0, Math.PI * 2);
-      ctx.arc(3 + ex, -1 + ey, 1.5, 0, Math.PI * 2);
+      const ex = guy.eyeDir*2.5, ey = guy.eyeY;
+      ctx.fillStyle = '#333'; ctx.beginPath();
+      ctx.arc(-3+ex, -1+ey, 1.5, 0, Math.PI*2);
+      ctx.arc(3+ex, -1+ey, 1.5, 0, Math.PI*2);
       ctx.fill();
     }
   } else {
@@ -1975,12 +1658,7 @@ function drawCharacter() {
 // LOOP
 // ============================================================
 loadScene(0);
-
-function loop() {
-  update();
-  render();
-  requestAnimationFrame(loop);
-}
+function loop() { update(); render(); requestAnimationFrame(loop); }
 loop();
 </script>
 </body>
