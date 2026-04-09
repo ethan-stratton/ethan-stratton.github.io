@@ -250,6 +250,8 @@ const state = {
   wordFreeze: 0,
   sessionCount: 1, pitPath: null, saveFlash: 0, returnTimeSince: 0,
   howAreYouCooldown: 0,
+  lastBreathSound: 0,
+  firstGrabResist: 0,
   scene8Warm: false,
   transitionShowCode: false,
   returnFlinch: false,
@@ -452,7 +454,7 @@ const scenes = [
           '// Try moving him. Click and drag.',
           '// He won\'t like it. That\'s okay.',
         ],
-        color: '#445544', reveal: 'always',
+        color: '#667766', reveal: 'always',
       },
       {
         x: 500, y: 100,
@@ -461,7 +463,7 @@ const scenes = [
           '// Felt wrong to make something big',
           '// before I knew what it was for.',
         ],
-        color: '#3a4a3a', reveal: 'proximity',
+        color: '#5a7a5a', reveal: 'proximity',
       },
     ],
     ambientFreq: 55, ambientVol: 0,
@@ -497,12 +499,12 @@ const scenes = [
         '// what "up" means first.',
         '// Lift him onto something higher.',
         '// He\'ll figure it out.',
-      ], color: '#445544', reveal: 'proximity' },
+      ], color: '#667766', reveal: 'proximity' },
       { x: 50, y: 380, lines: [
         '// I keep second-guessing the physics.',
         '// Is 0.4 gravity too harsh?',
         '// He\'s so small.',
-      ], color: '#3a4438', reveal: 'proximity' },
+      ], color: '#5a6a58', reveal: 'proximity' },
     ],
     ambientFreq: 55, ambientVol: 0.025,
     triggers: [
@@ -540,14 +542,14 @@ const scenes = [
         '//',
         '// Be thoughtful about which ones you give him.',
         '// They\'ll shape what he can say later.',
-      ], color: '#445544', reveal: 'proximity' },
+      ], color: '#667766', reveal: 'proximity' },
       { x: 550, y: 340, lines: [
         '// I almost gave him a full dictionary.',
         '// Then I thought about what I\'d want',
         '// if someone gave me language for the',
         '// first time. Not everything. Just enough',
         '// to start asking.',
-      ], color: '#384438', reveal: 'proximity' },
+      ], color: '#5a6a58', reveal: 'proximity' },
     ],
     ambientFreq: 60, ambientVol: 0.025,
     triggers: [
@@ -585,13 +587,13 @@ const scenes = [
         '//',
         '// You can draw platforms too —',
         '// click and drag on empty space.',
-      ], color: '#445544', reveal: 'proximity' },
+      ], color: '#667766', reveal: 'proximity' },
       { x: 620, y: 200, lines: [
         '// I put a lock on the door because',
         '// I wanted to see if he\'d wait for help',
         '// or try to go through it anyway.',
         '// I don\'t know what that says about me.',
-      ], color: '#384438', reveal: 'proximity' },
+      ], color: '#5a6a58', reveal: 'proximity' },
     ],
     ambientFreq: 60, ambientVol: 0.03,
     triggers: [
@@ -649,16 +651,16 @@ const scenes = [
         '// He can\'t see what\'s below. You can.',
         '// He\'s going to have to trust the process.',
         '//', '// (I\'m sorry about this one.)',
-      ], color: '#445544', reveal: 'proximity' },
+      ], color: '#667766', reveal: 'proximity' },
       { x: 520, y: GROUND_Y_DEFAULT - 50, lines: [
         '// There are two ways through.',
         '// I wonder which one you\'ll pick.',
-      ], color: '#554433', reveal: 'always', font: '10px monospace' },
-      { x: 350, y: GROUND_Y_DEFAULT + 85, lines: ['// ...'], color: '#332a2a', reveal: 'after:fell_in', font: '10px monospace' },
+      ], color: '#776655', reveal: 'always', font: '10px monospace' },
+      { x: 350, y: GROUND_Y_DEFAULT + 85, lines: ['// ...'], color: '#554a4a', reveal: 'after:fell_in', font: '10px monospace' },
       { x: 500, y: GROUND_Y_DEFAULT - 70, lines: [
         '// You chose the long way.',
         '// That matters more than you think.',
-      ], color: '#3a4a3a', reveal: 'after:crossed_safely' },
+      ], color: '#5a7a5a', reveal: 'after:crossed_safely' },
     ],
     ambientFreq: 40, ambientVol: 0.015,
     triggers: [
@@ -733,13 +735,13 @@ const scenes = [
         '// Once he can ask the question, he will.',
         '//', '// Not all words mean the same thing',
         '// when you\'re the only one who has them.',
-      ], color: '#445544', reveal: 'proximity' },
+      ], color: '#667766', reveal: 'proximity' },
       { x: 500, y: 100, lines: [
         '// I thought about giving him LOVE',
         '// but I don\'t think I understand it well',
         '// enough to put it in a block.',
         '// Maybe that\'s the point.',
-      ], color: '#3a4438', reveal: 'proximity' },
+      ], color: '#5a6a58', reveal: 'proximity' },
     ],
     ambientFreq: 65, ambientVol: 0.03,
     triggers: [
@@ -776,13 +778,13 @@ const scenes = [
         '// most of it.',
         '//', '// But he\'ll find the parts about himself.',
         '// That\'s the part that matters to him.',
-      ], color: '#445544', reveal: 'proximity' },
+      ], color: '#667766', reveal: 'proximity' },
       { x: 500, y: 280, lines: [
         '// created_by: ...',
         '// purpose: ...',
         '//', '// (I left those blank on purpose.)',
         '// (I didn\'t know how to fill them in.)',
-      ], color: '#504838', reveal: 'after:book_near_guy' },
+      ], color: '#706858', reveal: 'after:book_near_guy' },
       {
         x: 30, y: 350,
         lines: [
@@ -790,7 +792,7 @@ const scenes = [
           '// I wrote them on the walls for you.',
           '// He walks right past them.',
         ],
-        color: '#3a4438', reveal: 'always',
+        color: '#5a6a58', reveal: 'always',
       },
       {
         x: 580, y: 100,
@@ -799,7 +801,7 @@ const scenes = [
           '// 800 pixels was the best I could do.',
           '// I\'m not very good at this.',
         ],
-        color: '#3a3a44', reveal: 'proximity',
+        color: '#5a5a6a', reveal: 'proximity',
       },
     ],
     ambientFreq: 50, ambientVol: 0.02,
@@ -832,7 +834,7 @@ const scenes = [
         '// He\'s going to look for the edges now.',
         '// You already know they\'re there.',
         '// He doesn\'t. Not really.',
-      ], color: '#445544', reveal: 'always' },
+      ], color: '#667766', reveal: 'always' },
       { x: 550, y: 350, lines: [
         '// You can try to draw past them.',
         '// It won\'t work.',
@@ -841,7 +843,7 @@ const scenes = [
       { x: 280, y: 110, lines: [
         '// 800 pixels wide. That\'s all I could give him.',
         '// Is that small? I can\'t tell anymore.',
-      ], color: '#3a3a44', reveal: 'after:both_edges' },
+      ], color: '#5a5a6a', reveal: 'after:both_edges' },
       {
         x: 80, y: 200,
         lines: [
@@ -851,7 +853,7 @@ const scenes = [
           '//',
           '// I keep going back and forth.',
         ],
-        color: '#3a3844', reveal: 'after:both_edges',
+        color: '#5a586a', reveal: 'after:both_edges',
       },
     ],
     ambientFreq: 45, ambientVol: 0.015,
@@ -893,19 +895,19 @@ const scenes = [
       { x: 200, y: 80, lines: [
         '// I don\'t know if this is right.',
         '// I just wanted to see what would happen.',
-      ], color: '#445544', reveal: 'always' },
+      ], color: '#667766', reveal: 'always' },
       { x: 100, y: 200, lines: [
         '// He\'s going to ask why.',
         '// I can\'t answer that.',
         '// Can you?',
-      ], color: '#504840', reveal: 'always' },
+      ], color: '#706860', reveal: 'always' },
       { x: 400, y: 300, lines: [
         '//                        ...',
         '//',
         '// Maybe the answer is that he asked at all.',
         '// Maybe that\'s enough.',
         '// I hope it\'s enough.',
-      ], color: '#3a3a34', reveal: 'after:sit_down' },
+      ], color: '#5a5a54', reveal: 'after:sit_down' },
       {
         x: 550, y: 140,
         lines: [
@@ -916,7 +918,7 @@ const scenes = [
           '//',
           '// I think it has to be.',
         ],
-        color: '#443a34', reveal: 'always',
+        color: '#6a5a54', reveal: 'always',
       },
       {
         x: 30, y: 380,
@@ -924,7 +926,7 @@ const scenes = [
           '// (I spent 3 hours on the eye tracking',
           '//  and nobody will ever know.)',
         ],
-        color: '#333830', reveal: 'proximity',
+        color: '#556850', reveal: 'proximity',
       },
     ],
     ambientFreq: 50, ambientVol: 0.01,
@@ -1137,6 +1139,7 @@ const guy = {
   headR: 8, bodyR: 7,
   grounded: false, inert: true,
   sitting: false, sleeping: false, thinker: false,
+  wakingUp: false, wakeTimer: 0,
   avoidX: null, avoidDir: 0,
   symbols: [],
   currentSpeech: '', speechFade: 0,
@@ -1198,9 +1201,8 @@ canvas.addEventListener('mousedown', e => {
 
   // Wake from idle poses
   if ((guy.sleeping || guy.thinker) && mouse.x >= guy.x - 30 && mouse.x <= guy.x + 30 && mouse.y >= guy.y - 50 && mouse.y <= guy.y + 10) {
-    guy.sleeping = false; guy.thinker = false; guy.sitting = false;
-    guy.idlePhase = 0; guy.idleTime = 0; guy.eyesClosed = false; guy.eyesCloseTimer = 0;
-    addSymbol('!'); updateTabTitle();
+    guy.wakingUp = true; guy.wakeTimer = 0;
+    return;
   }
 
   // Guy
@@ -1215,6 +1217,7 @@ canvas.addEventListener('mousedown', e => {
     if (guy.inert) { addSymbol('!'); setTimeout(() => addSymbol('?'), 200); }
     else {
       addSymbol('!'); guy.currentBark = null; guy.barkQueue.length = 0;
+      if (state.dragCount === 1) { state.firstGrabResist = 12; addSymbol('?!'); }
       if (state.scene === 4 && hasFired(4, 'near_edge') && !hasFired(4, 'fell_in')) {
         addSymbol('!!!');
         if (state.learnedSpeak && state.wordsLearned.includes('NO')) showSpeech('NO!');
