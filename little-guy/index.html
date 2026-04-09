@@ -8,21 +8,10 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: #0a0a0f; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: monospace; }
 canvas { cursor: default; }
-#book-overlay {
-  display: none; position: fixed; top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  background: #1a1a1a; border: 1px solid #444;
-  padding: 30px 40px; max-width: 520px;
-  color: #8a8; font-family: monospace; font-size: 13px;
-  line-height: 1.7; white-space: pre-wrap; z-index: 10; border-radius: 4px;
-}
-#book-overlay .close { position: absolute; top: 8px; right: 12px; color: #666; cursor: pointer; font-size: 18px; }
-#book-overlay .close:hover { color: #aaa; }
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="book-overlay"><span class="close" onclick="closeBook()">×</span><pre id="book-text"></pre></div>
 <script>
 // ============================================================
 // CANVAS
@@ -40,6 +29,7 @@ const BOUNCE = 0.4;
 const AIR_DRAG = 0.995;
 const GROUND_FRIC = 0.88;
 const MOUSE_HIST_LEN = 6;
+const GROUND_Y_DEFAULT = H - 60;
 
 // ============================================================
 // AUDIO ENGINE (Web Audio API — synthesized, no files)
@@ -47,6 +37,7 @@ const MOUSE_HIST_LEN = 6;
 let audioCtx = null;
 let masterGain = null;
 let ambientOsc = null;
+let ambientOsc2 = null;
 let ambientGain = null;
 let ambientActive = false;
 
@@ -58,7 +49,6 @@ function initAudio() {
   masterGain.connect(audioCtx.destination);
 }
 
-// Speech blip — pitch varies per character, Undertale-style
 function playSpeechBlip(char, index) {
   if (!audioCtx) return;
   const baseFreq = 280 + (char.charCodeAt(0) % 20) * 12;
@@ -69,13 +59,10 @@ function playSpeechBlip(char, index) {
   osc.frequency.value = freq;
   gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
-  osc.connect(gain);
-  gain.connect(masterGain);
-  osc.start(audioCtx.currentTime);
-  osc.stop(audioCtx.currentTime + 0.08);
+  osc.connect(gain); gain.connect(masterGain);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.08);
 }
 
-// Impact thud
 function playImpact(intensity) {
   if (!audioCtx) return;
   const osc = audioCtx.createOscillator();
@@ -85,33 +72,28 @@ function playImpact(intensity) {
   osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.15);
   gain.gain.setValueAtTime(Math.min(0.15, intensity * 0.03), audioCtx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-  osc.connect(gain);
-  gain.connect(masterGain);
+  osc.connect(gain); gain.connect(masterGain);
   osc.start(); osc.stop(audioCtx.currentTime + 0.15);
 }
 
-// Symbol pop (! ? ...)
 function playSymbol(sym) {
   if (!audioCtx) return;
   const freq = sym === '!' ? 600 : sym === '?' ? 450 : sym === '!!!' ? 700 : 350;
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
-  osc.type = 'triangle';
-  osc.frequency.value = freq;
+  osc.type = 'triangle'; osc.frequency.value = freq;
   gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
   osc.connect(gain); gain.connect(masterGain);
   osc.start(); osc.stop(audioCtx.currentTime + 0.12);
 }
 
-// Book discovery tone — low warm chord
 function playBookTone() {
   if (!audioCtx) return;
   [130.8, 164.8, 196.0].forEach((f, i) => {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = f;
+    osc.type = 'sine'; osc.frequency.value = f;
     gain.gain.setValueAtTime(0.04, audioCtx.currentTime + i * 0.1);
     gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5 + i * 0.1);
     osc.connect(gain); gain.connect(masterGain);
@@ -120,25 +102,19 @@ function playBookTone() {
   });
 }
 
-// Ambient drone — starts after waking
-function startAmbient(scene) {
+function startAmbient() {
   if (!audioCtx || ambientActive) return;
   ambientActive = true;
   ambientOsc = audioCtx.createOscillator();
   ambientGain = audioCtx.createGain();
-  ambientOsc.type = 'sine';
-  ambientOsc.frequency.value = 55; // low A
+  ambientOsc.type = 'sine'; ambientOsc.frequency.value = 55;
   ambientGain.gain.setValueAtTime(0, audioCtx.currentTime);
   ambientGain.gain.linearRampToValueAtTime(0.025, audioCtx.currentTime + 3);
-  ambientOsc.connect(ambientGain);
-  ambientGain.connect(masterGain);
+  ambientOsc.connect(ambientGain); ambientGain.connect(masterGain);
   ambientOsc.start();
-  // Add a very subtle second oscillator slightly detuned
-  const osc2 = audioCtx.createOscillator();
-  osc2.type = 'sine';
-  osc2.frequency.value = 55.3;
-  osc2.connect(ambientGain);
-  osc2.start();
+  ambientOsc2 = audioCtx.createOscillator();
+  ambientOsc2.type = 'sine'; ambientOsc2.frequency.value = 55.3;
+  ambientOsc2.connect(ambientGain); ambientOsc2.start();
 }
 
 function setAmbientTone(freq, vol) {
@@ -148,55 +124,90 @@ function setAmbientTone(freq, vol) {
 }
 
 // ============================================================
+// PARTICLE SYSTEM
+// ============================================================
+const particles = [];
+
+function spawnDust(x, y, count, opts = {}) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * (opts.spread || 2),
+      vy: -(Math.random() * (opts.upward || 1.5) + 0.3),
+      life: (opts.life || 30) + Math.random() * 15 | 0,
+      maxLife: (opts.life || 30) + 15,
+      size: opts.size || (1 + Math.random() * 1.5),
+      color: opts.color || '#666',
+    });
+  }
+}
+
+function spawnImpactDust(x, y, intensity) {
+  const count = Math.min(12, 3 + intensity * 1.5 | 0);
+  spawnDust(x, y, count, { spread: intensity * 0.8, upward: intensity * 0.4, life: 20 + intensity * 3, color: '#777' });
+}
+
+function spawnWalkDust(x, y) {
+  if (Math.random() > 0.3) return;
+  spawnDust(x, y, 1, { spread: 0.5, upward: 0.4, life: 15, size: 1, color: '#444' });
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy;
+    p.vy += 0.02; // tiny gravity
+    p.vx *= 0.98;
+    p.life--;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function renderParticles() {
+  for (const p of particles) {
+    const alpha = Math.min(1, p.life / (p.maxLife * 0.3));
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ============================================================
 // WORD COMBINATION ENGINE
 // ============================================================
-// Grammar templates — he assembles novel phrases from his vocabulary
 const wordTemplates = [
-  // 2-word
   { pattern: ['question', 'noun'], make: (q, n) => q + '... ' + n + '?' },
   { pattern: ['noun', 'verb'], make: (n, v) => n + '... ' + v + '.' },
   { pattern: ['feeling', 'question'], make: (f, q) => f + '... ' + q + '?' },
-  // 3-word
   { pattern: ['question', 'verb', 'noun'], make: (q, v, n) => q + '... ' + v + '... ' + n + '?' },
   { pattern: ['noun', 'verb', 'adverb'], make: (n, v, a) => n + '... ' + v + '... ' + a + '.' },
 ];
 
 const wordCategories = {
-  'HERE':  'adverb', 'GO': 'verb', 'NO': 'negation', 'WHY': 'question',
-  'HELP':  'verb', 'WHAT': 'question', 'WHO': 'question', 'MADE': 'verb',
-  'ME':    'noun', 'FEEL': 'feeling', 'REAL': 'adjective', 'THINK': 'feeling',
+  'HERE': 'adverb', 'GO': 'verb', 'NO': 'negation', 'WHY': 'question',
+  'HELP': 'verb', 'WHAT': 'question', 'WHO': 'question', 'MADE': 'verb',
+  'ME': 'noun', 'FEEL': 'feeling', 'REAL': 'adjective', 'THINK': 'feeling',
 };
 
 function generatePhrase() {
   const words = state.wordsLearned;
   if (words.length < 2) return null;
-
-  // Categorize available words
   const byCategory = {};
   for (const w of words) {
     const cat = wordCategories[w] || 'noun';
     if (!byCategory[cat]) byCategory[cat] = [];
     byCategory[cat].push(w);
   }
-
-  // Try templates
-  const shuffled = wordTemplates.filter(t => {
-    return t.pattern.every(cat => byCategory[cat] && byCategory[cat].length > 0);
-  });
-  if (shuffled.length === 0) {
-    // Fallback: just pair two random words
+  const valid = wordTemplates.filter(t => t.pattern.every(cat => byCategory[cat]?.length > 0));
+  if (valid.length === 0) {
     const a = words[Math.random() * words.length | 0];
     const b = words[Math.random() * words.length | 0];
-    if (a === b) return a + '...';
-    return a + '... ' + b + (Math.random() > 0.5 ? '?' : '.');
+    return a === b ? a + '...' : a + '... ' + b + (Math.random() > 0.5 ? '?' : '.');
   }
-
-  const template = shuffled[Math.random() * shuffled.length | 0];
-  const chosen = template.pattern.map(cat => {
-    const opts = byCategory[cat];
-    return opts[Math.random() * opts.length | 0];
-  });
-  return template.make(...chosen);
+  const t = valid[Math.random() * valid.length | 0];
+  const chosen = t.pattern.map(cat => { const o = byCategory[cat]; return o[Math.random() * o.length | 0]; });
+  return t.make(...chosen);
 }
 
 // ============================================================
@@ -219,8 +230,10 @@ const state = {
   transitionTarget: -1,
   frameCount: 0,
   sceneFrames: 0,
-  // Fading drawn platforms (for edge scene)
-  fadingPlatforms: [], // {x,y,w,h,life}
+  fadingPlatforms: [],
+  // Idle tracking
+  playerAbsentFrames: 0, // frames since last mouse move
+  lastMouseMove: 0,
 };
 
 // ============================================================
@@ -236,8 +249,7 @@ class Body {
     this.label = opts.label || null;
     this.type = opts.type || 'box';
     this.grounded = false;
-    this.rotation = 0;
-    this.rotV = 0;
+    this.rotation = 0; this.rotV = 0;
     this.id = opts.id || null;
     this.visible = opts.visible !== undefined ? opts.visible : true;
     this.solid = opts.solid !== undefined ? opts.solid : true;
@@ -251,9 +263,47 @@ class Body {
 }
 
 // ============================================================
+// WALL WRITING — replaces book overlay
+// ============================================================
+// Each scene has wallWritings: [{x, y, lines, color, reveal}]
+// reveal: 'proximity' (default) | 'always' | 'after:triggerId'
+// They render on the wall, fade in when guy is near
+
+function getWallWritings(sceneIdx) {
+  return (scenes[sceneIdx] && scenes[sceneIdx].wallWritings) || [];
+}
+
+function renderWallWritings() {
+  const writings = getWallWritings(state.scene);
+  for (const w of writings) {
+    let alpha = 0;
+    if (w.reveal === 'always') {
+      alpha = 0.6;
+    } else if (w.reveal && w.reveal.startsWith('after:')) {
+      const tid = w.reveal.slice(6);
+      alpha = hasFired(state.scene, tid) ? 0.5 : 0;
+    } else {
+      // proximity — fade based on distance to guy
+      const dist = Math.abs(guy.x - w.x);
+      alpha = dist < 120 ? Math.max(0, 0.55 - dist / 300) : 0;
+    }
+    if (alpha <= 0.01) continue;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = w.font || '11px monospace';
+    ctx.fillStyle = w.color || '#556655';
+    const lines = w.lines;
+    for (let i = 0; i < lines.length; i++) {
+      ctx.fillText(lines[i], w.x, w.y + i * 16);
+    }
+    ctx.restore();
+  }
+}
+
+// ============================================================
 // SCENE DATA
 // ============================================================
-const GROUND_Y_DEFAULT = H - 60;
 
 function makeGround(gy) {
   return new Body(0, gy || GROUND_Y_DEFAULT, W, 60, { isStatic: true, color: '#1e1e2e' });
@@ -271,21 +321,39 @@ const scenes = [
     bodies: [
       () => new Body(180, GROUND_Y_DEFAULT - 18, 22, 18, { color: '#6b5b3a', type: 'book', draggable: true, id: 'book' }),
     ],
-    bookPage: `// version 0.1
-// He's in there. All the code is running.
-// He just doesn't know what he can do yet.
-//
-// Try moving him. Click and drag.
-// He won't like it. That's okay.`,
+    wallWritings: [
+      {
+        x: 30, y: 60,
+        lines: [
+          '// version 0.1',
+          '// He\'s in there. All the code is running.',
+          '// He just doesn\'t know what he can do yet.',
+          '//',
+          '// Try moving him. Click and drag.',
+          '// He won\'t like it. That\'s okay.',
+        ],
+        color: '#445544',
+        reveal: 'always',
+      },
+      {
+        x: 500, y: 100,
+        lines: [
+          '// I made him small on purpose.',
+          '// Felt wrong to make something big',
+          '// before I knew what it was for.',
+        ],
+        color: '#3a4a3a',
+        reveal: 'proximity',
+      },
+    ],
     ambientFreq: 55, ambientVol: 0,
     triggers: [
       {
         id: 'wake',
         condition: () => state.learnedMove,
-        once: true,
-        delay: 120,
+        once: true, delay: 120,
         action: () => {
-          startAmbient(0);
+          startAmbient();
           queueBark({ lookAt: { x: guy.x + 100, y: guy.y - 20 }, duration: 60, symbol: '...' });
           queueBark({ lookAt: { x: guy.x - 80, y: guy.y }, duration: 50 });
           queueBark({ headTilt: -0.3, duration: 50, symbol: '?' });
@@ -298,7 +366,7 @@ const scenes = [
         action: () => transitionTo(1),
       },
     ],
-    hint: () => !state.learnedMove && state.dragCount === 0 ? { text: 'double-click the book', x: 180 + 11, y: GROUND_Y_DEFAULT - 28 } : null,
+    hint: () => !state.learnedMove && state.dragCount === 0 ? { text: 'click and drag him', x: 100, y: GROUND_Y_DEFAULT - 50 } : null,
   },
 
   // ── SCENE 1: THE STEP ──
@@ -313,11 +381,30 @@ const scenes = [
       () => new Body(380, GROUND_Y_DEFAULT - 45, 400, 12, { isStatic: true, color: '#2a2a3e' }),
     ],
     bodies: [],
-    bookPage: `// jump_height: 8
-// He can jump. But he has to learn
-// what "up" means first.
-// Lift him onto something higher.
-// He'll figure it out.`,
+    wallWritings: [
+      {
+        x: 420, y: 50,
+        lines: [
+          '// jump_height: 8',
+          '// He can jump. But he has to learn',
+          '// what "up" means first.',
+          '// Lift him onto something higher.',
+          '// He\'ll figure it out.',
+        ],
+        color: '#445544',
+        reveal: 'proximity',
+      },
+      {
+        x: 50, y: 380,
+        lines: [
+          '// I keep second-guessing the physics.',
+          '// Is 0.4 gravity too harsh?',
+          '// He\'s so small.',
+        ],
+        color: '#3a4438',
+        reveal: 'proximity',
+      },
+    ],
     ambientFreq: 55, ambientVol: 0.025,
     triggers: [
       {
@@ -356,20 +443,39 @@ const scenes = [
       () => new Body(490, GROUND_Y_DEFAULT - 16, 38, 16, { color: '#3a4a5a', type: 'word', label: 'WHY', draggable: true }),
       () => new Body(555, GROUND_Y_DEFAULT - 16, 40, 16, { color: '#3a4a5a', type: 'word', label: 'HELP', draggable: true }),
     ],
-    bookPage: `// talk: true (dormant)
-// He has a voice. He just needs words.
-// The blocks have labels. Bring them to him.
-// Start with something simple.
-//
-// Be thoughtful about which ones you give him.
-// They'll shape what he can say later.`,
+    wallWritings: [
+      {
+        x: 80, y: 50,
+        lines: [
+          '// talk: true (dormant)',
+          '// He has a voice. He just needs words.',
+          '// The blocks have labels. Bring them to him.',
+          '//',
+          '// Be thoughtful about which ones you give him.',
+          '// They\'ll shape what he can say later.',
+        ],
+        color: '#445544',
+        reveal: 'proximity',
+      },
+      {
+        x: 550, y: 340,
+        lines: [
+          '// I almost gave him a full dictionary.',
+          '// Then I thought about what I\'d want',
+          '// if someone gave me language for the',
+          '// first time. Not everything. Just enough',
+          '// to start asking.',
+        ],
+        color: '#384438',
+        reveal: 'proximity',
+      },
+    ],
     ambientFreq: 60, ambientVol: 0.025,
     triggers: [
       {
         id: 'first_word',
         condition: () => state.wordsLearned.length >= 1 && !hasFired(2, 'first_word'),
-        once: true,
-        delay: 60,
+        once: true, delay: 60,
         action: () => {
           queueBark({ lookAt: { x: guy.x, y: guy.y - 10 }, duration: 50 });
           queueBark({ headTilt: 0.1, duration: 40, symbol: '...' });
@@ -401,19 +507,37 @@ const scenes = [
       () => new Body(150, GROUND_Y_DEFAULT - 20, 30, 20, { color: '#444', type: 'box', draggable: true }),
       () => new Body(250, GROUND_Y_DEFAULT - 20, 30, 20, { color: '#444', type: 'box', draggable: true }),
     ],
-    bookPage: `// He's getting smarter. Watch.
-// Give him a path and he'll try to take it.
-// You don't have to carry him everywhere.
-//
-// You can draw platforms too —
-// click and drag on empty space.`,
+    wallWritings: [
+      {
+        x: 30, y: 55,
+        lines: [
+          '// He\'s getting smarter. Watch.',
+          '// Give him a path and he\'ll try to take it.',
+          '//',
+          '// You can draw platforms too —',
+          '// click and drag on empty space.',
+        ],
+        color: '#445544',
+        reveal: 'proximity',
+      },
+      {
+        x: 620, y: 200,
+        lines: [
+          '// I put a lock on the door because',
+          '// I wanted to see if he\'d wait for help',
+          '// or try to go through it anyway.',
+          '// I don\'t know what that says about me.',
+        ],
+        color: '#384438',
+        reveal: 'proximity',
+      },
+    ],
     ambientFreq: 60, ambientVol: 0.03,
     triggers: [
       {
         id: 'key_near_door',
         condition: () => {
-          const key = findBody('key');
-          const door = findBody('door');
+          const key = findBody('key'), door = findBody('door');
           return key && door && Math.abs(key.cx - door.cx) < 40 && Math.abs(key.cy - door.cy) < 50;
         },
         once: true,
@@ -450,12 +574,40 @@ const scenes = [
       () => new Body(450, GROUND_Y_DEFAULT + 60, 350, 60, { isStatic: true, color: '#1e1e2e' }),
     ],
     bodies: [],
-    bookPage: `// This is the hard part.
-// He can't see what's below. You can.
-// He's going to have to trust the process.
-//
-// (I'm sorry about this one.)`,
     customGround: true,
+    wallWritings: [
+      {
+        x: 30, y: 55,
+        lines: [
+          '// This is the hard part.',
+          '// He can\'t see what\'s below. You can.',
+          '// He\'s going to have to trust the process.',
+          '//',
+          '// (I\'m sorry about this one.)',
+        ],
+        color: '#445544',
+        reveal: 'proximity',
+      },
+      // Hint: writing on the far side, always visible, to lure the player
+      {
+        x: 520, y: GROUND_Y_DEFAULT + 30,
+        lines: [
+          '// keep going →',
+        ],
+        color: '#554433',
+        reveal: 'always',
+        font: '10px monospace',
+      },
+      {
+        x: 490, y: GROUND_Y_DEFAULT + 44,
+        lines: [
+          '// there\'s ground. I promise.',
+        ],
+        color: '#443a2a',
+        reveal: 'always',
+        font: '10px monospace',
+      },
+    ],
     ambientFreq: 40, ambientVol: 0.015,
     triggers: [
       {
@@ -464,8 +616,7 @@ const scenes = [
         once: true,
         action: () => {
           guy.wanderTarget = null;
-          guy.avoidX = 310;
-          guy.avoidDir = -1; // flee left
+          guy.avoidX = 310; guy.avoidDir = -1;
           if (state.learnedSpeak) {
             if (state.wordsLearned.includes('NO')) showSpeech('NO...');
             else showSpeech('...');
@@ -482,15 +633,17 @@ const scenes = [
           addSymbol('!!!');
           if (state.learnedSpeak && state.wordsLearned.includes('NO')) showSpeech('NO NO NO');
           playImpact(8);
+          // Ambient drops out in the pit
+          setAmbientTone(30, 0.003);
         }
       },
       {
         id: 'landed_other_side',
         condition: () => guy.x > 450 && guy.y > GROUND_Y_DEFAULT + 40 && guy.grounded,
-        once: true,
-        delay: 60,
+        once: true, delay: 60,
         action: () => {
           setAmbientTone(65, 0.035);
+          spawnDust(guy.x, guy.y, 8, { spread: 3, upward: 2, life: 40, color: '#665' });
           if (state.learnedSpeak) {
             const words = state.wordsLearned;
             if (words.includes('WHY')) setTimeout(() => showSpeech('WHY... HERE...'), 500);
@@ -530,19 +683,37 @@ const scenes = [
       () => new Body(560, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#4a3a5a', type: 'word', label: 'REAL', draggable: true }),
       () => new Body(640, GROUND_Y_DEFAULT - 16, 48, 16, { color: '#4a3a5a', type: 'word', label: 'THINK', draggable: true }),
     ],
-    bookPage: `// He's ready for more.
-// Be careful which words you give him.
-// Once he can ask the question, he will.
-//
-// Not all words mean the same thing
-// when you're the only one who has them.`,
+    wallWritings: [
+      {
+        x: 30, y: 55,
+        lines: [
+          '// He\'s ready for more.',
+          '// Once he can ask the question, he will.',
+          '//',
+          '// Not all words mean the same thing',
+          '// when you\'re the only one who has them.',
+        ],
+        color: '#445544',
+        reveal: 'proximity',
+      },
+      {
+        x: 500, y: 100,
+        lines: [
+          '// I thought about giving him LOVE',
+          '// but I don\'t think I understand it well',
+          '// enough to put it in a block.',
+          '// Maybe that\'s the point.',
+        ],
+        color: '#3a4438',
+        reveal: 'proximity',
+      },
+    ],
     ambientFreq: 65, ambientVol: 0.03,
     triggers: [
       {
         id: 'big_question',
         condition: () => state.wordsLearned.includes('WHO') && state.wordsLearned.includes('MADE') && state.wordsLearned.includes('ME') && !hasFired(5, 'big_question'),
-        once: true,
-        delay: 90,
+        once: true, delay: 90,
         action: () => {
           showSpeech('WHO... MADE... ME?');
           queueBark({ headTilt: -0.2, duration: 100 });
@@ -552,8 +723,7 @@ const scenes = [
       {
         id: 'feel_real',
         condition: () => state.wordsLearned.includes('FEEL') && state.wordsLearned.includes('REAL') && !hasFired(5, 'feel_real'),
-        once: true,
-        delay: 80,
+        once: true, delay: 80,
         action: () => {
           showSpeech('FEEL... REAL?');
           queueBark({ headTilt: -0.15, duration: 80, symbol: '...' });
@@ -582,18 +752,33 @@ const scenes = [
     bodies: [
       () => new Body(400, GROUND_Y_DEFAULT - 18, 28, 22, { color: '#6b5b3a', type: 'book', draggable: true, id: 'his_book' }),
     ],
-    bookPage: `// This is the same book. Or a copy of it.
-// He can see it now. He won't understand
-// most of it.
-//
-// But he'll find the parts about himself.
-// That's the part that matters to him.
-//
-// created_by: ...
-// purpose: ...
-//
-// (I left those blank on purpose.)
-// (I didn't know how to fill them in.)`,
+    wallWritings: [
+      {
+        x: 80, y: 50,
+        lines: [
+          '// This is the same book. Or a copy.',
+          '// He can see it now. He won\'t understand',
+          '// most of it.',
+          '//',
+          '// But he\'ll find the parts about himself.',
+          '// That\'s the part that matters to him.',
+        ],
+        color: '#445544',
+        reveal: 'proximity',
+      },
+      {
+        x: 500, y: 280,
+        lines: [
+          '// created_by: ...',
+          '// purpose: ...',
+          '//',
+          '// (I left those blank on purpose.)',
+          '// (I didn\'t know how to fill them in.)',
+        ],
+        color: '#504838',
+        reveal: 'after:book_near_guy',
+      },
+    ],
     ambientFreq: 50, ambientVol: 0.02,
     triggers: [
       {
@@ -602,8 +787,7 @@ const scenes = [
           const b = findBody('his_book');
           return b && Math.abs(b.cx - guy.x) < 45 && guy.grounded && b.grounded;
         },
-        once: true,
-        delay: 30,
+        once: true, delay: 30,
         action: () => {
           const b = findBody('his_book');
           if (b) queueBark({ lookAt: { x: b.cx, y: b.cy }, duration: 120 });
@@ -638,14 +822,38 @@ const scenes = [
     guyStart: { x: 400, y: GROUND_Y_DEFAULT },
     platforms: [],
     bodies: [],
-    drawingFails: true, // platforms fizzle here
-    bookPage: `// He's going to look for the edges now.
-// You already know they're there.
-// He doesn't. Not really.
-//
-// You can try to draw past them.
-// It won't work.
-// My tools have limits too.`,
+    drawingFails: true,
+    wallWritings: [
+      {
+        x: 30, y: 60,
+        lines: [
+          '// He\'s going to look for the edges now.',
+          '// You already know they\'re there.',
+          '// He doesn\'t. Not really.',
+        ],
+        color: '#445544',
+        reveal: 'always',
+      },
+      {
+        x: 550, y: 350,
+        lines: [
+          '// You can try to draw past them.',
+          '// It won\'t work.',
+          '// My tools have limits too.',
+        ],
+        color: '#443838',
+        reveal: 'always',
+      },
+      {
+        x: 280, y: 110,
+        lines: [
+          '// 800 pixels wide. That\'s all I could give him.',
+          '// Is that small? I can\'t tell anymore.',
+        ],
+        color: '#3a3a44',
+        reveal: 'after:both_edges',
+      },
+    ],
     ambientFreq: 45, ambientVol: 0.015,
     triggers: [
       {
@@ -674,8 +882,7 @@ const scenes = [
       {
         id: 'both_edges',
         condition: () => hasFired(7, 'hit_right') && hasFired(7, 'hit_left'),
-        once: true,
-        delay: 120,
+        once: true, delay: 120,
         action: () => {
           const words = state.wordsLearned;
           if (words.includes('ME')) showSpeech('ME... ONLY... HERE.');
@@ -687,8 +894,7 @@ const scenes = [
       {
         id: 'exit',
         condition: () => state.sceneTriggered['7_exit_ready'] && guy.x > 380 && guy.x < 420 && guy.y >= GROUND_Y_DEFAULT - 2,
-        once: true,
-        delay: 60,
+        once: true, delay: 60,
         action: () => transitionTo(8),
       },
     ],
@@ -703,46 +909,65 @@ const scenes = [
     guyStart: { x: 400, y: GROUND_Y_DEFAULT },
     platforms: [],
     bodies: [],
-    bookPage: `// I don't know if this is right.
-// I just wanted to see what would happen.
-//
-// He's going to ask why.
-// I can't answer that.
-// Can you?
-//
-//                        ...
-//
-// Maybe the answer is that he asked at all.
-// Maybe that's enough.
-// I hope it's enough.`,
+    wallWritings: [
+      {
+        x: 200, y: 80,
+        lines: [
+          '// I don\'t know if this is right.',
+          '// I just wanted to see what would happen.',
+        ],
+        color: '#445544',
+        reveal: 'always',
+      },
+      {
+        x: 100, y: 200,
+        lines: [
+          '// He\'s going to ask why.',
+          '// I can\'t answer that.',
+          '// Can you?',
+        ],
+        color: '#504840',
+        reveal: 'always',
+      },
+      {
+        x: 400, y: 300,
+        lines: [
+          '//                        ...',
+          '//',
+          '// Maybe the answer is that he asked at all.',
+          '// Maybe that\'s enough.',
+          '// I hope it\'s enough.',
+        ],
+        color: '#3a3a34',
+        reveal: 'after:sit_down',
+      },
+    ],
     ambientFreq: 50, ambientVol: 0.01,
     triggers: [
       {
         id: 'sit_down',
         condition: () => state.sceneFrames > 120 && Math.abs(guy.vx) < 0.2 && guy.grounded,
-        once: true,
-        delay: 90,
+        once: true, delay: 90,
         action: () => {
           guy.wanderTarget = null;
           guy.sitting = true;
           setAmbientTone(45, 0.008);
-          
-          // Emotional memory affects pacing
+
           const gentleRatio = state.gentlePlaces / Math.max(1, state.gentlePlaces + state.thrownHard);
-          const pauseMult = gentleRatio > 0.6 ? 1.0 : 1.4; // hurt character pauses longer
-          const extraSighs = state.thrownHard > 3; // abused character sighs more
-          
+          const pauseMult = gentleRatio > 0.6 ? 1.0 : 1.4;
+          const extraSighs = state.thrownHard > 3;
+
           const words = state.wordsLearned;
           const lines = [];
           let t = 1000;
-          
+
           if (words.includes('ME') && words.includes('MADE')) { lines.push({ t, text: 'ME... MADE.' }); t += 3000 * pauseMult; }
           else { lines.push({ t, text: '...' }); t += 2000 * pauseMult; }
-          
+
           if (extraSighs) { lines.push({ t, text: '...', sigh: true }); t += 2500 * pauseMult; }
-          
+
           if (words.includes('NO') && words.includes('WHY')) { lines.push({ t, text: 'NO... WHY.' }); t += 3000 * pauseMult; }
-          
+
           if (words.includes('FEEL') && words.includes('REAL')) {
             lines.push({ t, text: 'FEEL... REAL. THINK... REAL.' }); t += 4000 * pauseMult;
           } else if (words.includes('THINK')) {
@@ -750,53 +975,48 @@ const scenes = [
           } else if (words.includes('FEEL')) {
             lines.push({ t, text: 'FEEL... REAL?' }); t += 3000 * pauseMult;
           }
-          
+
           if (words.includes('WHO') && words.includes('MADE') && words.includes('ME')) {
             lines.push({ t, text: 'WHO... MADE... ME... ?' }); t += 4000 * pauseMult;
             if (extraSighs) { lines.push({ t, text: '...', sigh: true }); t += 2000 * pauseMult; }
           }
-          
+
           if (words.includes('WHAT') && words.includes('ME')) {
             lines.push({ t, text: 'WHAT... ME... FOR?' }); t += 4000 * pauseMult;
           } else if (words.includes('WHY') && words.includes('HERE')) {
             lines.push({ t, text: 'WHY... HERE?' }); t += 3500 * pauseMult;
           }
-          
+
           lines.push({ t, text: '...' }); t += 3500 * pauseMult;
-          
+
           if (words.includes('GO') && words.includes('HELP')) {
             lines.push({ t, text: 'HELP... CAME. WHY... CAME.' }); t += 4000 * pauseMult;
           } else if (words.includes('HELP')) {
             lines.push({ t, text: 'HELP... CAME.' }); t += 3000 * pauseMult;
           }
-          
-          // Generated novel phrase from word engine
+
           const novel = generatePhrase();
-          if (novel) {
-            lines.push({ t, text: novel }); t += 4000 * pauseMult;
-          }
-          
+          if (novel) { lines.push({ t, text: novel }); t += 4000 * pauseMult; }
+
           lines.push({ t, text: 'SOMETHING...' }); t += 4000 * pauseMult;
-          
+
           if (words.includes('FEEL')) {
             lines.push({ t, text: 'FEEL... SOMETHING.' }); t += 4000 * pauseMult;
           }
-          
+
           lines.push({ t, text: '...' }); t += 3000;
-          
-          // Gentle players get a softer ending
+
           if (gentleRatio > 0.6 && words.length >= 6) {
             lines.push({ t, text: '... REAL.' });
           }
-          
+
           lines.forEach(l => {
             setTimeout(() => {
               showSpeech(l.text);
               if (l.text === '...' || l.sigh) queueBark({ headTilt: -0.4, duration: 100, eyesClosed: true });
             }, l.t);
           });
-          
-          // Tab title at the very end
+
           setTimeout(() => { document.title = 'little guy is waiting'; }, t + 5000);
         }
       },
@@ -816,43 +1036,31 @@ let drawnPlatforms = [];
 function loadScene(idx) {
   const s = scenes[idx];
   if (!s) return;
-  
   state.scene = idx;
   state.sceneFrames = 0;
   currentScene = s;
   currentGroundY = s.groundY || GROUND_Y_DEFAULT;
-  
+
   currentPlatforms = [makeGround(currentGroundY)];
-  if (s.platforms) {
-    for (const pf of s.platforms) currentPlatforms.push(typeof pf === 'function' ? pf() : pf);
-  }
-  
+  if (s.platforms) for (const pf of s.platforms) currentPlatforms.push(typeof pf === 'function' ? pf() : pf);
+
   currentBodies = [];
-  if (s.bodies) {
-    for (const bf of s.bodies) currentBodies.push(typeof bf === 'function' ? bf() : bf);
-  }
-  
+  if (s.bodies) for (const bf of s.bodies) currentBodies.push(typeof bf === 'function' ? bf() : bf);
+
   drawnPlatforms = [];
   state.fadingPlatforms = [];
-  
+
   if (s.guyStart) { guy.x = s.guyStart.x; guy.y = s.guyStart.y; }
   guy.vx = 0; guy.vy = 0;
-  guy.wanderTarget = null;
-  guy.wanderTimer = 60;
-  guy.sitting = false;
-  guy.avoidX = null;
-  guy.avoidDir = 0;
-  guy.barkQueue = [];
-  guy.currentBark = null;
-  guy.idleTime = 0;
-  guy.eyesClosed = false;
-  
+  guy.wanderTarget = null; guy.wanderTimer = 60;
+  guy.sitting = false; guy.sleeping = false; guy.thinker = false;
+  guy.avoidX = null; guy.avoidDir = 0;
+  guy.barkQueue = []; guy.currentBark = null;
+  guy.idleTime = 0; guy.eyesClosed = false;
+  guy.idlePhase = 0;
+
   if (s.bookPage && idx > 0) state.bookPagesUnlocked = idx + 1;
-  
-  // Ambient tone
   if (s.ambientFreq && ambientActive) setAmbientTone(s.ambientFreq, s.ambientVol || 0.02);
-  
-  // Tab title
   updateTabTitle();
 }
 
@@ -881,12 +1089,12 @@ function findBody(id) { return currentBodies.find(b => b.id === id); }
 // TAB TITLE
 // ============================================================
 function updateTabTitle() {
-  const s = state.scene;
   if (guy.inert) { document.title = 'little guy'; return; }
+  if (guy.sleeping) { document.title = 'little guy is sleeping'; return; }
+  if (guy.thinker) { document.title = 'little guy is thinking'; return; }
   if (guy.sitting) { document.title = 'little guy is sitting'; return; }
   if (state.wordsLearned.length > 0) {
-    const last = state.wordsLearned[state.wordsLearned.length - 1];
-    document.title = 'little guy learned ' + last;
+    document.title = 'little guy learned ' + state.wordsLearned[state.wordsLearned.length - 1];
     return;
   }
   if (state.learnedJump) { document.title = 'little guy is jumping'; return; }
@@ -905,24 +1113,23 @@ const guy = {
   grounded: false,
   inert: true,
   sitting: false,
-  avoidX: null,
-  avoidDir: 0,
+  sleeping: false,
+  thinker: false,
+  avoidX: null, avoidDir: 0,
   symbols: [],
   currentSpeech: '', speechFade: 0,
-  speechBlipIndex: 0, // for sound
-  speechDisplayed: '', // for typing effect
+  speechBlipIndex: 0,
+  speechDisplayed: '',
   speechFullText: '',
   speechCharTimer: 0,
   lookTarget: null,
   headTilt: 0, headTiltTarget: 0,
   eyeDir: 0, eyeY: 0,
   eyesClosed: false, eyesCloseTimer: 0,
-  barkQueue: [],
-  barkTimer: 0,
-  currentBark: null,
+  barkQueue: [], barkTimer: 0, currentBark: null,
   wanderTarget: null, wanderTimer: 60,
   idleTime: 0,
-  // Movement energy (decreases over scenes)
+  idlePhase: 0, // 0=normal, 1=restless, 2=sit, 3=thinker, 4=talk-to-self, 5=sleep
   energy: 1.0,
 };
 
@@ -946,25 +1153,23 @@ function recordMouse() {
 
 function getThrowVelocity() {
   if (mouseHistory.length < 2) return { vx: 0, vy: 0 };
-  const oldest = mouseHistory[0];
-  const newest = mouseHistory[mouseHistory.length - 1];
+  const oldest = mouseHistory[0], newest = mouseHistory[mouseHistory.length - 1];
   const dt = (newest.t - oldest.t) / 1000;
   if (dt < 0.001) return { vx: 0, vy: 0 };
   let vx = (newest.x - oldest.x) / dt / 60;
   let vy = (newest.y - oldest.y) / dt / 60;
-  const maxV = 18;
   const mag = Math.sqrt(vx * vx + vy * vy);
-  if (mag > maxV) { vx *= maxV / mag; vy *= maxV / mag; }
+  if (mag > 18) { vx *= 18 / mag; vy *= 18 / mag; }
   return { vx, vy };
 }
 
-// First interaction unlocks audio
 canvas.addEventListener('click', () => { initAudio(); }, { once: true });
 
 canvas.addEventListener('mousemove', e => {
   const r = canvas.getBoundingClientRect();
-  mouse.x = e.clientX - r.left;
-  mouse.y = e.clientY - r.top;
+  mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
+  state.lastMouseMove = state.frameCount;
+  state.playerAbsentFrames = 0;
   recordMouse();
   if (draggingGuy) { guy.x = mouse.x - dragOffset.x; guy.y = mouse.y - dragOffset.y; guy.vx = 0; guy.vy = 0; }
   else if (dragging) { dragging.x = mouse.x - dragOffset.x; dragging.y = mouse.y - dragOffset.y; dragging.vx = 0; dragging.vy = 0; }
@@ -974,26 +1179,37 @@ canvas.addEventListener('mousedown', e => {
   if (state.transitioning) return;
   initAudio();
   mouse.down = true;
+  state.playerAbsentFrames = 0;
+  state.lastMouseMove = state.frameCount;
   mouseHistory.length = 0;
   recordMouse();
   const now = Date.now();
 
-  if (now - lastClickTime < 350 && lastClickTarget === 'book') { openBook(); return; }
+  // Wake from idle poses on any click near guy
+  if ((guy.sleeping || guy.thinker) && mouse.x >= guy.x - 30 && mouse.x <= guy.x + 30 && mouse.y >= guy.y - 50 && mouse.y <= guy.y + 10) {
+    guy.sleeping = false; guy.thinker = false; guy.sitting = false;
+    guy.idlePhase = 0; guy.idleTime = 0;
+    addSymbol('!');
+    updateTabTitle();
+  }
 
-  // Click guy — larger hitbox
+  if (now - lastClickTime < 350 && lastClickTarget === 'book') {
+    // Books no longer have overlay — just a physical object
+    lastClickTime = now;
+    return;
+  }
+
   if (mouse.x >= guy.x - 14 && mouse.x <= guy.x + 14 && mouse.y >= guy.y - 38 && mouse.y <= guy.y + 2) {
     draggingGuy = true;
-    dragOffset.x = mouse.x - guy.x;
-    dragOffset.y = mouse.y - guy.y;
-    state.dragCount++;
-    state.totalInteractions++;
+    dragOffset.x = mouse.x - guy.x; dragOffset.y = mouse.y - guy.y;
+    state.dragCount++; state.totalInteractions++;
+    // Wake from any idle pose
+    guy.sleeping = false; guy.thinker = false; guy.sitting = false;
+    guy.idlePhase = 0; guy.idleTime = 0;
     if (guy.inert) { addSymbol('!'); setTimeout(() => addSymbol('?'), 200); }
     else {
       addSymbol('!');
-      guy.idleTime = 0;
-      guy.currentBark = null;
-      guy.barkQueue.length = 0;
-      // Near the pit and being dragged toward it — extra panic
+      guy.currentBark = null; guy.barkQueue.length = 0;
       if (state.scene === 4 && hasFired(4, 'near_edge') && !hasFired(4, 'fell_in')) {
         addSymbol('!!!');
         if (state.learnedSpeak && state.wordsLearned.includes('NO')) showSpeech('NO!');
@@ -1005,9 +1221,7 @@ canvas.addEventListener('mousedown', e => {
 
   for (const b of currentBodies) {
     if (b.draggable && b.visible && mouse.x >= b.x && mouse.x <= b.right && mouse.y >= b.y && mouse.y <= b.bottom) {
-      dragging = b;
-      dragOffset.x = mouse.x - b.x;
-      dragOffset.y = mouse.y - b.y;
+      dragging = b; dragOffset.x = mouse.x - b.x; dragOffset.y = mouse.y - b.y;
       lastClickTime = now; lastClickTarget = b.type;
       return;
     }
@@ -1026,7 +1240,6 @@ canvas.addEventListener('mouseup', e => {
     draggingGuy = false;
     guy.vx = Math.max(-15, Math.min(15, throwVel.vx));
     guy.vy = Math.max(-15, Math.min(15, throwVel.vy));
-
     const speed = Math.sqrt(throwVel.vx ** 2 + throwVel.vy ** 2);
     if (speed > 6) {
       state.thrownHard++;
@@ -1035,24 +1248,17 @@ canvas.addEventListener('mouseup', e => {
     } else {
       state.gentlePlaces++;
     }
-
     if (guy.inert && state.dragCount >= 1) {
-      guy.inert = false;
-      state.learnedMove = true;
+      guy.inert = false; state.learnedMove = true;
       setTimeout(() => { addSymbol('...'); setTimeout(() => { guy.wanderTimer = 10; }, 800); }, 500);
     }
-    if (!state.learnedJump && guy.y < currentGroundY - 20) {
-      state.learnedJump = true;
-      addSymbol('!!');
-    }
+    if (!state.learnedJump && guy.y < currentGroundY - 20) { state.learnedJump = true; addSymbol('!!'); }
     updateTabTitle();
   }
 
   if (dragging) {
-    dragging.vx = throwVel.vx;
-    dragging.vy = throwVel.vy;
+    dragging.vx = throwVel.vx; dragging.vy = throwVel.vy;
     dragging.rotV = throwVel.vx * 0.05;
-
     if (dragging.type === 'word' && dragging.label) {
       if (Math.abs(dragging.cx - guy.x) < 60 && !state.wordsLearned.includes(dragging.label)) learnWord(dragging.label);
     }
@@ -1066,8 +1272,7 @@ canvas.addEventListener('mouseup', e => {
   }
 
   if (drawMode && drawStart) {
-    const dx = mouse.x - drawStart.x;
-    const dy = mouse.y - drawStart.y;
+    const dx = mouse.x - drawStart.x, dy = mouse.y - drawStart.y;
     const len = Math.sqrt(dx * dx + dy * dy);
     if (len > 20 && state.bookPagesUnlocked >= 4) {
       const px = Math.max(0, Math.min(W, Math.min(drawStart.x, mouse.x)));
@@ -1075,37 +1280,16 @@ canvas.addEventListener('mouseup', e => {
       const pw = Math.min(W - px, Math.abs(dx));
       const ph = Math.max(Math.abs(dy), 8);
       if (pw > 5) {
-        if (currentScene && currentScene.drawingFails) {
-          // Platform fizzles — appears then fades
+        if (currentScene?.drawingFails) {
           state.fadingPlatforms.push({ x: px, y: py, w: pw, h: ph, life: 60 });
         } else {
           drawnPlatforms.push(new Body(px, py, pw, ph, { isStatic: true, color: 'rgba(80,110,140,0.4)' }));
         }
       }
     }
-    drawMode = false;
-    drawStart = null;
+    drawMode = false; drawStart = null;
   }
 });
-
-// ============================================================
-// BOOK OVERLAY
-// ============================================================
-function getAllBookPages() {
-  const pages = [];
-  for (let i = 0; i <= state.scene && i < scenes.length; i++) {
-    if (scenes[i].bookPage) pages.push(scenes[i].bookPage);
-  }
-  return pages;
-}
-function openBook() {
-  const pages = getAllBookPages();
-  document.getElementById('book-text').textContent = pages.join('\n\n─────────────────────────────\n\n');
-  document.getElementById('book-overlay').style.display = 'block';
-}
-function closeBook() {
-  document.getElementById('book-overlay').style.display = 'none';
-}
 
 // ============================================================
 // EXPRESSION
@@ -1116,11 +1300,9 @@ function addSymbol(sym) {
 }
 
 function showSpeech(text) {
-  guy.speechFullText = text;
-  guy.speechDisplayed = '';
-  guy.speechCharTimer = 0;
-  guy.speechBlipIndex = 0;
-  guy.currentSpeech = text; // for measurement
+  guy.speechFullText = text; guy.speechDisplayed = '';
+  guy.speechCharTimer = 0; guy.speechBlipIndex = 0;
+  guy.currentSpeech = text;
   guy.speechFade = 160 + text.length * 5;
   updateTabTitle();
 }
@@ -1128,13 +1310,11 @@ function showSpeech(text) {
 function updateSpeechTyping() {
   if (guy.speechDisplayed.length < guy.speechFullText.length && guy.speechFade > 0) {
     guy.speechCharTimer++;
-    if (guy.speechCharTimer >= 3) { // 3 frames per character
+    if (guy.speechCharTimer >= 3) {
       guy.speechCharTimer = 0;
-      const nextChar = guy.speechFullText[guy.speechDisplayed.length];
-      guy.speechDisplayed += nextChar;
-      if (nextChar !== ' ' && nextChar !== '.') {
-        playSpeechBlip(nextChar, guy.speechBlipIndex++);
-      }
+      const ch = guy.speechFullText[guy.speechDisplayed.length];
+      guy.speechDisplayed += ch;
+      if (ch !== ' ' && ch !== '.') playSpeechBlip(ch, guy.speechBlipIndex++);
     }
   }
 }
@@ -1152,25 +1332,113 @@ function learnWord(word) {
 function queueBark(bark) { guy.barkQueue.push(bark); }
 
 // ============================================================
+// IDLE BEHAVIOR — layered by self-awareness
+// ============================================================
+// Awareness level: 0 = pre-verbal, 1 = few words, 2 = many words, 3 = existential
+function getAwareness() {
+  const w = state.wordsLearned.length;
+  if (w === 0) return 0;
+  if (w <= 3) return 1;
+  if (w <= 7) return 2;
+  return 3;
+}
+
+// Idle phases, unlocked by awareness:
+// Phase 0: normal wander/look (always)
+// Phase 1: restless pacing — walks faster, changes direction more (awareness >= 0, ~8s idle)
+// Phase 2: sits down (awareness >= 0, ~18s idle)
+// Phase 3: thinker pose — chin on hand (awareness >= 1, ~30s idle)
+// Phase 4: talks to self (awareness >= 2, ~45s idle)
+// Phase 5: sleeps — curls up (awareness >= 0, ~70s idle)
+
+function updateIdleBehavior() {
+  if (guy.inert || draggingGuy || guy.sitting || state.scene === 8) return;
+
+  const speed = Math.sqrt(guy.vx ** 2 + guy.vy ** 2);
+  if (speed > 1 || guy.wanderTarget !== null) {
+    // Moving — reset idle
+    if (guy.sleeping || guy.thinker) {
+      guy.sleeping = false; guy.thinker = false;
+      guy.idlePhase = 0;
+      updateTabTitle();
+    }
+    return;
+  }
+
+  // Count idle frames
+  guy.idleTime++;
+  const awareness = getAwareness();
+  const absent = state.playerAbsentFrames; // how long since mouse moved
+  // Idle thresholds (in frames, 60fps): scale down if player is absent
+  const absentMult = absent > 300 ? 0.6 : 1.0; // things happen faster if player leaves
+
+  const RESTLESS_T = 480 * absentMult;  // ~8s
+  const SIT_T = 1080 * absentMult;       // ~18s
+  const THINKER_T = 1800 * absentMult;   // ~30s
+  const TALK_T = 2700 * absentMult;      // ~45s
+  const SLEEP_T = 4200 * absentMult;     // ~70s
+
+  // Phase transitions
+  if (guy.idleTime > SLEEP_T && guy.idlePhase < 5 && guy.grounded) {
+    guy.idlePhase = 5;
+    guy.sleeping = true; guy.thinker = false;
+    guy.eyesClosed = true; guy.eyesCloseTimer = 999999;
+    updateTabTitle();
+  } else if (guy.idleTime > TALK_T && guy.idlePhase < 4 && awareness >= 2 && guy.grounded) {
+    guy.idlePhase = 4;
+    // Mumble to self
+    const phrase = generatePhrase();
+    if (phrase) showSpeech(phrase);
+    else if (state.wordsLearned.length > 0) showSpeech(state.wordsLearned[Math.random() * state.wordsLearned.length | 0] + '...');
+    queueBark({ headTilt: -0.2, duration: 80 });
+    // Will keep generating every ~15s
+  } else if (guy.idleTime > THINKER_T && guy.idlePhase < 3 && awareness >= 1 && guy.grounded) {
+    guy.idlePhase = 3;
+    guy.thinker = true;
+    addSymbol('...');
+    updateTabTitle();
+  } else if (guy.idleTime > SIT_T && guy.idlePhase < 2 && guy.grounded) {
+    guy.idlePhase = 2;
+    guy.sitting = true;
+    updateTabTitle();
+  } else if (guy.idleTime > RESTLESS_T && guy.idlePhase < 1) {
+    guy.idlePhase = 1;
+    // Restless — look around more
+    queueBark({ lookAt: { x: guy.x + (Math.random() > 0.5 ? 200 : -200), y: guy.y - 60 }, duration: 40 });
+    queueBark({ lookAt: { x: guy.x + (Math.random() > 0.5 ? -150 : 150), y: guy.y - 20 }, duration: 30, symbol: '?' });
+  }
+
+  // Periodic mumbling in phase 4
+  if (guy.idlePhase === 4 && guy.idleTime % 900 === 0 && awareness >= 2) {
+    const phrase = generatePhrase();
+    if (phrase) showSpeech(phrase);
+    queueBark({ headTilt: -0.15, duration: 60 });
+  }
+
+  // In phase 1, occasionally look around or pace
+  if (guy.idlePhase === 1 && guy.idleTime % 240 === 0 && !guy.sitting && !guy.thinker && !guy.sleeping) {
+    queueBark({ lookAt: { x: guy.x + (Math.random() - 0.5) * 300, y: guy.y - 30 + Math.random() * 60 }, duration: 50 });
+  }
+}
+
+// ============================================================
 // BARK SYSTEM
 // ============================================================
 function updateBarks() {
   if (guy.inert || draggingGuy) return;
-  
-  // Eyes close timer
-  if (guy.eyesCloseTimer > 0) {
+
+  if (guy.eyesCloseTimer > 0 && guy.eyesCloseTimer < 999999) {
     guy.eyesCloseTimer--;
     guy.eyesClosed = true;
     if (guy.eyesCloseTimer <= 0) guy.eyesClosed = false;
   }
 
-  if (guy.sitting) return; // no barks when sitting (monologue handles it)
+  if (guy.sitting && state.scene === 8) return; // final monologue handles it
+  if (guy.sleeping) return;
 
   if (guy.currentBark) {
     guy.barkTimer--;
-    if (guy.currentBark.eyesClosed && guy.barkTimer < 20) {
-      guy.eyesCloseTimer = 20;
-    }
+    if (guy.currentBark.eyesClosed && guy.barkTimer < 20) guy.eyesCloseTimer = 20;
     if (guy.barkTimer <= 0) { guy.currentBark = null; guy.lookTarget = null; guy.headTiltTarget = 0; }
     return;
   }
@@ -1187,28 +1455,23 @@ function updateBarks() {
     return;
   }
 
-  guy.idleTime++;
-  if (guy.idleTime > 200 && guy.idleTime % 220 === 0) {
-    const interests = [];
-    for (const b of currentBodies) {
-      if (b.visible && Math.abs(b.cx - guy.x) < 300) interests.push(b);
-    }
-    if (interests.length > 0) {
-      const t = interests[Math.random() * interests.length | 0];
-      queueBark({ lookAt: { x: t.cx, y: t.cy }, duration: 80 + Math.random() * 60 | 0, symbol: '?' });
-    } else {
-      queueBark({ lookAt: { x: guy.x + (Math.random() > 0.5 ? 200 : -200), y: guy.y - 40 }, duration: 40 });
-      queueBark({ lookAt: { x: guy.x + (Math.random() > 0.5 ? -150 : 150), y: guy.y - 20 }, duration: 40 });
-      // Sigh with eyes closed
-      queueBark({ headTilt: -0.4, duration: 80, symbol: '...', eyesClosed: true });
-    }
+  // Standard idle barks (only when not in advanced idle phase)
+  if (guy.idlePhase < 2) {
+    guy.idleTime++;
+    if (guy.idleTime > 200 && guy.idleTime % 220 === 0) {
+      const interests = [];
+      for (const b of currentBodies) { if (b.visible && Math.abs(b.cx - guy.x) < 300) interests.push(b); }
+      if (interests.length > 0) {
+        const t = interests[Math.random() * interests.length | 0];
+        queueBark({ lookAt: { x: t.cx, y: t.cy }, duration: 80 + Math.random() * 60 | 0, symbol: '?' });
+      } else {
+        queueBark({ lookAt: { x: guy.x + (Math.random() > 0.5 ? 200 : -200), y: guy.y - 40 }, duration: 40 });
+        queueBark({ headTilt: -0.4, duration: 80, symbol: '...', eyesClosed: true });
+      }
 
-    // Auto-generate novel speech during idle (scenes 5+)
-    if (state.scene >= 5 && state.wordsLearned.length >= 3 && Math.random() < 0.3) {
-      const phrase = generatePhrase();
-      if (phrase) {
-        queueBark({ duration: 60 });
-        setTimeout(() => showSpeech(phrase), 500);
+      if (state.scene >= 5 && state.wordsLearned.length >= 3 && Math.random() < 0.3) {
+        const phrase = generatePhrase();
+        if (phrase) { queueBark({ duration: 60 }); setTimeout(() => showSpeech(phrase), 500); }
       }
     }
   }
@@ -1232,7 +1495,7 @@ function resolveBody(body) {
     if (body.right > p.left && body.left < p.right) {
       if (body.bottom >= p.top && body.bottom <= p.top + 16 && body.vy >= 0) {
         body.y = p.top - body.h;
-        if (body.vy > 2) { body.vy = -body.vy * BOUNCE; playImpact(body.vy); }
+        if (body.vy > 2) { body.vy = -body.vy * BOUNCE; playImpact(body.vy); spawnImpactDust(body.cx, p.top, body.vy); }
         else body.vy = 0;
         body.grounded = true;
         if (Math.abs(body.vx) > 0.5) body.rotV = body.vx * 0.03;
@@ -1241,7 +1504,7 @@ function resolveBody(body) {
   }
   if (body.bottom >= currentGroundY) {
     body.y = currentGroundY - body.h;
-    if (body.vy > 2) { body.vy = -body.vy * BOUNCE; playImpact(body.vy); }
+    if (body.vy > 2) { body.vy = -body.vy * BOUNCE; playImpact(body.vy); spawnImpactDust(body.cx, currentGroundY, body.vy); }
     else body.vy = 0;
     body.grounded = true;
   }
@@ -1252,8 +1515,12 @@ function resolveBody(body) {
 
 function resolveGuy() {
   if (draggingGuy) return;
+  // Don't apply physics if sleeping or in thinker
+  if (guy.sleeping || guy.thinker) { guy.vx = 0; guy.vy = 0; return; }
+  
   guy.vy += GRAVITY;
   guy.vx *= guy.grounded ? GROUND_FRIC : AIR_DRAG;
+  const prevVy = guy.vy;
   guy.x += guy.vx; guy.y += guy.vy;
   guy.grounded = false;
 
@@ -1266,7 +1533,7 @@ function resolveGuy() {
         guy.y = p.y;
         if (guy.vy > 4) {
           guy.vy = -guy.vy * 0.25;
-          if (!guy.inert) { addSymbol('!'); playImpact(4); }
+          if (!guy.inert) { addSymbol('!'); playImpact(4); spawnImpactDust(guy.x, p.y, 5); }
         } else guy.vy = 0;
         guy.grounded = true;
       }
@@ -1275,34 +1542,34 @@ function resolveGuy() {
   if (guy.y >= currentGroundY && !currentScene?.customGround) {
     if (guy.vy > 4) {
       guy.vy = -guy.vy * 0.25;
-      if (!guy.inert) { addSymbol('!'); playImpact(4); }
-    } else guy.vy = 0;
-    guy.y = currentGroundY;
-    guy.grounded = true;
+      if (!guy.inert) { addSymbol('!'); playImpact(4); spawnImpactDust(guy.x, currentGroundY, 5); }
+    } else {
+      // Landing dust (gentle)
+      if (prevVy > 2 && !guy.inert) spawnDust(guy.x, currentGroundY, 3, { spread: 1, upward: 0.8, life: 15, color: '#555' });
+      guy.vy = 0;
+    }
+    guy.y = currentGroundY; guy.grounded = true;
   }
   if (guy.y > H + 50) { guy.y = H - 20; guy.vy = 0; guy.grounded = true; }
   if (guy.x < 20) { guy.x = 20; guy.vx = Math.abs(guy.vx) * 0.4; }
   if (guy.x > W - 20) { guy.x = W - 20; guy.vx = -Math.abs(guy.vx) * 0.4; }
+
+  // Walking dust
+  if (guy.grounded && Math.abs(guy.vx) > 0.8 && !guy.inert) spawnWalkDust(guy.x, guy.y);
 }
 
 // ============================================================
 // GUY AI
 // ============================================================
 function updateGuyAI() {
-  if (guy.inert || draggingGuy || guy.sitting) return;
+  if (guy.inert || draggingGuy || guy.sitting || guy.sleeping || guy.thinker) return;
   const speed = Math.sqrt(guy.vx ** 2 + guy.vy ** 2);
-  if (speed > 2) { guy.idleTime = 0; guy.wanderTarget = null; return; }
+  if (speed > 2) { guy.wanderTarget = null; return; }
 
-  // Energy decreases through scenes — slower movement later
   guy.energy = Math.max(0.4, 1.0 - state.scene * 0.07);
 
-  // Pit avoidance — actively flee
   if (guy.avoidX !== null && guy.grounded) {
-    if (guy.x > guy.avoidX - 40) {
-      guy.vx -= 0.3;
-      guy.wanderTarget = null;
-      return;
-    }
+    if (guy.x > guy.avoidX - 40) { guy.vx -= 0.3; guy.wanderTarget = null; return; }
   }
 
   guy.wanderTimer--;
@@ -1315,7 +1582,6 @@ function updateGuyAI() {
       if (guy.avoidX !== null && target > guy.avoidX - 30) target = guy.avoidX - 80;
       guy.wanderTarget = target;
       guy.wanderTimer = (100 + Math.random() * 150 | 0) / guy.energy;
-      guy.idleTime = 0;
     }
   }
 
@@ -1324,10 +1590,7 @@ function updateGuyAI() {
     if (Math.abs(dx) > 8) {
       guy.vx += (dx > 0 ? 0.15 : -0.15) * guy.energy;
       if (state.learnedJump && guy.grounded && Math.abs(guy.vx) < 0.3 && Math.abs(dx) > 15) guy.vy = -7;
-    } else {
-      guy.wanderTarget = null;
-    }
-    guy.idleTime = 0;
+    } else guy.wanderTarget = null;
   }
 }
 
@@ -1336,6 +1599,8 @@ function updateGuyAI() {
 // ============================================================
 function updateLook() {
   guy.headTilt += (guy.headTiltTarget - guy.headTilt) * 0.08;
+  if (guy.sleeping) { guy.headTiltTarget = -0.6; return; }
+  if (guy.thinker) { guy.headTiltTarget = -0.25; return; }
   if (guy.lookTarget) {
     const dx = guy.lookTarget.x - guy.x;
     const dy = guy.lookTarget.y - (guy.y - 26);
@@ -1346,7 +1611,7 @@ function updateLook() {
     guy.eyeDir += (td - guy.eyeDir) * 0.06;
     guy.eyeY += (0 - guy.eyeY) * 0.05;
   }
-  if (!guy.currentBark) guy.headTiltTarget = 0;
+  if (!guy.currentBark) guy.headTiltTarget = guy.thinker ? -0.25 : 0;
 }
 
 // ============================================================
@@ -1355,7 +1620,7 @@ function updateLook() {
 const triggerDelays = {};
 
 function updateTriggers() {
-  if (!currentScene || !currentScene.triggers) return;
+  if (!currentScene?.triggers) return;
   for (const t of currentScene.triggers) {
     const key = state.scene + '_' + t.id;
     if (t.once && state.sceneTriggered[key]) continue;
@@ -1368,9 +1633,6 @@ function updateTriggers() {
   }
 }
 
-// ============================================================
-// WORD BLOCK PROXIMITY
-// ============================================================
 function checkWordProximity() {
   if (guy.inert) return;
   for (const b of currentBodies) {
@@ -1386,29 +1648,29 @@ function checkWordProximity() {
 function update() {
   state.frameCount++;
   state.sceneFrames++;
-  
+  state.playerAbsentFrames++;
+
   updateTransition();
   if (state.transitioning && state.transitionAlpha >= 1) return;
-  
+
   resolveGuy();
   for (const b of currentBodies) { if (b !== dragging && b.visible) resolveBody(b); }
-  
+
   updateGuyAI();
+  updateIdleBehavior();
   updateBarks();
   updateLook();
   updateTriggers();
   checkWordProximity();
   updateSpeechTyping();
-  
-  // Symbols
+  updateParticles();
+
   for (let i = guy.symbols.length - 1; i >= 0; i--) {
-    guy.symbols[i].life--;
-    guy.symbols[i].y -= 0.6;
+    guy.symbols[i].life--; guy.symbols[i].y -= 0.6;
     if (guy.symbols[i].life <= 0) guy.symbols.splice(i, 1);
   }
   if (guy.speechFade > 0) guy.speechFade--;
-  
-  // Fading platforms
+
   for (let i = state.fadingPlatforms.length - 1; i >= 0; i--) {
     state.fadingPlatforms[i].life--;
     if (state.fadingPlatforms[i].life <= 0) state.fadingPlatforms.splice(i, 1);
@@ -1420,17 +1682,24 @@ function update() {
 // ============================================================
 function render() {
   const s = currentScene || scenes[0];
-  
+
   ctx.fillStyle = s.bgColor || '#0f0f1a';
   ctx.fillRect(0, 0, W, H);
-  
+
+  // Wall writings (behind everything)
+  renderWallWritings();
+
   if (!s.customGround) {
     ctx.fillStyle = s.groundColor || '#1a1a2a';
     ctx.fillRect(0, currentGroundY, W, H - currentGroundY);
     ctx.strokeStyle = '#2a2a3e'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, currentGroundY); ctx.lineTo(W, currentGroundY); ctx.stroke();
   }
-  
+
+  // Scene-specific backgrounds
+  if (state.scene === 4) renderPitScene();
+  if (state.scene === 7) renderEdgeScene();
+
   for (const p of currentPlatforms) {
     if (p.y === currentGroundY && p.w === W) continue;
     ctx.fillStyle = p.color || '#2a2a3e';
@@ -1438,26 +1707,18 @@ function render() {
     ctx.strokeStyle = '#3a3a4e'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.right, p.y); ctx.stroke();
   }
-  
-  // Drawn platforms
+
   for (const p of drawnPlatforms) {
-    ctx.fillStyle = 'rgba(80,110,140,0.3)';
-    ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.strokeStyle = 'rgba(80,110,140,0.5)'; ctx.lineWidth = 1;
-    ctx.strokeRect(p.x, p.y, p.w, p.h);
+    ctx.fillStyle = 'rgba(80,110,140,0.3)'; ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.strokeStyle = 'rgba(80,110,140,0.5)'; ctx.lineWidth = 1; ctx.strokeRect(p.x, p.y, p.w, p.h);
   }
-  
-  // Fading platforms (edge scene)
+
   for (const fp of state.fadingPlatforms) {
     const alpha = fp.life / 60;
-    ctx.fillStyle = `rgba(80,110,140,${alpha * 0.3})`;
-    ctx.fillRect(fp.x, fp.y, fp.w, fp.h);
-    ctx.strokeStyle = `rgba(80,110,140,${alpha * 0.5})`;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(fp.x, fp.y, fp.w, fp.h);
+    ctx.fillStyle = `rgba(80,110,140,${alpha * 0.3})`; ctx.fillRect(fp.x, fp.y, fp.w, fp.h);
+    ctx.strokeStyle = `rgba(80,110,140,${alpha * 0.5})`; ctx.lineWidth = 1; ctx.strokeRect(fp.x, fp.y, fp.w, fp.h);
   }
-  
-  // Draw preview
+
   if (drawMode && drawStart && state.bookPagesUnlocked >= 4) {
     ctx.strokeStyle = currentScene?.drawingFails ? 'rgba(140,80,80,0.3)' : 'rgba(80,110,140,0.3)';
     ctx.setLineDash([4, 4]);
@@ -1465,51 +1726,38 @@ function render() {
       Math.abs(mouse.x - drawStart.x), Math.max(Math.abs(mouse.y - drawStart.y), 8));
     ctx.setLineDash([]);
   }
-  
-  // Scene-specific rendering
-  if (state.scene === 4) renderPitScene();
-  if (state.scene === 7) renderEdgeScene();
-  
+
   // Bodies
   for (const b of currentBodies) {
     if (!b.visible) continue;
-    ctx.save();
-    ctx.translate(b.cx, b.cy);
-    ctx.rotate(b.rotation);
-    
+    ctx.save(); ctx.translate(b.cx, b.cy); ctx.rotate(b.rotation);
     if (b.type === 'book') {
-      ctx.fillStyle = b.color;
-      ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
+      ctx.fillStyle = b.color; ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
       ctx.strokeStyle = '#8a7a5a'; ctx.lineWidth = 1;
-      for (let i = 0; i < 3; i++) {
-        ctx.beginPath(); ctx.moveTo(-b.w/2 + 4, -b.h/2 + 4 + i * 5);
-        ctx.lineTo(b.w/2 - 4, -b.h/2 + 4 + i * 5); ctx.stroke();
-      }
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(-b.w/2+4, -b.h/2+4+i*5); ctx.lineTo(b.w/2-4, -b.h/2+4+i*5); ctx.stroke(); }
     } else if (b.type === 'key') {
       ctx.fillStyle = b.color;
       ctx.beginPath(); ctx.arc(0, -4, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillRect(-2, 0, 4, 12);
-      ctx.fillRect(-4, 8, 8, 3);
+      ctx.fillRect(-2, 0, 4, 12); ctx.fillRect(-4, 8, 8, 3);
     } else if (b.type === 'door') {
-      ctx.fillStyle = b.color;
-      ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
-      ctx.fillStyle = '#887766';
-      ctx.beginPath(); ctx.arc(b.w/2 - 8, 0, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = b.color; ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
+      ctx.fillStyle = '#887766'; ctx.beginPath(); ctx.arc(b.w/2-8, 0, 3, 0, Math.PI*2); ctx.fill();
     } else {
-      ctx.fillStyle = b.color;
-      ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
+      ctx.fillStyle = b.color; ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
     }
-    
     if (b.label) {
       ctx.fillStyle = '#aabbcc'; ctx.font = '9px monospace'; ctx.textAlign = 'center';
       ctx.fillText(b.label, 0, 3); ctx.textAlign = 'left';
     }
     ctx.restore();
   }
-  
+
+  // Particles (behind character for dust at feet, but looks fine either way)
+  renderParticles();
+
   // Character
   drawCharacter();
-  
+
   // Symbols
   for (const sym of guy.symbols) {
     const alpha = Math.min(1, sym.life / 20);
@@ -1518,13 +1766,11 @@ function render() {
     ctx.fillText(sym.text, guy.x + (sym.x || 0), guy.y - guy.h - 10 + sym.y);
     ctx.restore();
   }
-  
-  // Speech — typed out character by character
+
+  // Speech
   if (guy.speechDisplayed && guy.speechFade > 0) {
     const alpha = Math.min(1, guy.speechFade / 20);
-    ctx.save(); ctx.globalAlpha = alpha;
-    ctx.font = '13px monospace';
-    const tw = ctx.measureText(guy.speechDisplayed).width;
+    ctx.save(); ctx.globalAlpha = alpha; ctx.font = '13px monospace';
     const fullTw = ctx.measureText(guy.speechFullText).width;
     const bx = Math.max(5, Math.min(W - fullTw - 25, guy.x - fullTw / 2 - 10));
     const by = Math.max(5, guy.y - guy.h - 45);
@@ -1535,9 +1781,9 @@ function render() {
     ctx.fillText(guy.speechDisplayed, bx + 10, by + 17);
     ctx.restore();
   }
-  
+
   // Hint
-  if (currentScene && currentScene.hint) {
+  if (currentScene?.hint) {
     const h = currentScene.hint();
     if (h) {
       ctx.save();
@@ -1547,30 +1793,35 @@ function render() {
       ctx.restore();
     }
   }
-  
+
   if (state.scene > 0) {
-    ctx.save(); ctx.globalAlpha = 0.15;
-    ctx.font = '10px monospace'; ctx.fillStyle = '#888';
-    ctx.fillText((state.scene + 1) + '/9', 10, H - 8);
-    ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.15; ctx.font = '10px monospace'; ctx.fillStyle = '#888';
+    ctx.fillText((state.scene + 1) + '/9', 10, H - 8); ctx.restore();
   }
-  
+
   if (state.transitioning || state.transitionAlpha > 0) {
-    ctx.fillStyle = `rgba(0,0,0,${state.transitionAlpha})`;
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = `rgba(0,0,0,${state.transitionAlpha})`; ctx.fillRect(0, 0, W, H);
   }
 }
 
 function renderPitScene() {
+  // Dark pit void
   ctx.fillStyle = '#050508';
   ctx.fillRect(300, GROUND_Y_DEFAULT, 150, H - GROUND_Y_DEFAULT);
+
+  // Faint warm glow on the other side — the hint that there's somewhere to go
+  const grd = ctx.createRadialGradient(550, GROUND_Y_DEFAULT + 50, 5, 550, GROUND_Y_DEFAULT + 50, 150);
+  grd.addColorStop(0, 'rgba(60,50,30,0.12)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(400, GROUND_Y_DEFAULT - 20, 400, H - GROUND_Y_DEFAULT + 20);
+
   if (hasFired(4, 'landed_other_side')) {
-    const grd = ctx.createRadialGradient(600, GROUND_Y_DEFAULT + 40, 10, 600, GROUND_Y_DEFAULT + 40, 200);
-    grd.addColorStop(0, 'rgba(60,50,30,0.15)');
-    grd.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, W, H);
+    const grd2 = ctx.createRadialGradient(600, GROUND_Y_DEFAULT + 40, 10, 600, GROUND_Y_DEFAULT + 40, 200);
+    grd2.addColorStop(0, 'rgba(60,50,30,0.15)'); grd2.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd2; ctx.fillRect(0, 0, W, H);
   }
+
   ctx.fillStyle = '#141420';
   ctx.fillRect(0, GROUND_Y_DEFAULT, 300, H - GROUND_Y_DEFAULT);
   ctx.fillStyle = '#1e1e2e';
@@ -1584,8 +1835,7 @@ function renderEdgeScene() {
   if (state.sceneTriggered['7_exit_ready']) {
     ctx.save();
     ctx.globalAlpha = 0.3 + 0.15 * Math.sin(Date.now() / 800);
-    ctx.fillStyle = '#334';
-    ctx.fillRect(385, currentGroundY - 2, 30, 6);
+    ctx.fillStyle = '#334'; ctx.fillRect(385, currentGroundY - 2, 30, 6);
     ctx.restore();
   }
 }
@@ -1593,9 +1843,88 @@ function renderEdgeScene() {
 function drawCharacter() {
   const x = guy.x;
   const footY = guy.y;
+
+  // Different poses
+  if (guy.sleeping) {
+    // Curled up on the ground — sideways
+    const bodyY = footY - 6;
+    ctx.strokeStyle = '#888'; ctx.lineWidth = 2;
+    // Legs tucked
+    ctx.beginPath();
+    ctx.moveTo(x + 2, bodyY + 2); ctx.lineTo(x + 8, bodyY + 5);
+    ctx.moveTo(x + 2, bodyY + 4); ctx.lineTo(x + 6, bodyY + 8);
+    ctx.stroke();
+    // Arms tucked under head
+    ctx.beginPath();
+    ctx.moveTo(x - 4, bodyY - 2); ctx.lineTo(x - 8, bodyY - 6);
+    ctx.moveTo(x - 2, bodyY); ctx.lineTo(x - 7, bodyY - 3);
+    ctx.stroke();
+    // Body
+    ctx.fillStyle = '#aaa';
+    ctx.beginPath(); ctx.ellipse(x, bodyY, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+    // Head resting
+    ctx.save(); ctx.translate(x - 8, bodyY - 6);
+    ctx.fillStyle = '#bbb';
+    ctx.beginPath(); ctx.arc(0, 0, guy.headR * 0.85, 0, Math.PI * 2); ctx.fill();
+    // Closed eyes
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(-1, 0); ctx.moveTo(1, 0); ctx.lineTo(4, 0); ctx.stroke();
+    ctx.restore();
+    // Zzz
+    const zAlpha = 0.3 + 0.2 * Math.sin(Date.now() / 600);
+    ctx.save(); ctx.globalAlpha = zAlpha;
+    ctx.font = '10px monospace'; ctx.fillStyle = '#667';
+    ctx.fillText('z', x - 14, bodyY - 18 + Math.sin(Date.now() / 500) * 2);
+    ctx.fillText('z', x - 20, bodyY - 26 + Math.sin(Date.now() / 400) * 2);
+    ctx.restore();
+    return;
+  }
+
+  if (guy.thinker) {
+    // Sitting with chin on hand — The Thinker
+    const bodyY = footY - 8;
+    const headY = footY - 20;
+    ctx.strokeStyle = '#999'; ctx.lineWidth = 2;
+    // Legs (sitting)
+    ctx.beginPath();
+    ctx.moveTo(x - 4, bodyY + 4); ctx.lineTo(x - 8, footY);
+    ctx.moveTo(x + 4, bodyY + 4); ctx.lineTo(x + 8, footY);
+    ctx.stroke();
+    // Left arm resting on knee
+    ctx.beginPath();
+    ctx.moveTo(x - guy.bodyR, bodyY); ctx.lineTo(x - guy.bodyR - 4, bodyY + 10);
+    ctx.stroke();
+    // Right arm — elbow on knee, hand to chin
+    ctx.beginPath();
+    ctx.moveTo(x + guy.bodyR, bodyY); ctx.lineTo(x + 6, bodyY - 4);
+    ctx.lineTo(x + 3, headY + guy.headR + 2);
+    ctx.stroke();
+    // Body
+    ctx.fillStyle = '#bbb';
+    ctx.beginPath(); ctx.arc(x, bodyY, guy.bodyR, 0, Math.PI * 2); ctx.fill();
+    // Head (tilted forward)
+    ctx.save(); ctx.translate(x, headY); ctx.rotate(guy.headTilt * 0.3);
+    ctx.fillStyle = '#ccc';
+    ctx.beginPath(); ctx.arc(0, 0, guy.headR, 0, Math.PI * 2); ctx.fill();
+    // Eyes looking down
+    if (!guy.eyesClosed) {
+      ctx.fillStyle = '#333';
+      ctx.beginPath();
+      ctx.arc(-3, 1, 1.5, 0, Math.PI * 2);
+      ctx.arc(3, 1, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(-1, 0); ctx.moveTo(1, 0); ctx.lineTo(5, 0); ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  // Normal / sitting pose
   const bodyY = guy.sitting ? footY - 8 : footY - 12;
   const headY = guy.sitting ? footY - 20 : footY - 26;
-  
+
   ctx.strokeStyle = '#999'; ctx.lineWidth = 2;
   if (guy.sitting) {
     ctx.beginPath();
@@ -1609,33 +1938,26 @@ function drawCharacter() {
     ctx.moveTo(x + 4, bodyY + 5); ctx.lineTo(x + 5 + legAnim, footY);
     ctx.stroke();
   }
-  
+
   const armAnim = guy.sitting ? 0 : Math.sin(Date.now() / 140) * Math.min(4, Math.abs(guy.vx) * 2);
   ctx.beginPath();
   ctx.moveTo(x - guy.bodyR, bodyY); ctx.lineTo(x - guy.bodyR - 4 - armAnim, bodyY + 10);
   ctx.moveTo(x + guy.bodyR, bodyY); ctx.lineTo(x + guy.bodyR + 4 + armAnim, bodyY + 10);
   ctx.stroke();
-  
+
   ctx.fillStyle = guy.inert ? '#777' : '#bbb';
   ctx.beginPath(); ctx.arc(x, bodyY, guy.bodyR, 0, Math.PI * 2); ctx.fill();
-  
-  ctx.save();
-  ctx.translate(x, headY);
-  ctx.rotate(guy.headTilt * 0.3);
+
+  ctx.save(); ctx.translate(x, headY); ctx.rotate(guy.headTilt * 0.3);
   ctx.fillStyle = guy.inert ? '#888' : '#ccc';
   ctx.beginPath(); ctx.arc(0, 0, guy.headR, 0, Math.PI * 2); ctx.fill();
-  
+
   if (!guy.inert) {
     if (guy.eyesClosed) {
-      // Closed eyes — horizontal lines (like when inert, but thinner)
       ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(-5, -1); ctx.lineTo(-1, -1);
-      ctx.moveTo(1, -1); ctx.lineTo(5, -1);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-5, -1); ctx.lineTo(-1, -1); ctx.moveTo(1, -1); ctx.lineTo(5, -1); ctx.stroke();
     } else {
-      const ex = guy.eyeDir * 2.5;
-      const ey = guy.eyeY;
+      const ex = guy.eyeDir * 2.5, ey = guy.eyeY;
       ctx.fillStyle = '#333';
       ctx.beginPath();
       ctx.arc(-3 + ex, -1 + ey, 1.5, 0, Math.PI * 2);
@@ -1644,10 +1966,7 @@ function drawCharacter() {
     }
   } else {
     ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(-5, 0); ctx.lineTo(-2, 0);
-    ctx.moveTo(2, 0); ctx.lineTo(5, 0);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-5, 0); ctx.lineTo(-2, 0); ctx.moveTo(2, 0); ctx.lineTo(5, 0); ctx.stroke();
   }
   ctx.restore();
 }
