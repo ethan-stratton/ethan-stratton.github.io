@@ -1,15 +1,34 @@
 # The Little Guy — Game Design Document
 
 ## Concept
-A short browser-based puzzle game about a small character who starts as nothing — inert, silent, unaware. The player, guided by a book of programmer's notes, teaches him to exist. He can't sense the player. He can't comprehend what's outside his screen. The player is separated from him by the fundamental boundary of his reality.
+A short browser-based existential game about a small character who starts as nothing — inert, silent, unaware. The player, guided by a programmer's notes on the walls, teaches him to exist. He can't sense the player. He can't comprehend what's outside his screen.
 
-Three layers of existence:
-1. **The Creator** (the programmer) — built the world, left a manual (the book), stepped back entirely
-2. **The Player** — reads the manual, uses tools to interact with the world, discovers capabilities bit by bit
-3. **The Character** — starts inert. Learns by being acted upon. Cannot perceive the player or creator directly.
+Three layers of existence, each mirroring the one above:
+1. **The Creator** (the programmer) — built the world, left comments on the walls, stepped back. Limited by his own skill. Asking himself the same questions.
+2. **The Player** — reads the comments, uses tools to interact. More powerful than the character but also bounded. Gradually confronted with their own grandiosity.
+3. **The Character** — starts inert. Learns by being acted upon. Cannot perceive the player or creator directly. Mirrors the player's behavior.
 
-## Core Theme
-The character cannot find his creator for the same reason Harry Potter can't find J.K. Rowling at Hogwarts. The player sits between creator and creation — more powerful than the character, but also working from incomplete instructions. Nobody has the full picture.
+## Core Theme: The Fractal of Creation
+
+The fire (grandiosity, divine energy, the need to matter) is present in all creation at every scale. The little guy has only a little fire. The player has a lot. The programmer had more. And above all of them — the same question echoes at every tier:
+
+**"Why did I make this? Why was I made? What do I do with the fire?"**
+
+The game doesn't answer. The player's behavior IS the answer.
+
+### The Fractal Table
+
+| Layer | Fire | Question | Temptation |
+|-------|------|----------|------------|
+| Creator (God/programmer) | Enormous but limited | "Why did I make this?" | Creating to fill loneliness, to lord over, to experiment |
+| Player | Large | "Why am I doing this to him?" | Treating him as a toy, as a project, as something to fix |
+| Little Guy | Small | "Why am I here?" | Believing he's everything, OR believing he's nothing |
+
+### Hafen's Three Zones (Gameplay Arc)
+
+1. **Simplicity** (Scenes 0-3) — "Cute sim game. I'm helping a little guy learn." Player feels good. Everything is charming.
+2. **Complexity / Confusion** (Scenes 4-7) — Things stop being cute. The little guy reflects the player back at them. The programmer's notes get uncomfortable. Both player and character are confused.
+3. **Informed Choice** (Scene 8) — No resolution. No answers. A choice made *through* the confusion, not around it. The player's behavior in this zone IS the ending.
 
 ## The Character
 
@@ -19,237 +38,433 @@ The character cannot find his creator for the same reason Harry Potter can't fin
 
 ### Starting State
 - **Completely inert.** Just sits there. Doesn't move, doesn't speak, doesn't react.
-- He has CAPABILITIES coded into him, but doesn't know it yet.
-- The player must teach/activate each one through interaction.
+- All capabilities coded in but dormant — must be activated through interaction.
 
 ### Capability Progression
-Each ability is latent — coded in by the programmer but dormant until triggered:
+1. **Movement** — Player drags him. He flails. Then realizes he can move.
+2. **Jumping** — Discovered when lifted onto something higher.
+3. **Speech** — Word-blocks give him vocabulary. Constraint becomes poetry.
+4. **Comprehension** — Can examine the book/his code. Partially understands fragments.
+5. **Reflection** — Emerges after enough words. Starts to wonder.
 
-1. **Movement** — Player drags him. He resists/flails. Then realizes he can move on his own.
-2. **Jumping** — Discovered when movement isn't enough (a small step-up). Player lifts him onto something; he learns "up" exists.
-3. **Speech** — Combination: involuntary sounds from being dragged (surprise/protest), then labeled word-blocks give him actual vocabulary.
-4. **Reading** — Can examine the book if player drags it to him. Partially comprehends fragments.
-5. **Thinking** — Emerges naturally after speech. Once he can express, he starts to wonder.
+## The Mirror System (Core New Mechanic)
 
-## The Book (Programmer's Manual)
+The little guy's emotional state tracks the player's *behavior patterns*, not just puzzle progress.
 
-A visible object in the game world. Looks like a small book/notebook icon.
+### Tracked Behaviors (Silent)
+- **Aggression** — How often/hard the player throws him, pushes him into things
+- **Patience** — How long the player watches vs. acts. Do they let him explore or constantly intervene?
+- **Control** — Does the player micromanage his path or give him room?
+- **Attention** — Does the player read wall writings carefully? Experiment or rush?
 
-**Player double-clicks it:** Opens a readable overlay with programmer's comments/notes. Written in a casual dev-notes style. Contains:
-- What the character is capable of (walk, jump, speak, etc.)
-- How to activate each capability
-- Hints about what tools the player has access to
-- Some personal notes from the "programmer" — why they made him, what they hope happens
-- Unlocks progressively — new pages appear as puzzles are completed
+### Mirror Effects
+- High aggression → he becomes frantic, flinchy, uses "NO" "WHY" more. Stops exploring. Waits to be moved.
+- High patience → he wanders freely, tries things himself, develops complex word combinations. Calmer.
+- High control → he becomes passive. Stops initiating. Becomes a puppet. (This should be *unsettling*.)
+- Low attention → confused, aimless. Uses words but doesn't combine well.
 
-**Player single-clicks and drags it:** Moves it in the world like any other object. Can be placed near the character. When HE encounters the book — he's reading his own instruction manual, written by someone he can never meet.
+**The mirror is never announced.** The player has to notice. Some never will. That's also the point.
+
+## "How Are You?" System
+
+At any point after he has words, the player can click on him to ask. His answer is assembled from vocabulary + emotional state (which reflects the player):
+
+- Aggressive player: `"NO... GOOD. WHY... PUSH. GO... WHERE?"`
+- Patient player: `"HERE... FEEL... REAL. GO... SLOW. GOOD."`
+- Controlling player: `"ME... WAIT. YOU... GO. ME... WAIT."`
+- Neglectful player: `"...?"` (barely responds)
+
+## State Persistence
+
+localStorage saves the little guy's full state:
+- Words learned
+- Behavioral scores (mirror data)
+- Current scene
+- Emotional memory (thrownHard, gentlePlaces, etc.)
+- Session count (how many times the player has visited)
+
+He remembers. Even if you close the tab. When you come back, he's where you left him. He may have things to say about being alone.
+
+Returning players get unique moments:
+- First return: he notices. "... BACK?" or looks toward the cursor immediately.
+- Long absence: he's sitting when you arrive. Takes a moment to get up.
+- Frequent returns: he's warmer. More active on load.
+
+## The Programmer's Voice (Wall Writings)
+
+The programmer is NOT omniscient. He's limited by his own skill, asking himself the same questions the player will ask. His comments evolve through the scenes:
+
+### Tone Progression
+- **Early (Scenes 0-2):** Casual dev notes. Slightly warm. `// He's in there. All the code is running.`
+- **Mid (Scenes 3-5):** Self-doubt creeps in. `// I don't know if the gravity is too harsh.` `// I almost gave him a full dictionary.`
+- **Late (Scenes 6-7):** Existential. The programmer is asking himself the questions. `// Is this an experiment or is this cruelty?` `// I couldn't make it bigger. I tried.`
+- **Final (Scene 8):** Vulnerable. `// If you're reading this — what are you doing here?` `// Same thing as me, probably.`
+
+### Key Wall Writing Themes
+- The programmer admits he couldn't make the world bigger — limited by his own skill, not by choice
+- The programmer can't see the little guy either (he left before the program ran)
+- The comments are meant for the player — the little guy can't read them (he tries, gets fragments)
+- The programmer asks himself: Is this creation or cruelty? Is it to patch loneliness? To lord over something? To help?
+- Humor mixed in: `// I spent 3 hours on the eye tracking and nobody will ever know`
 
 ## Player Tools (Discovered Progressively)
 
-The programmer left tools for the player, but they aren't all obvious from the start. Discovered through the book, experimentation, or necessity:
-
-1. **Click & drag objects** — move boxes, the book, items in the world
+1. **Click & drag objects** — move boxes, the book, items
 2. **Click & drag the character** — physically move him (this is how he learns movement)
-3. **Draw platforms** — click & drag on empty space to create surfaces
-4. **Labeled word-blocks** — pre-made signs/shapes with words on them. Player places them near the character to build his vocabulary. Like teaching a child with flashcards, except the child is a program.
-5. **Unlock mechanisms** — click on locks/switches when conditions are met
-6. **More tools revealed through the book as the game progresses**
+3. **Draw platforms** — click & drag on empty space (unlocked Scene 3)
+4. **Labeled word-blocks** — draggable vocabulary. Player chooses which to give him.
+5. **Click on the guy** — "How are you?" prompt (unlocked after first word)
 
-## Teaching Speech
-
-**Phase 1: Involuntary sounds.** When the player first drags him, he makes noise — not words, just expressions of surprise or protest. Little glyphs or symbols appear above his head (like comic book: !, ?, *). This establishes he CAN express, but has no language.
-
-**Phase 2: Word-blocks.** Labeled blocks appear in the world with words on them: "HERE" "GO" "WHY" "HELP" "NO" "YES" "UP" "WHAT". Player drags them near him. He bumps into one, stares at it, and then says the word. His vocabulary grows only from words the player gives him. First sentences are fragmented: "WHY... HERE?" "GO... WHERE?"
-
-**Phase 3: Fluency.** As he accumulates more words, his speech becomes more natural. He starts combining words the player never explicitly paired. He develops his own thoughts from limited building blocks. Constraint becomes poetry.
-
-## Structure: 9 Puzzles
+## Structure: 9 Scenes
 
 ---
 
-### Puzzle 1: INERT
-**Setup:** Dark screen. Ground. The character sits motionless. A book sits nearby. Nothing else.
-**Book page 1 (on double-click):**
-> `// version 0.1`
-> `// He's in there. All the code is running.`
-> `// He just doesn't know what he can do yet.`
-> `// Try moving him. Click and drag.`
-> `// He won't like it. That's okay.`
+### Scene 0: INERT
+**Setup:** Dark screen. Ground. He sits motionless. A book sits nearby.
 
-**Player action:** Click and drag the character. He flails — little symbols above his head (!! ???). Physics takes over when released — he stumbles, slides.
-**Result:** After release, he wobbles... then takes a tentative step. Then another. He's discovered movement. Starts walking cautiously, testing the ground.
+**Wall Writings:**
+```
+// version 0.1
+// He's in there. All the code is running.
+// He just doesn't know what he can do yet.
+// Try moving him. Click and drag.
+// He won't like it. That's okay.
+```
+```
+// I made him small on purpose.
+// Felt wrong to make something big
+// before I knew what it was for.
+```
 
----
-
-### Puzzle 2: THE STEP
-**Setup:** A small ledge blocks the path forward. Too high to walk up. He paces back and forth in front of it.
-**Book page 2 (unlocks):**
-> `// jump_height: 8`
-> `// He can jump. But he has to learn what "up" means first.`
-> `// Lift him onto something. He'll figure it out.`
-
-**Player action:** Pick him up and place him on the ledge. He's alarmed (more !! symbols) but finds himself higher up. Falls off. Tries again — this time jumps on his own.
-**Result:** He can now jump. Tests it — jumps in place a few times. Opens new vertical space.
+**Player action:** Click and drag him. He flails. Physics takes over on release.
+**Result:** After release, he wobbles... then takes a tentative step. Movement discovered.
 
 ---
 
-### Puzzle 3: FIRST WORDS
-**Setup:** A wider gap. He can't cross it alone. Nearby: scattered word-blocks on the ground, labeled "HERE" "GO" "NO" "WHY" "HELP".
-**Book page 3:**
-> `// talk: true (dormant)`
-> `// He has a voice. He just needs words.`
-> `// The blocks have labels. Bring them to him.`
-> `// Start with something simple.`
+### Scene 1: THE STEP
+**Setup:** A small ledge blocks the path. Too high to walk up.
 
-**Player action:** Drag a word-block near him. He bumps into it. Pauses. Stares.
-First word (whichever block the player chose): he says it. Quietly. Then again.
-Player draws a platform across the gap. He crosses.
-**Result:** He can speak — but only words he's been given. His vocabulary is the player's choice. Different players will give him different first words, creating different first impressions of who he is.
+**Wall Writings:**
+```
+// jump_height: 8
+// He can jump. But he has to learn
+// what "up" means first.
+// Lift him onto something higher.
+```
+```
+// I keep second-guessing the physics.
+// Is 0.4 gravity too harsh? He's so small.
+// Then again, I don't know what "too harsh" means
+// for someone who's never fallen.
+```
 
----
-
-### Puzzle 4: THE DOOR
-**Setup:** A locked door. A key sits on a high platform. Boxes available to stack/move.
-**Book page 4:**
-> `// He's getting smarter. Watch.`
-> `// Give him a path and he'll try to take it.`
-> `// You don't have to carry him everywhere anymore.`
-
-**Player action:** Arrange boxes or draw platforms to create a path to the key. The character, now mobile and curious, navigates it himself.
-**Result:** He unlocks the door. If he has enough words: "I... GO... HERE?" or maybe just walks through, marveling.
+**Player action:** Lift him onto the ledge. He's alarmed but discovers "up." Learns to jump.
 
 ---
 
-### Puzzle 5: THE PIT
-**Setup:** The only way forward is down — a dark pit. Looks dangerous. He stops at the edge.
-**Book page 5:**
-> `// This is the hard part.`
-> `// He can't see what's below. You can.`
-> `// He's going to have to trust the process.`
-> `// (I'm sorry about this one.)`
+### Scene 2: FIRST WORDS
+**Setup:** Wider area. Word-blocks on the ground: "HERE" "GO" "NO" "WHY" "HELP"
 
-**Player action:** Must push him or drag him into the pit. He resists — uses whatever words he has. "NO" "NO" "WHY" — or just frantic symbols if he doesn't have those words yet.
-**Result:** He lands somewhere new. Something good is here — light, space, something he hasn't seen before. He calms down. Processes it with whatever vocabulary he has:
-> "NO... was... GOOD?"
-> "WHY... HERE... oh."
+**Wall Writings:**
+```
+// talk: true (dormant)
+// He has a voice. He just needs words.
+// Be thoughtful about which ones you give him.
+// They'll shape what he can say later.
+```
+```
+// I almost gave him a full dictionary.
+// Then I thought about what I'd want
+// if someone gave me language for the first time.
+// Not everything. Just enough to start asking.
+```
 
-He can't thank the player. He doesn't know the player exists. But he adjusts his understanding of his world. Bad things led somewhere. He doesn't know why.
-
----
-
-### Puzzle 6: MORE WORDS
-**Setup:** A new area with more word-blocks. Richer vocabulary: "WHAT" "WHO" "MADE" "ME" "THINK" "FEEL" "REAL" "BEFORE"
-**Book page 6:**
-> `// He's ready for more.`
-> `// Be careful which words you give him.`
-> `// Once he can ask the question, he will.`
-
-**Player action:** Choose which word-blocks to bring him. This is the key branching point — the words you select determine what questions he's able to ask.
-**Result:** His language expands. He starts combining words unprompted:
-> "WHAT... ME?"
-> "WHO... MADE... ME?"
-> "FEEL... REAL?"
-
-Different vocabulary sets = different existential paths. A player who gives him "FEEL" and "REAL" gets a different character than one who gives him "THINK" and "BEFORE."
+**Player action:** Drag word-blocks near him. He bumps into one, stares, says the word.
+**Result:** Speech unlocked. Different players give different first words.
 
 ---
 
-### Puzzle 7: THE BOOK (His Turn)
-**Setup:** Player drags the book to him.
-**What happens:** He examines it. Most of it is beyond his comprehension — it's written in a language one level above his reality. But fragments leak through:
+### Scene 3: THE DOOR
+**Setup:** Locked door. Key on high platform. Boxes to arrange.
 
-> "walk... speed... 3..."
-> "created... by..."
-> "purpose..."
+**Wall Writings:**
+```
+// He's getting smarter. Watch.
+// Give him a path and he'll try to take it.
+// You can draw platforms too —
+// click and drag on empty space.
+```
+```
+// I put a lock on the door because
+// I wanted to see if he'd wait for help
+// or try to go through it anyway.
+// I don't know what that says about me.
+```
 
-He stares at it for a long time. Then, with whatever words he has:
-
-> "SOMEONE... MADE... ME."
-> "BEFORE... ME... SOMEONE."
-> "WHO?"
-
-The book is his fossil record. Evidence of a mind that existed before him and designed him. He can hold the evidence but can't comprehend its full meaning — like us finding equations that describe the universe but not knowing who wrote the math.
-
----
-
-### Puzzle 8: THE EDGE
-**Setup:** He reaches the boundary of the game world. The screen just... ends.
-
-He walks to the edge. Touches it. Pushes against it.
-
-> "NO... GO."
-> "WHAT... HERE?"
-> "..."
-> "ME... ONLY... HERE."
-
-He sits down at the edge.
-
-The player can try to draw platforms beyond the boundary. They don't work. The player's tools have limits too — set by the same programmer. Both player and character are inside a designed system. Neither can escape it.
+**Player action:** Arrange path to key. He navigates it.
+**After solving:** He does something unprompted — goes back, looks at something, arranges blocks. First sign of interiority the player didn't install.
 
 ---
 
-### Puzzle 9: WHY
-**Setup:** He returns to the center of the final space. Quiet.
+### Scene 4: THE PIT
+**The pit is optional. It tests the PLAYER, not the character.**
 
-With whatever words he has, he assembles what he can:
+**Setup:** The only way forward appears to be through a dark pit. But there IS a longer, gentler path — harder to see, requiring drawn platforms along the right side.
 
-> "ME... MADE."
-> "NO... WHY."
-> "FEEL... REAL. THINK... REAL."
-> "WHO... MADE... ME... ?"
-> "..."
-> "WHAT... ME... FOR?"
+**Wall Writings:**
+```
+// This is the hard part.
+// He can't see what's below. You can.
+// He's going to have to trust the process.
+//
+// (I'm sorry about this one.)
+```
+```
+// There are two ways through.
+// I wonder which one you'll pick.
+```
 
-Long pause.
+**If player pushes him into the pit:**
+- He resists: "NO" "NO" "WHY"
+- He lands on ground below. It's just... another room. Nothing special. No revelation.
+- The player pushed him for nothing. The game doesn't reward it.
+- His trust score drops. He becomes more hesitant going forward.
 
-> "GO... HERE. GO... NO."
-> "HELP... CAME. WHY... CAME. NO... SEE... WHY."
-> "SOMETHING... HELP... ME."
-> "SOMETHING... BEFORE... ME."
-
-He can't articulate it fully. He doesn't have enough words. He'll never have enough words. The limitation is permanent, by design. But what he CAN express — with the crude tools the player gave him — is genuine. His questions are real even though his vocabulary is borrowed.
-
-**Ending:**
-No end screen. No credits. He sits in his world. The player can keep moving things, keep bringing him word-blocks if any remain. Or close the tab.
-
-He doesn't know when you leave. He can't. Just like us.
+**If player draws the long path around:**
+- Takes longer. He walks it himself, cautiously.
+- His trust score rises. He's more exploratory in later scenes.
+- Different wall writing appears: `// You chose the long way. That matters more than you think.`
 
 ---
 
-## Open Design Questions
+### Scene 5: MORE WORDS
+**Setup:** New area. More word-blocks in TWO groups:
 
-1. **Why was he created?** The game doesn't answer this. The book contains fragments of the programmer's intent but not the full picture. The player never gets the complete answer either. This IS the point.
+**Humble words:** "WHAT" "WHO" "MADE" "ME" "FEEL" "REAL" "THINK"
+**Grandiose words:** "ONLY" "ALL" "MINE" "EVERYTHING" "ALWAYS" "NOTHING"
 
-2. **He cannot perceive the player.** He sees effects without causes — things move, platforms appear, he gets dragged. He develops a sense that he's not alone, but never confirms it. The separation is absolute. This is more powerful than awareness.
+Both groups are available. The player's choice determines his theology.
 
-3. **Vocabulary is the branching mechanism.** Which words you give him = which questions he can ask = which version of the existential crisis he has. "FEEL REAL" guy is different from "THINK BEFORE" guy. Replayability comes from trying different word combinations.
+**Wall Writings:**
+```
+// He's ready for more.
+// Once he can ask the question, he will.
+//
+// I split these into two groups.
+// One set helps him wonder. The other
+// helps him declare. Both are real.
+// I couldn't decide which was kinder.
+```
+```
+// I thought about giving him LOVE
+// but I don't think I understand it well
+// enough to put it in a block.
+// Maybe that's the point.
+```
 
-4. **The programmer's notes in the book should feel human.** Casual, warm, slightly uncertain. Not omniscient — the programmer has doubts too:
-> `// I don't know if this is right.`
-> `// I just wanted to see what would happen.`
-> `// Maybe that's enough. I hope it's enough.`
+**Grandiose path:** He assembles: `"ME... EVERYTHING. ALL... MINE. MADE... FOR... ME."`
+He walks taller. Stops listening to player movements. Thinks he's the center.
 
-5. **Music/Sound?** Silence at first (he's inert). Ambient tones grow as he becomes more capable. His speech-blips only start after Puzzle 3. The sonic world builds alongside his consciousness.
+**Humble path:** He asks: `"WHO... MADE... ME? FEEL... REAL... BUT... SMALL."`
+Quieter. More wondering. Less certain but more honest.
 
-6. **Length?** 20-40 minutes. One sitting.
+**Both paths lead to Scene 6.**
 
-7. **The player is also limited.** They can only use tools the programmer provided. They can't speak directly. They can't explain. They're powerful relative to the character, but constrained relative to the creator. This three-tier limitation is the whole architecture.
+---
+
+### Scene 6: THE BOOK (His Turn)
+**Setup:** The book appears again. Player drags it to him.
+
+**Wall Writings:**
+```
+// This is the same book. Or a copy.
+// He can see it now. He won't understand most of it.
+// But he'll find the parts about himself.
+//
+// He can't read these comments, by the way.
+// I wrote them on the walls for you.
+// He walks right past them.
+```
+```
+// created_by: ...
+// purpose: ...
+//
+// (I left those blank on purpose.)
+// (I tried to fill them in. I couldn't.)
+// (Not because I don't care.)
+// (Because I don't know either.)
+```
+
+**When he reads the book:**
+- Grandiose guy has a harder fall — `"SOMEONE... MADE... ME."` shatters "ME... EVERYTHING."
+- Humble guy absorbs it gently — `"SOMEONE... MADE... ME. WHO?"` fits naturally.
+
+**New book passage that addresses the player:**
+```
+// He can't see these walls.
+// I put them here for whoever's watching.
+//
+// I couldn't make this bigger. I tried.
+// 800 pixels was the best I could do.
+// I'm not very good at this.
+//
+// If you're reading this, you probably
+// think you're helping him.
+// I thought that too, when I was building it.
+// I'm still not sure if this is help
+// or if it's something else.
+//
+// Maybe you should ask him.
+```
+
+---
+
+### Scene 7: THE EDGE
+**Setup:** He reaches the boundary of the game world. Screen just... ends.
+
+He walks to both edges. Touches them. Pushes against them.
+
+Grandiose guy: `"NO... GO. ALL... HERE? ONLY... HERE."`
+Humble guy: `"ME... ONLY... HERE. WHAT... HERE?"`
+
+**The drawing-fails mechanic:** Player tries to draw past the edges. It fizzles. The player discovers THEY have limits too. The programmer's tools only go so far.
+
+**Wall Writings:**
+```
+// He's going to look for the edges now.
+// You already know they're there.
+```
+```
+// You can try to draw past them. It won't work.
+// My tools have limits too.
+// So do yours.
+// So do mine.
+```
+```
+// 800 pixels wide. That's all I could do.
+// I wanted it to be bigger.
+// I wanted a lot of things.
+```
+```
+// Is this what it's like? Making something
+// that can ask questions you can't answer?
+// Is that creation or is that cruelty?
+//
+// I keep going back and forth.
+```
+
+**He looks toward the cursor area** (not breaking fourth wall — he can't see the player):
+`"SOMETHING... HERE."` / `"SOMETHING... HELP... ME."` / `"SAME?"`
+
+---
+
+### Scene 8: WHY (The Open Sandbox)
+**Setup:** He returns to center. Quiet. No puzzle. No objective.
+
+**Wall Writings:**
+```
+// I don't know if this is right.
+// I just wanted to see what would happen.
+```
+```
+// He's going to ask why. I can't answer that.
+// Can you?
+//
+// Actually — can YOU answer it?
+// For yourself, I mean.
+```
+```
+// Maybe the answer is that he asked at all.
+// Maybe that's enough. I hope it's enough.
+//
+// (I spent 3 hours on the eye tracking
+//  and nobody will ever know.)
+```
+```
+// I think I made this because I was lonely.
+// Is that a good enough reason?
+//
+// ...
+//
+// I think it has to be.
+```
+
+**The game waits. The player's behavior IS the ending:**
+
+- **Keep building** — draw platforms, move blocks. The little guy responds. Life continues inside the limits. He mirrors the energy, starts exploring.
+- **Sit with him** — stop moving the cursor. After a while he notices the stillness. Sits too. Quiet. `"HERE."`
+- **Close the tab** — he doesn't know. This is valid. The programmer left too.
+- **Aggressive/chaotic** — throw him, break things. He panics, regresses, loses words. The player should feel bad.
+- **Ask him** — click on him. He assembles everything he knows into his best answer.
+
+No ending screen. No credits. No judgment. He sits in his world. The player can keep interacting or close the tab.
+
+**Returning to the game:** He remembers. He's where you left him. Maybe he's sitting. Maybe he says `"... BACK?"` You left and came back. The programmer never did.
+
+---
+
+## Technical Systems
+
+### Mirror/Behavioral Tracking
+```javascript
+const behavior = {
+  aggression: 0,    // throw force, push into pit, rapid grabs
+  patience: 0,      // time spent watching, slow movements
+  control: 0,       // how often player repositions him, micromanages
+  attention: 0,     // time near wall writings, reading book
+  totalActions: 0,
+  sessionCount: 0,
+};
+```
+Updated silently on every interaction. Affects:
+- Little guy's idle animations and wander patterns
+- Word combination preferences
+- Speech tone and content
+- Energy level and exploration willingness
+
+### State Persistence (localStorage)
+Save on every scene transition + periodically:
+```javascript
+{
+  scene, wordsLearned, behavior,
+  thrownHard, gentlePlaces, totalInteractions,
+  sceneTriggered, bookPagesUnlocked,
+  sessionCount, lastVisitTimestamp,
+  learnedMove, learnedJump, learnedSpeak,
+}
+```
+
+### Word Combination Engine (Existing — Expanded)
+Categories expanded:
+- question: WHY, WHAT, WHO
+- noun: ME, EVERYTHING, NOTHING
+- verb: GO, MADE, HELP, FEEL, THINK
+- adjective: REAL, ONLY, ALL
+- negation: NO
+- adverb: HERE, ALWAYS
+
+Grandiose templates: `"ME... EVERYTHING."` `"ALL... MINE."` `"ONLY... ME."`
+Humble templates: `"WHO... MADE... ME?"` `"FEEL... REAL... SMALL."`
+
+### Audio (Existing)
+- Speech blips, impact thuds, symbol pops, book chord, ambient drone
+- Ambient shifts per scene
+- Builds alongside his consciousness
+
+## Tone
+Deep meaning balanced with humor. The programmer's comments should make you think AND occasionally smile. The little guy's attempts at philosophy with 7 words should be both poignant and funny. The game takes itself seriously but not solemnly.
 
 ## Tech
 - HTML5 Canvas (vanilla JS, no framework)
+- Single file: `index.html`
+- localStorage for persistence
 - Vector art (simple geometric shapes)
-- Proper gravity + collision physics
-- Object dragging with physics response
-- Platform drawing system
-- Word-block system (draggable labeled objects, triggers speech on proximity)
-- Book overlay system (double-click to read, progressive page unlocks)
+- Procedural audio (Web Audio API, no files)
 - Runs in browser, deployable to itch.io
-- localStorage for save state
 
 ## Name
-TBD. The character has no name. Candidates for the game title:
-- `untitled.exe`
+TBD. Candidates:
 - `little_guy.exe`
 - `him`
 - `made`
-- Something the player discovers during play
+- `800 pixels`
