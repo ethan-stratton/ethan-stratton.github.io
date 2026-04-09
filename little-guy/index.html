@@ -1613,27 +1613,39 @@ function resolveBody(body) {
 
   // Body bounces off guy's head
   if (!draggingGuy && !guy.inert && body.visible && body !== dragging) {
-    const hw = guy.w / 2;
-    const headTop = guy.y - guy.h;
+    const hw = guy.w / 2 + 4;
+    // Adjust hitbox for sleeping/sitting pose
+    const headTop = guy.sleeping ? guy.y - 12 : guy.sitting ? guy.y - 20 : guy.y - guy.h;
     // Landing on guy's head
-    if (body.right > guy.x - hw && body.x < guy.x + hw && body.bottom >= headTop && body.bottom <= headTop + 12 && body.vy > 0) {
+    if (body.right > guy.x - hw && body.x < guy.x + hw && body.bottom >= headTop && body.bottom <= headTop + 14 && body.vy > 0) {
       body.y = headTop - body.h;
       body.vy = -body.vy * BOUNCE * 0.6;
       body.vx += (body.cx > guy.x ? 1 : -1) * 0.5; // deflect sideways
       guy.squashTarget = 0.8;
       const speed = Math.sqrt(body.vx ** 2 + body.vy ** 2);
+      // Wake from sleep/thinker on impact
+      if (guy.sleeping || guy.thinker) {
+        guy.sleeping = false; guy.thinker = false; guy.sitting = false;
+        guy.idlePhase = 0; guy.idleTime = 0; guy.eyesClosed = false; guy.eyesCloseTimer = 0;
+        updateTabTitle();
+      }
       if (speed > 2) { addSymbol('!'); playImpact(speed * 0.5); behavior.aggression += 0.5; }
-      else addSymbol('...');
+      else addSymbol('!');
     }
     // Side collision — body pushes guy or guy pushes body
     else if (body.bottom > headTop + 8 && body.y < guy.y && body.right > guy.x - hw && body.x < guy.x + hw) {
       const pushDir = guy.x < body.cx ? -1 : 1;
       const bodySpeed = Math.abs(body.vx);
       if (bodySpeed > 1) {
-        // Fast body pushes guy
         guy.vx += pushDir * bodySpeed * 0.3;
         body.vx *= 0.5;
         if (bodySpeed > 3 && !guy.inert) addSymbol('!');
+        // Wake from sleep on side hit too
+        if (guy.sleeping || guy.thinker) {
+          guy.sleeping = false; guy.thinker = false; guy.sitting = false;
+          guy.idlePhase = 0; guy.idleTime = 0; guy.eyesClosed = false; guy.eyesCloseTimer = 0;
+          updateTabTitle();
+        }
       }
     }
   }
