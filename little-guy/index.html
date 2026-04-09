@@ -292,7 +292,7 @@ class Body {
 function updateCursor() {
   if (draggingGuy || dragging) { canvas.style.cursor = 'grabbing'; return; }
   // Check what's under the mouse
-  if (mouse.x >= guy.x - 14 && mouse.x <= guy.x + 14 && mouse.y >= guy.y - 38 && mouse.y <= guy.y + 2 && !guy.inert) {
+  if (mouse.x >= guy.x - 14 && mouse.x <= guy.x + 14 && mouse.y >= guy.y - 38 && mouse.y <= guy.y + 2) {
     canvas.style.cursor = 'grab'; return;
   }
   for (const b of currentBodies) {
@@ -667,6 +667,7 @@ const scenes = [
         }
       },
       { id: 'fell_in', condition: () => guy.y > GROUND_Y_DEFAULT + 50 && !hasFired(4, 'fell_in'), once: true, action: () => {
+          guy.avoidX = null; guy.avoidDir = 0;
           state.pitPath = 'pushed';
           behavior.aggression += 5;
           addSymbol('!!!');
@@ -676,6 +677,7 @@ const scenes = [
       },
       { id: 'crossed_safely', condition: () => guy.x > 450 && guy.y < GROUND_Y_DEFAULT + 10 && guy.grounded && !hasFired(4, 'fell_in') && !hasFired(4, 'crossed_safely'),
         once: true, action: () => {
+          guy.avoidX = null; guy.avoidDir = 0;
           state.pitPath = 'drawn';
           behavior.patience += 50;
           setAmbientTone(65, 0.035);
@@ -953,15 +955,17 @@ const scenes = [
             lines.push({ t, text: 'WHO... MADE... ME... ?' }); t += 4000 * pauseMult;
             if (extraSighs) { lines.push({ t, text: '...', sigh: true }); t += 2000 * pauseMult; }
           }
-          if (words.includes('WHAT') && words.includes('ME')) { lines.push({ t, text: 'WHAT... ME... FOR?' }); t += 4000 * pauseMult; }
+          if (words.includes('WHAT') && words.includes('ME')) { lines.push({ t, text: 'WHAT... ME?' }); t += 4000 * pauseMult; }
           else if (words.includes('WHY') && words.includes('HERE')) { lines.push({ t, text: 'WHY... HERE?' }); t += 3500 * pauseMult; }
           lines.push({ t, text: '...' }); t += 3500 * pauseMult;
-          if (words.includes('GO') && words.includes('HELP')) { lines.push({ t, text: 'HELP... CAME. WHY... CAME.' }); t += 4000 * pauseMult; }
-          else if (words.includes('HELP')) { lines.push({ t, text: 'HELP... CAME.' }); t += 3000 * pauseMult; }
+          if (words.includes('GO') && words.includes('HELP')) { lines.push({ t, text: words.includes('HERE') ? 'HELP... HERE. WHY... HERE.' : 'HELP... HELP...' }); t += 4000 * pauseMult; }
+          else if (words.includes('HELP')) { lines.push({ t, text: words.includes('HERE') ? 'HELP... HERE.' : 'HELP...' }); t += 3000 * pauseMult; }
           const novel = generatePhrase();
           if (novel) { lines.push({ t, text: novel }); t += 4000 * pauseMult; }
-          lines.push({ t, text: 'SOMETHING...' }); t += 4000 * pauseMult;
-          if (words.includes('FEEL')) { lines.push({ t, text: 'FEEL... SOMETHING.' }); t += 4000 * pauseMult; }
+          const novelEnd = generatePhrase();
+          if (novelEnd) { lines.push({ t, text: novelEnd }); t += 4000 * pauseMult; }
+          else { lines.push({ t, text: '...' }); t += 2000 * pauseMult; }
+          if (words.includes('FEEL')) { lines.push({ t, text: words.includes('REAL') ? 'FEEL... REAL.' : words.includes('ME') ? 'FEEL... ME.' : 'FEEL...' }); t += 4000 * pauseMult; }
           lines.push({ t, text: '...' }); t += 3000;
           if (gentleRatio > 0.6 && words.length >= 6) { lines.push({ t, text: '... REAL.' }); t += 4000; }
 
@@ -1480,7 +1484,6 @@ function updateBarks() {
   if (state.postMonologue) return;
 
   if (guy.idlePhase < 2) {
-    guy.idleTime++;
     if (guy.idleTime > 200 && guy.idleTime % 220 === 0) {
       const interests = currentBodies.filter(b => b.visible && Math.abs(b.cx - guy.x) < 300);
       if (interests.length > 0) {
@@ -1734,6 +1737,7 @@ function loadGame() {
     const timeSince = Date.now() - (d.lastVisit || 0);
     state.returnTimeSince = timeSince;
     loadScene(d.scene || 0);
+    if ((d.scene || 0) > 0) { initAudio(); startAmbient(); }
     if (timeSince > 300000) {
       guy.sitting = true;
       setTimeout(() => {
@@ -1761,13 +1765,13 @@ function askHowAreYou() {
   const patienceRatio = behavior.patience / totalBehav;
   const controlRatio = behavior.control / totalBehav;
 
-  const aggroWords = ['NO', 'WHY', 'HELP', 'NOTHING'].filter(w => words.includes(w));
-  const gentleWords = ['FEEL', 'REAL', 'HERE', 'THINK', 'GOOD'].filter(w => words.includes(w));
-  const passiveWords = ['ME', 'WAIT', 'HERE'].filter(w => words.includes(w));
+  const aggroWords = ['NO', 'WHY', 'HELP'].filter(w => words.includes(w));
+  const gentleWords = ['FEEL', 'REAL', 'HERE', 'THINK'].filter(w => words.includes(w));
+  const passiveWords = ['ME', 'HERE'].filter(w => words.includes(w));
 
   let response;
   if (controlRatio > 0.4 && passiveWords.length > 0) {
-    response = 'ME... WAIT.';
+    response = 'ME... HERE.';
   } else if (aggroRatio > 0.35 && aggroWords.length > 0) {
     const w = aggroWords[Math.random() * aggroWords.length | 0];
     const w2 = aggroWords.find(x => x !== w) || words[Math.random() * words.length | 0];
