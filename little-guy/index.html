@@ -9,26 +9,14 @@
 body { background: #0a0a0f; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; font-family: monospace; }
 canvas { cursor: default; }
 #book-overlay {
-  display: none;
-  position: fixed;
-  top: 50%; left: 50%;
+  display: none; position: fixed; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  background: #1a1a1a;
-  border: 1px solid #444;
-  padding: 30px 40px;
-  max-width: 500px;
-  color: #8a8;
-  font-family: monospace;
-  font-size: 13px;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  z-index: 10;
-  border-radius: 4px;
+  background: #1a1a1a; border: 1px solid #444;
+  padding: 30px 40px; max-width: 520px;
+  color: #8a8; font-family: monospace; font-size: 13px;
+  line-height: 1.7; white-space: pre-wrap; z-index: 10; border-radius: 4px;
 }
-#book-overlay .close {
-  position: absolute; top: 8px; right: 12px;
-  color: #666; cursor: pointer; font-size: 16px;
-}
+#book-overlay .close { position: absolute; top: 8px; right: 12px; color: #666; cursor: pointer; font-size: 18px; }
 #book-overlay .close:hover { color: #aaa; }
 </style>
 </head>
@@ -36,47 +24,63 @@ canvas { cursor: default; }
 <canvas id="game"></canvas>
 <div id="book-overlay"><span class="close" onclick="closeBook()">×</span><pre id="book-text"></pre></div>
 <script>
-// --- Canvas setup ---
+// ============================================================
+// CANVAS
+// ============================================================
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const W = 800, H = 500;
 canvas.width = W; canvas.height = H;
 
-// --- Physics ---
+// ============================================================
+// CONSTANTS
+// ============================================================
 const GRAVITY = 0.4;
-const GROUND_Y = H - 60;
-const BOUNCE = 0.4;       // bounciness on ground hit
-const AIR_DRAG = 0.995;   // very slight air resistance
-const GROUND_FRIC = 0.88; // friction when grounded
-
-// --- Throw tracking ---
-const mouseHistory = []; // {x, y, t} — last N mouse positions for velocity calc
+const BOUNCE = 0.4;
+const AIR_DRAG = 0.995;
+const GROUND_FRIC = 0.88;
 const MOUSE_HIST_LEN = 6;
 
-// --- Game state ---
+// ============================================================
+// GLOBAL STATE
+// ============================================================
 const state = {
+  scene: 0,
   learnedMove: false,
   learnedJump: false,
   learnedSpeak: false,
-  bookPageUnlocked: 1,
   wordsLearned: [],
   dragCount: 0,
+  bookPagesUnlocked: 1,
+  thrownHard: 0,       // times thrown hard
+  gentlePlaces: 0,     // times placed gently
+  totalInteractions: 0,
+  sceneTriggered: {},   // { "scene_triggerName": true }
+  transitioning: false,
+  transitionAlpha: 0,
+  transitionTarget: -1,
+  frameCount: 0,
+  sceneFrames: 0,       // frames in current scene
 };
 
-// --- Bodies (physics objects) ---
+// ============================================================
+// BODY CLASS
+// ============================================================
 class Body {
   constructor(x, y, w, h, opts = {}) {
     this.x = x; this.y = y; this.w = w; this.h = h;
     this.vx = 0; this.vy = 0;
-    this.static = opts.static || false;
-    this.draggable = opts.draggable !== undefined ? opts.draggable : !this.static;
+    this.isStatic = opts.isStatic || false;
+    this.draggable = opts.draggable !== undefined ? opts.draggable : !this.isStatic;
     this.color = opts.color || '#555';
     this.label = opts.label || null;
     this.type = opts.type || 'box';
     this.grounded = false;
-    this.mass = opts.mass || 1;
-    this.rotation = 0;    // visual rotation (radians)
-    this.rotV = 0;        // rotational velocity
+    this.rotation = 0;
+    this.rotV = 0;
+    this.id = opts.id || null;
+    this.visible = opts.visible !== undefined ? opts.visible : true;
+    this.solid = opts.solid !== undefined ? opts.solid : true;
   }
   get left() { return this.x; }
   get right() { return this.x + this.w; }
@@ -86,61 +90,653 @@ class Body {
   get cy() { return this.y + this.h / 2; }
 }
 
-// --- World objects ---
-const ground = new Body(0, GROUND_Y, W, 60, { static: true, color: '#1e1e2e' });
+// ============================================================
+// SCENE DATA
+// ============================================================
+const GROUND_Y_DEFAULT = H - 60;
 
-const platforms = [
-  ground,
-  new Body(250, GROUND_Y - 40, 80, 12, { static: true, color: '#2a2a3e' }),
+function makeGround(gy) {
+  return new Body(0, gy || GROUND_Y_DEFAULT, W, 60, { isStatic: true, color: '#1e1e2e' });
+}
+
+const scenes = [
+  // ── SCENE 0: INERT ──
+  {
+    name: 'inert',
+    bgColor: '#0f0f1a',
+    groundColor: '#1a1a2a',
+    groundY: GROUND_Y_DEFAULT,
+    guyStart: { x: 100, y: GROUND_Y_DEFAULT },
+    platforms: [],
+    bodies: [
+      () => new Body(180, GROUND_Y_DEFAULT - 18, 22, 18, { color: '#6b5b3a', type: 'book', draggable: true, id: 'book' }),
+    ],
+    bookPage: `// version 0.1
+// He's in there. All the code is running.
+// He just doesn't know what he can do yet.
+//
+// Try moving him. Click and drag.
+// He won't like it. That's okay.`,
+    triggers: [
+      {
+        id: 'wake',
+        condition: () => state.learnedMove,
+        once: true,
+        delay: 120, // frames after condition met
+        action: () => {
+          queueBark({ lookAt: { x: guy.x + 100, y: guy.y - 20 }, duration: 60, symbol: '...' });
+          queueBark({ lookAt: { x: guy.x - 80, y: guy.y }, duration: 50 });
+          queueBark({ headTilt: -0.3, duration: 50, symbol: '?' });
+        }
+      },
+      {
+        id: 'exit',
+        condition: () => state.learnedMove && state.sceneFrames > 300 && guy.x > W - 40,
+        once: true,
+        action: () => transitionTo(1),
+      },
+    ],
+    hint: () => !state.learnedMove && state.dragCount === 0 ? { text: 'double-click the book', x: 180 + 11, y: GROUND_Y_DEFAULT - 28 } : null,
+  },
+
+  // ── SCENE 1: THE STEP ──
+  {
+    name: 'step',
+    bgColor: '#0f0f1a',
+    groundColor: '#1a1a2a',
+    groundY: GROUND_Y_DEFAULT,
+    guyStart: { x: 60, y: GROUND_Y_DEFAULT },
+    platforms: [
+      () => new Body(200, GROUND_Y_DEFAULT - 45, 100, 12, { isStatic: true, color: '#2a2a3e' }),
+      () => new Body(380, GROUND_Y_DEFAULT - 45, 400, 12, { isStatic: true, color: '#2a2a3e' }),
+    ],
+    bodies: [],
+    bookPage: `// jump_height: 8
+// He can jump. But he has to learn
+// what "up" means first.
+// Lift him onto something higher.
+// He'll figure it out.`,
+    triggers: [
+      {
+        id: 'learn_jump',
+        condition: () => !state.learnedJump && guy.y < GROUND_Y_DEFAULT - 20 && guy.grounded,
+        once: true,
+        action: () => {
+          state.learnedJump = true;
+          addSymbol('!!');
+          queueBark({ duration: 40, symbol: '!' });
+          // He tests jumping after a beat
+          setTimeout(() => { if (!draggingGuy) guy.vy = -7; }, 600);
+          setTimeout(() => { if (!draggingGuy) guy.vy = -7; }, 1200);
+        }
+      },
+      {
+        id: 'exit',
+        condition: () => state.learnedJump && guy.x > W - 40,
+        once: true,
+        action: () => transitionTo(2),
+      },
+    ],
+  },
+
+  // ── SCENE 2: FIRST WORDS ──
+  {
+    name: 'first_words',
+    bgColor: '#0e0e1c',
+    groundColor: '#1a1a2a',
+    groundY: GROUND_Y_DEFAULT,
+    guyStart: { x: 60, y: GROUND_Y_DEFAULT },
+    platforms: [],
+    bodies: [
+      () => new Body(300, GROUND_Y_DEFAULT - 16, 42, 16, { color: '#3a4a5a', type: 'word', label: 'HERE', draggable: true }),
+      () => new Body(370, GROUND_Y_DEFAULT - 16, 34, 16, { color: '#3a4a5a', type: 'word', label: 'GO', draggable: true }),
+      () => new Body(430, GROUND_Y_DEFAULT - 16, 34, 16, { color: '#3a4a5a', type: 'word', label: 'NO', draggable: true }),
+      () => new Body(490, GROUND_Y_DEFAULT - 16, 38, 16, { color: '#3a4a5a', type: 'word', label: 'WHY', draggable: true }),
+      () => new Body(555, GROUND_Y_DEFAULT - 16, 40, 16, { color: '#3a4a5a', type: 'word', label: 'HELP', draggable: true }),
+    ],
+    bookPage: `// talk: true (dormant)
+// He has a voice. He just needs words.
+// The blocks have labels. Bring them to him.
+// Start with something simple.
+//
+// Be thoughtful about which ones you give him.
+// They'll shape what he can say later.`,
+    triggers: [
+      {
+        id: 'first_word',
+        condition: () => state.wordsLearned.length >= 1 && !hasFired(2, 'first_word'),
+        once: true,
+        delay: 60,
+        action: () => {
+          queueBark({ lookAt: { x: guy.x, y: guy.y - 10 }, duration: 50 });
+          queueBark({ headTilt: 0.1, duration: 40, symbol: '...' });
+        }
+      },
+      {
+        id: 'exit',
+        condition: () => state.wordsLearned.length >= 2 && guy.x > W - 40,
+        once: true,
+        action: () => transitionTo(3),
+      },
+    ],
+  },
+
+  // ── SCENE 3: THE DOOR ──
+  {
+    name: 'door',
+    bgColor: '#0e0e1c',
+    groundColor: '#1a1a2a',
+    groundY: GROUND_Y_DEFAULT,
+    guyStart: { x: 60, y: GROUND_Y_DEFAULT },
+    platforms: [
+      () => new Body(400, GROUND_Y_DEFAULT - 80, 80, 12, { isStatic: true, color: '#2a2a3e' }),
+      () => new Body(550, GROUND_Y_DEFAULT - 40, 60, 12, { isStatic: true, color: '#2a2a3e' }),
+    ],
+    bodies: [
+      () => new Body(420, GROUND_Y_DEFAULT - 96, 16, 16, { color: '#cc9933', type: 'key', draggable: true, id: 'key' }),
+      () => new Body(720, GROUND_Y_DEFAULT - 50, 30, 50, { color: '#443322', type: 'door', draggable: false, isStatic: true, id: 'door' }),
+      () => new Body(150, GROUND_Y_DEFAULT - 20, 30, 20, { color: '#444', type: 'box', draggable: true }),
+      () => new Body(250, GROUND_Y_DEFAULT - 20, 30, 20, { color: '#444', type: 'box', draggable: true }),
+    ],
+    bookPage: `// He's getting smarter. Watch.
+// Give him a path and he'll try to take it.
+// You don't have to carry him everywhere.
+//
+// You can draw platforms too —
+// click and drag on empty space.`,
+    triggers: [
+      {
+        id: 'key_near_door',
+        condition: () => {
+          const key = findBody('key');
+          const door = findBody('door');
+          return key && door && Math.abs(key.cx - door.cx) < 40 && Math.abs(key.cy - door.cy) < 50;
+        },
+        once: true,
+        action: () => {
+          // Door opens
+          const door = findBody('door');
+          if (door) { door.color = '#2a2a1a'; door.solid = false; }
+          const key = findBody('key');
+          if (key) key.visible = false;
+          if (state.learnedSpeak && state.wordsLearned.length > 0) {
+            const w = state.wordsLearned[0];
+            setTimeout(() => showSpeech(w + "... " + (state.wordsLearned.includes('HERE') ? 'HERE?' : '...')), 500);
+          }
+          addSymbol('!');
+        }
+      },
+      {
+        id: 'exit',
+        condition: () => hasFired(3, 'key_near_door') && guy.x > W - 40,
+        once: true,
+        action: () => transitionTo(4),
+      },
+    ],
+  },
+
+  // ── SCENE 4: THE PIT ──
+  {
+    name: 'pit',
+    bgColor: '#0a0a14',
+    groundColor: '#141420',
+    groundY: GROUND_Y_DEFAULT,
+    guyStart: { x: 60, y: GROUND_Y_DEFAULT },
+    platforms: [
+      // Gap in ground — left side
+      () => new Body(0, GROUND_Y_DEFAULT, 300, 60, { isStatic: true, color: '#141420' }),
+      // Right side (lower — the "other side")
+      () => new Body(450, GROUND_Y_DEFAULT + 60, 350, 60, { isStatic: true, color: '#1e1e2e' }),
+    ],
+    bodies: [],
+    bookPage: `// This is the hard part.
+// He can't see what's below. You can.
+// He's going to have to trust the process.
+//
+// (I'm sorry about this one.)`,
+    customGround: true, // don't draw default ground
+    triggers: [
+      {
+        id: 'near_edge',
+        condition: () => guy.x > 250 && guy.x < 310 && guy.grounded && !hasFired(4, 'near_edge'),
+        once: true,
+        action: () => {
+          guy.wanderTarget = null;
+          guy.avoidX = 310; // AI will avoid going past this
+          if (state.learnedSpeak) {
+            if (state.wordsLearned.includes('NO')) showSpeech('NO...');
+            else showSpeech('...');
+          }
+          addSymbol('!');
+          queueBark({ lookAt: { x: 350, y: GROUND_Y_DEFAULT + 100 }, duration: 80, symbol: '?' });
+        }
+      },
+      {
+        id: 'fell_in',
+        condition: () => guy.y > GROUND_Y_DEFAULT + 30,
+        once: true,
+        action: () => {
+          addSymbol('!!!');
+          if (state.learnedSpeak && state.wordsLearned.includes('NO')) {
+            showSpeech('NO NO NO');
+          }
+        }
+      },
+      {
+        id: 'landed_other_side',
+        condition: () => guy.x > 450 && guy.y > GROUND_Y_DEFAULT + 40 && guy.grounded,
+        once: true,
+        delay: 60,
+        action: () => {
+          // The other side is... nice
+          if (state.learnedSpeak) {
+            const words = state.wordsLearned;
+            if (words.includes('WHY')) setTimeout(() => showSpeech('WHY... HERE...'), 500);
+            else setTimeout(() => showSpeech('...'), 500);
+            setTimeout(() => {
+              if (words.includes('NO')) showSpeech('NO... was... GOOD?');
+              else showSpeech('...');
+            }, 2500);
+          }
+          queueBark({ duration: 60 });
+          queueBark({ headTilt: 0.1, duration: 50, symbol: '...' });
+        }
+      },
+      {
+        id: 'exit',
+        condition: () => hasFired(4, 'landed_other_side') && guy.x > W - 40,
+        once: true,
+        action: () => transitionTo(5),
+      },
+    ],
+  },
+
+  // ── SCENE 5: MORE WORDS ──
+  {
+    name: 'more_words',
+    bgColor: '#0e101e',
+    groundColor: '#1a1c2e',
+    groundY: GROUND_Y_DEFAULT,
+    guyStart: { x: 60, y: GROUND_Y_DEFAULT },
+    platforms: [],
+    bodies: [
+      () => new Body(200, GROUND_Y_DEFAULT - 16, 42, 16, { color: '#4a3a5a', type: 'word', label: 'WHAT', draggable: true }),
+      () => new Body(270, GROUND_Y_DEFAULT - 16, 40, 16, { color: '#4a3a5a', type: 'word', label: 'WHO', draggable: true }),
+      () => new Body(340, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#4a3a5a', type: 'word', label: 'MADE', draggable: true }),
+      () => new Body(420, GROUND_Y_DEFAULT - 16, 34, 16, { color: '#4a3a5a', type: 'word', label: 'ME', draggable: true }),
+      () => new Body(490, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#4a3a5a', type: 'word', label: 'FEEL', draggable: true }),
+      () => new Body(560, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#4a3a5a', type: 'word', label: 'REAL', draggable: true }),
+      () => new Body(640, GROUND_Y_DEFAULT - 16, 48, 16, { color: '#4a3a5a', type: 'word', label: 'THINK', draggable: true }),
+    ],
+    bookPage: `// He's ready for more.
+// Be careful which words you give him.
+// Once he can ask the question, he will.
+//
+// Not all words mean the same thing
+// when you're the only one who has them.`,
+    triggers: [
+      {
+        id: 'big_question',
+        condition: () => state.wordsLearned.includes('WHO') && state.wordsLearned.includes('MADE') && state.wordsLearned.includes('ME') && !hasFired(5, 'big_question'),
+        once: true,
+        delay: 90,
+        action: () => {
+          showSpeech('WHO... MADE... ME?');
+          queueBark({ headTilt: -0.2, duration: 100 });
+        }
+      },
+      {
+        id: 'feel_real',
+        condition: () => state.wordsLearned.includes('FEEL') && state.wordsLearned.includes('REAL') && !hasFired(5, 'feel_real'),
+        once: true,
+        delay: 80,
+        action: () => {
+          showSpeech('FEEL... REAL?');
+          queueBark({ headTilt: -0.15, duration: 80, symbol: '...' });
+        }
+      },
+      {
+        id: 'exit',
+        condition: () => {
+          const newWords = state.wordsLearned.filter(w => ['WHAT','WHO','MADE','ME','FEEL','REAL','THINK'].includes(w));
+          return newWords.length >= 3 && guy.x > W - 40;
+        },
+        once: true,
+        action: () => transitionTo(6),
+      }
+    ],
+  },
+
+  // ── SCENE 6: THE BOOK (His Turn) ──
+  {
+    name: 'his_book',
+    bgColor: '#0d0d18',
+    groundColor: '#191928',
+    groundY: GROUND_Y_DEFAULT,
+    guyStart: { x: 60, y: GROUND_Y_DEFAULT },
+    platforms: [],
+    bodies: [
+      () => new Body(400, GROUND_Y_DEFAULT - 18, 28, 22, { color: '#6b5b3a', type: 'book', draggable: true, id: 'his_book' }),
+    ],
+    bookPage: `// This is the same book. Or a copy of it.
+// He can see it now. He won't understand
+// most of it.
+//
+// But he'll find the parts about himself.
+// That's the part that matters to him.
+//
+// created_by: ...
+// purpose: ...
+//
+// (I left those blank on purpose.)
+// (I didn't know how to fill them in.)`,
+    triggers: [
+      {
+        id: 'book_near_guy',
+        condition: () => {
+          const b = findBody('his_book');
+          return b && Math.abs(b.cx - guy.x) < 45 && guy.grounded && b.grounded;
+        },
+        once: true,
+        delay: 30,
+        action: () => {
+          // He examines it
+          const b = findBody('his_book');
+          if (b) queueBark({ lookAt: { x: b.cx, y: b.cy }, duration: 120 });
+          
+          const seq = [
+            { t: 500, speech: '...' },
+            { t: 1800, speech: 'walk... speed... 3...' },
+            { t: 3500, speech: 'created... by...' },
+            { t: 5500, speech: state.wordsLearned.includes('WHO') ? 'WHO?' : '...' },
+            { t: 7000, speech: state.wordsLearned.includes('MADE') && state.wordsLearned.includes('ME') ? 'SOMEONE... MADE... ME.' : 'SOMEONE...' },
+            { t: 9500, speech: state.wordsLearned.includes('WHY') ? 'WHY?' : '...' },
+          ];
+          seq.forEach(s => setTimeout(() => showSpeech(s.speech), s.t));
+          
+          setTimeout(() => {
+            queueBark({ headTilt: -0.4, duration: 120, symbol: '...' });
+          }, 11000);
+        }
+      },
+      {
+        id: 'exit',
+        condition: () => hasFired(6, 'book_near_guy') && state.sceneFrames > 800 && guy.x > W - 40,
+        once: true,
+        action: () => transitionTo(7),
+      },
+    ],
+  },
+
+  // ── SCENE 7: THE EDGE ──
+  {
+    name: 'edge',
+    bgColor: '#0a0c14',
+    groundColor: '#16182a',
+    groundY: GROUND_Y_DEFAULT,
+    guyStart: { x: 400, y: GROUND_Y_DEFAULT },
+    platforms: [],
+    bodies: [],
+    bookPage: `// He's going to look for the edges now.
+// You already know they're there.
+// He doesn't. Not really.
+//
+// You can try to draw past them.
+// It won't work.
+// My tools have limits too.`,
+    triggers: [
+      {
+        id: 'hit_right',
+        condition: () => guy.x > W - 30 && !hasFired(7, 'hit_right'),
+        once: true,
+        action: () => {
+          guy.wanderTarget = null;
+          const words = state.wordsLearned;
+          if (words.includes('NO') && words.includes('GO')) showSpeech('NO... GO.');
+          else addSymbol('...');
+          queueBark({ lookAt: { x: W + 50, y: guy.y - 20 }, duration: 80 });
+          queueBark({ headTilt: -0.3, duration: 60 });
+        }
+      },
+      {
+        id: 'hit_left',
+        condition: () => guy.x < 30 && !hasFired(7, 'hit_left'),
+        once: true,
+        action: () => {
+          const words = state.wordsLearned;
+          if (words.includes('WHAT') && words.includes('HERE')) showSpeech('WHAT... HERE?');
+          queueBark({ lookAt: { x: -50, y: guy.y }, duration: 60, symbol: '?' });
+        }
+      },
+      {
+        id: 'both_edges',
+        condition: () => hasFired(7, 'hit_right') && hasFired(7, 'hit_left'),
+        once: true,
+        delay: 120,
+        action: () => {
+          const words = state.wordsLearned;
+          if (words.includes('ME')) showSpeech('ME... ONLY... HERE.');
+          else showSpeech('...');
+          queueBark({ headTilt: -0.5, duration: 150, symbol: '...' });
+          // After this contemplation, open the exit
+          setTimeout(() => {
+            // A subtle gap appears at bottom center
+            state.sceneTriggered['7_exit_ready'] = true;
+          }, 4000);
+        }
+      },
+      {
+        id: 'exit',
+        condition: () => state.sceneTriggered['7_exit_ready'] && guy.x > 380 && guy.x < 420 && guy.y >= GROUND_Y_DEFAULT - 2,
+        once: true,
+        delay: 60,
+        action: () => transitionTo(8),
+      },
+    ],
+  },
+
+  // ── SCENE 8: WHY ──
+  {
+    name: 'why',
+    bgColor: '#0d0d12',
+    groundColor: '#18181e',
+    groundY: GROUND_Y_DEFAULT,
+    guyStart: { x: 400, y: GROUND_Y_DEFAULT },
+    platforms: [],
+    bodies: [],
+    bookPage: `// I don't know if this is right.
+// I just wanted to see what would happen.
+//
+// He's going to ask why.
+// I can't answer that.
+// Can you?
+//
+// Maybe the answer is that he asked at all.
+// Maybe that's enough.
+// I hope it's enough.`,
+    triggers: [
+      {
+        id: 'sit_down',
+        condition: () => state.sceneFrames > 120 && Math.abs(guy.vx) < 0.2 && guy.grounded,
+        once: true,
+        delay: 90,
+        action: () => {
+          guy.wanderTarget = null;
+          guy.sitting = true;
+          
+          // Final monologue — assembled from learned words
+          const words = state.wordsLearned;
+          const lines = [];
+          
+          if (words.includes('ME') && words.includes('MADE')) lines.push({ t: 1000, text: 'ME... MADE.' });
+          else lines.push({ t: 1000, text: '...' });
+          
+          if (words.includes('NO') && words.includes('WHY')) lines.push({ t: 3500, text: 'NO... WHY.' });
+          
+          if (words.includes('FEEL') && words.includes('REAL')) lines.push({ t: 6000, text: 'FEEL... REAL. THINK... REAL.' });
+          else if (words.includes('THINK')) lines.push({ t: 6000, text: 'THINK... REAL?' });
+          else if (words.includes('FEEL')) lines.push({ t: 6000, text: 'FEEL... REAL?' });
+          
+          if (words.includes('WHO') && words.includes('MADE') && words.includes('ME')) {
+            lines.push({ t: 9000, text: 'WHO... MADE... ME... ?' });
+          }
+          
+          if (words.includes('WHAT') && words.includes('ME')) {
+            lines.push({ t: 12000, text: 'WHAT... ME... FOR?' });
+          } else if (words.includes('WHY') && words.includes('HERE')) {
+            lines.push({ t: 12000, text: 'WHY... HERE?' });
+          }
+          
+          // Universal final lines
+          lines.push({ t: 16000, text: '...' });
+          
+          if (words.includes('GO') && words.includes('HELP')) {
+            lines.push({ t: 19000, text: 'HELP... CAME. WHY... CAME.' });
+          } else if (words.includes('HELP')) {
+            lines.push({ t: 19000, text: 'HELP... CAME.' });
+          }
+          
+          lines.push({ t: 23000, text: 'SOMETHING...' });
+          
+          if (words.includes('FEEL')) {
+            lines.push({ t: 27000, text: 'FEEL... SOMETHING.' });
+          }
+          
+          lines.push({ t: 31000, text: '...' });
+          
+          lines.forEach(l => {
+            setTimeout(() => {
+              showSpeech(l.text);
+              if (l.text === '...') queueBark({ headTilt: -0.4, duration: 100 });
+            }, l.t);
+          });
+        }
+      },
+    ],
+    // No exit. This is the end. The game stays open.
+  },
 ];
 
-const book = new Body(180, GROUND_Y - 18, 22, 18, { color: '#6b5b3a', type: 'book', draggable: true });
+// ============================================================
+// SCENE MANAGEMENT
+// ============================================================
+let currentPlatforms = [];
+let currentBodies = [];
+let currentGroundY = GROUND_Y_DEFAULT;
+let currentScene = null;
+let drawnPlatforms = [];
 
-const wordBlocks = [
-  new Body(500, GROUND_Y - 16, 40, 16, { color: '#3a4a5a', type: 'word', label: 'HERE', draggable: true }),
-  new Body(560, GROUND_Y - 16, 32, 16, { color: '#3a4a5a', type: 'word', label: 'GO', draggable: true }),
-  new Body(610, GROUND_Y - 16, 32, 16, { color: '#3a4a5a', type: 'word', label: 'NO', draggable: true }),
-  new Body(660, GROUND_Y - 16, 36, 16, { color: '#3a4a5a', type: 'word', label: 'WHY', draggable: true }),
-];
+function loadScene(idx) {
+  const s = scenes[idx];
+  if (!s) return;
+  
+  state.scene = idx;
+  state.sceneFrames = 0;
+  currentScene = s;
+  currentGroundY = s.groundY || GROUND_Y_DEFAULT;
+  
+  // Build platforms
+  currentPlatforms = [makeGround(currentGroundY)];
+  if (s.platforms) {
+    for (const pf of s.platforms) {
+      currentPlatforms.push(typeof pf === 'function' ? pf() : pf);
+    }
+  }
+  
+  // Build bodies
+  currentBodies = [];
+  if (s.bodies) {
+    for (const bf of s.bodies) {
+      currentBodies.push(typeof bf === 'function' ? bf() : bf);
+    }
+  }
+  
+  // Clear drawn platforms
+  drawnPlatforms = [];
+  
+  // Position guy
+  if (s.guyStart) {
+    guy.x = s.guyStart.x;
+    guy.y = s.guyStart.y;
+  }
+  guy.vx = 0; guy.vy = 0;
+  guy.wanderTarget = null;
+  guy.wanderTimer = 60;
+  guy.sitting = false;
+  guy.avoidX = null;
+  guy.barkQueue = [];
+  guy.currentBark = null;
+  guy.idleTime = 0;
+  
+  // Unlock book page
+  if (s.bookPage && idx > 0) {
+    state.bookPagesUnlocked = idx + 1;
+  }
+}
 
-const dynamicBodies = [book, ...wordBlocks];
+function transitionTo(idx) {
+  if (state.transitioning) return;
+  state.transitioning = true;
+  state.transitionTarget = idx;
+  state.transitionAlpha = 0;
+}
 
-// --- Character ---
+function updateTransition() {
+  if (!state.transitioning) return;
+  
+  if (state.transitionTarget >= 0 && state.transitionAlpha < 1) {
+    state.transitionAlpha += 0.02;
+    if (state.transitionAlpha >= 1) {
+      state.transitionAlpha = 1;
+      loadScene(state.transitionTarget);
+      state.transitionTarget = -1; // signal: now fade back in
+    }
+  } else if (state.transitionTarget < 0) {
+    state.transitionAlpha -= 0.02;
+    if (state.transitionAlpha <= 0) {
+      state.transitionAlpha = 0;
+      state.transitioning = false;
+    }
+  }
+}
+
+function hasFired(scene, triggerId) {
+  return !!state.sceneTriggered[scene + '_' + triggerId];
+}
+
+function findBody(id) {
+  return currentBodies.find(b => b.id === id);
+}
+
+// ============================================================
+// CHARACTER
+// ============================================================
 const guy = {
-  x: 100, y: GROUND_Y,
+  x: 100, y: GROUND_Y_DEFAULT,
   vx: 0, vy: 0,
   w: 16, h: 34,
-  headR: 8,
-  bodyR: 7,
+  headR: 8, bodyR: 7,
   grounded: false,
-  // State
   inert: true,
-  // Expression
+  sitting: false,
+  avoidX: null,
   symbols: [],
-  currentSpeech: '',
-  speechFade: 0,
-  // Look direction & barks
-  lookTarget: null,    // {x, y} world position he's looking at
-  lookTimer: 0,
-  headTilt: 0,         // -1 to 1, current head tilt (negative = drooped/sigh)
-  headTiltTarget: 0,
-  eyeDir: 0,           // -1 left, 0 center, 1 right (computed from lookTarget)
-  eyeY: 0,             // vertical eye offset
-  // Bark system
-  barkQueue: [],       // [{action, duration, lookAt}]
+  currentSpeech: '', speechFade: 0,
+  lookTarget: null, lookTimer: 0,
+  headTilt: 0, headTiltTarget: 0,
+  eyeDir: 0, eyeY: 0,
+  barkQueue: [],
   barkTimer: 0,
   currentBark: null,
-  // AI
-  wanderTarget: null,
-  wanderTimer: 60,
-  idleTime: 0,         // frames spent idle (triggers barks)
+  wanderTarget: null, wanderTimer: 60,
+  idleTime: 0,
 };
 
-// --- Drawn platforms ---
-const drawnPlatforms = [];
-
-// --- Mouse ---
+// ============================================================
+// MOUSE & INPUT
+// ============================================================
 const mouse = { x: 0, y: 0, down: false };
+const mouseHistory = [];
 let dragging = null;
 let dragOffset = { x: 0, y: 0 };
 let draggingGuy = false;
@@ -149,42 +745,6 @@ let drawStart = null;
 let lastClickTime = 0;
 let lastClickTarget = null;
 
-// --- Book pages ---
-const bookPages = [
-  `// version 0.1
-// He's in there. All the code is running.
-// He just doesn't know what he can do yet.
-//
-// Try moving him. Click and drag.
-// He won't like it. That's okay.`,
-
-  `// jump_height: 8
-// He can jump. But he has to learn
-// what "up" means first.
-// Lift him onto something higher.
-// He'll figure it out.`,
-
-  `// talk: true (dormant)
-// He has a voice. He just needs words.
-// The blocks have labels. Bring them to him.
-// Start with something simple.`,
-
-  `// He's getting smarter. Watch.
-// Give him a path and he'll try to take it.
-// You don't have to carry him everywhere.
-//
-// You can draw platforms too —
-// click and drag on empty space.`,
-
-  `// I don't know if this is right.
-// I just wanted to see what would happen.
-// Maybe that's enough.
-// I hope it's enough.`,
-];
-
-// ============================================================
-// THROW VELOCITY — track mouse movement for release momentum
-// ============================================================
 function recordMouse() {
   mouseHistory.push({ x: mouse.x, y: mouse.y, t: performance.now() });
   if (mouseHistory.length > MOUSE_HIST_LEN) mouseHistory.shift();
@@ -194,40 +754,186 @@ function getThrowVelocity() {
   if (mouseHistory.length < 2) return { vx: 0, vy: 0 };
   const oldest = mouseHistory[0];
   const newest = mouseHistory[mouseHistory.length - 1];
-  const dt = (newest.t - oldest.t) / 1000; // seconds
+  const dt = (newest.t - oldest.t) / 1000;
   if (dt < 0.001) return { vx: 0, vy: 0 };
-  let vx = (newest.x - oldest.x) / dt / 60; // convert to per-frame
+  let vx = (newest.x - oldest.x) / dt / 60;
   let vy = (newest.y - oldest.y) / dt / 60;
-  // Clamp max throw speed
   const maxV = 18;
   const mag = Math.sqrt(vx * vx + vy * vy);
   if (mag > maxV) { vx *= maxV / mag; vy *= maxV / mag; }
   return { vx, vy };
 }
 
-// ============================================================
-// BARK / TELL SYSTEM
-// ============================================================
-// Barks are little autonomous behaviors: look at something, sigh, glance around
-function queueBark(bark) {
-  guy.barkQueue.push(bark);
-}
+canvas.addEventListener('mousemove', e => {
+  const r = canvas.getBoundingClientRect();
+  mouse.x = e.clientX - r.left;
+  mouse.y = e.clientY - r.top;
+  recordMouse();
+  if (draggingGuy) { guy.x = mouse.x - dragOffset.x; guy.y = mouse.y - dragOffset.y; guy.vx = 0; guy.vy = 0; }
+  else if (dragging) { dragging.x = mouse.x - dragOffset.x; dragging.y = mouse.y - dragOffset.y; dragging.vx = 0; dragging.vy = 0; }
+});
 
-function updateBarks() {
-  if (guy.inert || draggingGuy) return;
+canvas.addEventListener('mousedown', e => {
+  if (state.transitioning) return;
+  mouse.down = true;
+  mouseHistory.length = 0;
+  recordMouse();
+  const now = Date.now();
 
-  // Process current bark
-  if (guy.currentBark) {
-    guy.barkTimer--;
-    if (guy.barkTimer <= 0) {
-      guy.currentBark = null;
-      guy.lookTarget = null;
-      guy.headTiltTarget = 0;
-    }
+  // Double-click book body
+  if (now - lastClickTime < 350 && lastClickTarget === 'book') { openBook(); return; }
+
+  // Click guy
+  if (mouse.x >= guy.x - 14 && mouse.x <= guy.x + 14 && mouse.y >= guy.y - 38 && mouse.y <= guy.y + 2) {
+    draggingGuy = true;
+    dragOffset.x = mouse.x - guy.x;
+    dragOffset.y = mouse.y - guy.y;
+    state.dragCount++;
+    state.totalInteractions++;
+    if (guy.inert) { addSymbol('!'); setTimeout(() => addSymbol('?'), 200); }
+    else { addSymbol('!'); guy.idleTime = 0; guy.currentBark = null; guy.barkQueue.length = 0; }
+    lastClickTime = now; lastClickTarget = 'guy';
     return;
   }
 
-  // Dequeue next bark
+  // Click bodies
+  for (const b of currentBodies) {
+    if (b.draggable && b.visible && mouse.x >= b.x && mouse.x <= b.right && mouse.y >= b.y && mouse.y <= b.bottom) {
+      dragging = b;
+      dragOffset.x = mouse.x - b.x;
+      dragOffset.y = mouse.y - b.y;
+      lastClickTime = now; lastClickTarget = b.type;
+      return;
+    }
+  }
+
+  drawMode = true;
+  drawStart = { x: mouse.x, y: mouse.y };
+  lastClickTime = now; lastClickTarget = null;
+});
+
+canvas.addEventListener('mouseup', e => {
+  mouse.down = false;
+  const throwVel = getThrowVelocity();
+
+  if (draggingGuy) {
+    draggingGuy = false;
+    guy.vx = Math.max(-15, Math.min(15, throwVel.vx));
+    guy.vy = Math.max(-15, Math.min(15, throwVel.vy));
+
+    const speed = Math.sqrt(throwVel.vx ** 2 + throwVel.vy ** 2);
+    if (speed > 6) { state.thrownHard++; if (!guy.inert) { addSymbol('!!!'); queueBark({ headTilt: -0.3, duration: 40 }); } }
+    else { state.gentlePlaces++; }
+
+    if (guy.inert && state.dragCount >= 1) {
+      guy.inert = false;
+      state.learnedMove = true;
+      setTimeout(() => { addSymbol('...'); setTimeout(() => { guy.wanderTimer = 10; }, 800); }, 500);
+    }
+    if (!state.learnedJump && guy.y < currentGroundY - 20) {
+      state.learnedJump = true;
+      addSymbol('!!');
+    }
+  }
+
+  if (dragging) {
+    dragging.vx = throwVel.vx;
+    dragging.vy = throwVel.vy;
+    dragging.rotV = throwVel.vx * 0.05;
+
+    // Word block near guy
+    if (dragging.type === 'word' && dragging.label) {
+      const dist = Math.abs(dragging.cx - guy.x);
+      if (dist < 60 && !state.wordsLearned.includes(dragging.label)) learnWord(dragging.label);
+    }
+    // Book near guy
+    if (dragging.type === 'book') {
+      const dist = Math.abs(dragging.cx - guy.x);
+      if (dist < 50) {
+        if (state.learnedSpeak) { showSpeech('...'); setTimeout(() => showSpeech('MADE... ME?'), 1500); }
+        else { addSymbol('?'); setTimeout(() => addSymbol('...'), 400); }
+      }
+    }
+    dragging = null;
+  }
+
+  if (drawMode && drawStart) {
+    const dx = mouse.x - drawStart.x;
+    const dy = mouse.y - drawStart.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    // Can only draw in scenes 3+ (after book page 4 unlocked)
+    if (len > 20 && state.bookPagesUnlocked >= 4) {
+      // Check bounds — can't draw past screen edges (the edge scene enforces this)
+      const px = Math.max(0, Math.min(W, Math.min(drawStart.x, mouse.x)));
+      const py = Math.max(0, Math.min(currentGroundY - 4, Math.min(drawStart.y, mouse.y)));
+      const pw = Math.min(W - px, Math.abs(dx));
+      const ph = Math.max(Math.abs(dy), 8);
+      if (pw > 5) {
+        drawnPlatforms.push(new Body(px, py, pw, ph, { isStatic: true, color: 'rgba(80,110,140,0.4)' }));
+      }
+    }
+    drawMode = false;
+    drawStart = null;
+  }
+});
+
+// ============================================================
+// BOOK OVERLAY
+// ============================================================
+function getAllBookPages() {
+  const pages = [];
+  for (let i = 0; i <= state.scene && i < scenes.length; i++) {
+    if (scenes[i].bookPage) pages.push(scenes[i].bookPage);
+  }
+  return pages;
+}
+
+function openBook() {
+  const pages = getAllBookPages();
+  document.getElementById('book-text').textContent = pages.join('\n\n─────────────────────────────\n\n');
+  document.getElementById('book-overlay').style.display = 'block';
+}
+function closeBook() {
+  document.getElementById('book-overlay').style.display = 'none';
+}
+
+// ============================================================
+// EXPRESSION
+// ============================================================
+function addSymbol(sym) {
+  guy.symbols.push({ text: sym, life: 90, y: 0, x: (Math.random() - 0.5) * 10 });
+}
+
+function showSpeech(text) {
+  guy.currentSpeech = text;
+  guy.speechFade = 140 + text.length * 4;
+}
+
+function learnWord(word) {
+  if (state.wordsLearned.includes(word)) return;
+  state.wordsLearned.push(word);
+  if (!state.learnedSpeak) {
+    state.learnedSpeak = true;
+  }
+  queueBark({ lookAt: { x: guy.x, y: guy.y - 10 }, duration: 30 });
+  setTimeout(() => showSpeech(word), 400);
+  setTimeout(() => showSpeech(word + '...'), 1400);
+}
+
+function queueBark(bark) { guy.barkQueue.push(bark); }
+
+// ============================================================
+// BARK SYSTEM
+// ============================================================
+function updateBarks() {
+  if (guy.inert || draggingGuy || guy.sitting) return;
+
+  if (guy.currentBark) {
+    guy.barkTimer--;
+    if (guy.barkTimer <= 0) { guy.currentBark = null; guy.lookTarget = null; guy.headTiltTarget = 0; }
+    return;
+  }
+
   if (guy.barkQueue.length > 0) {
     const b = guy.barkQueue.shift();
     guy.currentBark = b;
@@ -239,344 +945,98 @@ function updateBarks() {
     return;
   }
 
-  // Auto-generate barks when idle
   guy.idleTime++;
-
-  if (guy.idleTime > 180 && guy.idleTime % 200 === 0) {
-    // Occasionally look at nearby objects of interest
-    const interests = findInterestingThings();
+  if (guy.idleTime > 200 && guy.idleTime % 220 === 0) {
+    const interests = [];
+    for (const b of currentBodies) {
+      if (b.visible && Math.abs(b.cx - guy.x) < 300) interests.push(b);
+    }
     if (interests.length > 0) {
-      const target = interests[Math.random() * interests.length | 0];
-      queueBark({ lookAt: { x: target.cx, y: target.cy }, duration: 80 + Math.random() * 60 | 0, symbol: '?' });
+      const t = interests[Math.random() * interests.length | 0];
+      queueBark({ lookAt: { x: t.cx, y: t.cy }, duration: 80 + Math.random() * 60 | 0, symbol: '?' });
     } else {
-      // Nothing interesting — look around, then sigh
       queueBark({ lookAt: { x: guy.x + (Math.random() > 0.5 ? 200 : -200), y: guy.y - 40 }, duration: 40 });
       queueBark({ lookAt: { x: guy.x + (Math.random() > 0.5 ? -150 : 150), y: guy.y - 20 }, duration: 40 });
-      queueBark({ headTilt: -0.4, duration: 80, symbol: '...' }); // sigh / head drop
+      queueBark({ headTilt: -0.4, duration: 80, symbol: '...' });
     }
   }
-}
-
-function findInterestingThings() {
-  const things = [];
-  // Book
-  const bookDist = Math.abs(book.cx - guy.x);
-  if (bookDist < 300) things.push(book);
-  // Word blocks
-  for (const wb of wordBlocks) {
-    if (Math.abs(wb.cx - guy.x) < 250) things.push(wb);
-  }
-  return things;
-}
-
-// ============================================================
-// INPUT
-// ============================================================
-canvas.addEventListener('mousemove', e => {
-  const r = canvas.getBoundingClientRect();
-  mouse.x = e.clientX - r.left;
-  mouse.y = e.clientY - r.top;
-  recordMouse();
-
-  if (draggingGuy) {
-    guy.x = mouse.x - dragOffset.x;
-    guy.y = mouse.y - dragOffset.y;
-    guy.vx = 0; guy.vy = 0;
-  } else if (dragging) {
-    dragging.x = mouse.x - dragOffset.x;
-    dragging.y = mouse.y - dragOffset.y;
-    dragging.vx = 0; dragging.vy = 0;
-  }
-});
-
-canvas.addEventListener('mousedown', e => {
-  mouse.down = true;
-  mouseHistory.length = 0; // reset throw tracking
-  recordMouse();
-  const now = Date.now();
-
-  // Double-click book
-  if (now - lastClickTime < 350 && lastClickTarget === 'book') {
-    openBook();
-    return;
-  }
-
-  // Click on guy
-  const gx = guy.x, gy = guy.y;
-  const guyHit = mouse.x >= gx - 12 && mouse.x <= gx + 12 && mouse.y >= gy - 36 && mouse.y <= gy + 2;
-  if (guyHit) {
-    draggingGuy = true;
-    dragOffset.x = mouse.x - guy.x;
-    dragOffset.y = mouse.y - guy.y;
-    state.dragCount++;
-    if (guy.inert) {
-      addSymbol('!');
-      setTimeout(() => addSymbol('?'), 200);
-    } else {
-      addSymbol('!');
-      guy.idleTime = 0;
-      // Interrupt any bark
-      guy.currentBark = null;
-      guy.barkQueue.length = 0;
-    }
-    lastClickTime = now;
-    lastClickTarget = 'guy';
-    return;
-  }
-
-  // Click on bodies
-  for (const b of dynamicBodies) {
-    if (b.draggable && mouse.x >= b.x && mouse.x <= b.right && mouse.y >= b.y && mouse.y <= b.bottom) {
-      dragging = b;
-      dragOffset.x = mouse.x - b.x;
-      dragOffset.y = mouse.y - b.y;
-      lastClickTime = now;
-      lastClickTarget = b.type;
-      return;
-    }
-  }
-
-  // Start drawing platform
-  drawMode = true;
-  drawStart = { x: mouse.x, y: mouse.y };
-  lastClickTime = now;
-  lastClickTarget = null;
-});
-
-canvas.addEventListener('mouseup', e => {
-  mouse.down = false;
-  const throwVel = getThrowVelocity();
-
-  if (draggingGuy) {
-    draggingGuy = false;
-    // Apply throw velocity
-    guy.vx = throwVel.vx;
-    guy.vy = throwVel.vy;
-
-    // Clamp so he doesn't escape the world too fast
-    guy.vx = Math.max(-15, Math.min(15, guy.vx));
-    guy.vy = Math.max(-15, Math.min(15, guy.vy));
-
-    if (guy.inert && state.dragCount >= 1) {
-      guy.inert = false;
-      state.learnedMove = true;
-      state.bookPageUnlocked = Math.max(state.bookPageUnlocked, 2);
-      setTimeout(() => {
-        addSymbol('...');
-        setTimeout(() => { guy.wanderTimer = 10; }, 800);
-      }, 500);
-    }
-
-    if (!state.learnedJump && guy.y < GROUND_Y - 20) {
-      state.learnedJump = true;
-      state.bookPageUnlocked = Math.max(state.bookPageUnlocked, 2);
-      addSymbol('!!');
-    }
-
-    // If thrown hard, react
-    const speed = Math.sqrt(throwVel.vx ** 2 + throwVel.vy ** 2);
-    if (speed > 6 && !guy.inert) {
-      addSymbol('!!!');
-      queueBark({ headTilt: -0.3, duration: 40 });
-    }
-  }
-
-  if (dragging) {
-    // Apply throw to object
-    dragging.vx = throwVel.vx;
-    dragging.vy = throwVel.vy;
-    dragging.rotV = throwVel.vx * 0.05; // spin proportional to horizontal throw
-
-    // Check proximity to guy
-    if (dragging.type === 'word' && dragging.label) {
-      const dist = Math.abs(dragging.cx - guy.x);
-      if (dist < 60 && !state.wordsLearned.includes(dragging.label)) {
-        learnWord(dragging.label);
-      }
-    }
-    if (dragging.type === 'book') {
-      const dist = Math.abs(dragging.cx - guy.x);
-      if (dist < 50) {
-        if (state.learnedSpeak) {
-          showSpeech("...");
-          setTimeout(() => showSpeech("MADE... ME?"), 1500);
-        } else {
-          addSymbol('?');
-          setTimeout(() => addSymbol('...'), 400);
-        }
-      }
-    }
-    dragging = null;
-  }
-
-  if (drawMode && drawStart) {
-    const dx = mouse.x - drawStart.x;
-    const dy = mouse.y - drawStart.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if (len > 20 && state.bookPageUnlocked >= 4) {
-      drawnPlatforms.push(new Body(
-        Math.min(drawStart.x, mouse.x),
-        Math.min(drawStart.y, mouse.y),
-        Math.abs(dx),
-        Math.max(Math.abs(dy), 8),
-        { static: true, color: 'rgba(80,110,140,0.4)' }
-      ));
-    }
-    drawMode = false;
-    drawStart = null;
-  }
-});
-
-// --- Book overlay ---
-function openBook() {
-  const text = bookPages.slice(0, state.bookPageUnlocked).join('\n\n---\n\n');
-  document.getElementById('book-text').textContent = text;
-  document.getElementById('book-overlay').style.display = 'block';
-}
-function closeBook() {
-  document.getElementById('book-overlay').style.display = 'none';
-}
-
-// --- Expression system ---
-function addSymbol(sym) {
-  guy.symbols.push({ text: sym, life: 90, y: 0, x: (Math.random() - 0.5) * 10 });
-}
-
-function showSpeech(text) {
-  guy.currentSpeech = text;
-  guy.speechFade = 120 + text.length * 3;
-}
-
-function learnWord(word) {
-  state.wordsLearned.push(word);
-  if (!state.learnedSpeak) {
-    state.learnedSpeak = true;
-    state.bookPageUnlocked = Math.max(state.bookPageUnlocked, 3);
-  }
-  // He looks at the block, then says the word
-  queueBark({ lookAt: { x: guy.x, y: guy.y - 10 }, duration: 30 });
-  setTimeout(() => showSpeech(word), 400);
-  setTimeout(() => showSpeech(word + "..."), 1400);
-
-  if (state.wordsLearned.length >= 2) state.bookPageUnlocked = Math.max(state.bookPageUnlocked, 4);
-  if (state.wordsLearned.length >= 3) state.bookPageUnlocked = Math.max(state.bookPageUnlocked, 5);
 }
 
 // ============================================================
 // PHYSICS
 // ============================================================
 function resolveBody(body) {
-  if (body.static) return;
-
+  if (body.isStatic) return;
   body.vy += GRAVITY;
   body.vx *= body.grounded ? GROUND_FRIC : AIR_DRAG;
-  body.x += body.vx;
-  body.y += body.vy;
-
-  // Rotation (visual)
+  body.x += body.vx; body.y += body.vy;
   body.rotation += body.rotV;
-  if (body.grounded) body.rotV *= 0.85; // slow spin on ground
-  else body.rotV *= 0.99;
-
+  if (body.grounded) body.rotV *= 0.85; else body.rotV *= 0.99;
   body.grounded = false;
 
-  // Collide with static platforms + drawn platforms
-  const allPlats = [...platforms, ...drawnPlatforms];
+  const allPlats = [...currentPlatforms, ...drawnPlatforms];
   for (const p of allPlats) {
-    if (body === p) continue;
+    if (body === p || !p.solid) continue;
     if (body.right > p.left && body.left < p.right) {
-      // Top
       if (body.bottom >= p.top && body.bottom <= p.top + 16 && body.vy >= 0) {
         body.y = p.top - body.h;
         body.vy = body.vy > 2 ? -body.vy * BOUNCE : 0;
         body.grounded = true;
-        // Spin from impact
         if (Math.abs(body.vx) > 0.5) body.rotV = body.vx * 0.03;
       }
     }
   }
-
-  // Ground
-  if (body.bottom >= GROUND_Y) {
-    body.y = GROUND_Y - body.h;
-    if (body.vy > 2) {
-      body.vy = -body.vy * BOUNCE;
-      body.rotV = body.vx * 0.03;
-    } else {
-      body.vy = 0;
-    }
+  if (body.bottom >= currentGroundY) {
+    body.y = currentGroundY - body.h;
+    body.vy = body.vy > 2 ? -body.vy * BOUNCE : 0;
     body.grounded = true;
   }
-
-  // Walls — bounce off
   if (body.x < 0) { body.x = 0; body.vx = Math.abs(body.vx) * BOUNCE; body.rotV *= -0.5; }
   if (body.right > W) { body.x = W - body.w; body.vx = -Math.abs(body.vx) * BOUNCE; body.rotV *= -0.5; }
-
-  // Settle rotation when nearly stopped
-  if (body.grounded && Math.abs(body.vx) < 0.3) {
-    body.rotation *= 0.9; // ease back to upright
-    body.rotV *= 0.8;
-  }
+  if (body.grounded && Math.abs(body.vx) < 0.3) { body.rotation *= 0.9; body.rotV *= 0.8; }
 }
 
 function resolveGuy() {
   if (draggingGuy) return;
-
   guy.vy += GRAVITY;
   guy.vx *= guy.grounded ? GROUND_FRIC : AIR_DRAG;
-  guy.x += guy.vx;
-  guy.y += guy.vy;
+  guy.x += guy.vx; guy.y += guy.vy;
   guy.grounded = false;
 
-  const allPlats = [...platforms, ...drawnPlatforms];
-  const halfW = guy.w / 2;
-
+  const allPlats = [...currentPlatforms, ...drawnPlatforms];
+  const hw = guy.w / 2;
   for (const p of allPlats) {
-    if (guy.x + halfW > p.x && guy.x - halfW < p.right) {
+    if (!p.solid) continue;
+    if (guy.x + hw > p.x && guy.x - hw < p.right) {
       if (guy.y >= p.y && guy.y <= p.y + 16 && guy.vy >= 0) {
         guy.y = p.y;
-        if (guy.vy > 4) {
-          // Hard landing — bounce a little, react
-          guy.vy = -guy.vy * 0.25;
-          if (!guy.inert) addSymbol('!');
-        } else {
-          guy.vy = 0;
-        }
+        if (guy.vy > 4) { guy.vy = -guy.vy * 0.25; if (!guy.inert) addSymbol('!'); }
+        else guy.vy = 0;
         guy.grounded = true;
       }
     }
   }
-
-  // Ground
-  if (guy.y >= GROUND_Y) {
-    if (guy.vy > 4) {
-      guy.vy = -guy.vy * 0.25;
-      if (!guy.inert) addSymbol('!');
-    } else {
-      guy.vy = 0;
-    }
-    guy.y = GROUND_Y;
+  // Fallback ground (only if scene doesn't have custom ground handling)
+  if (guy.y >= currentGroundY && !currentScene?.customGround) {
+    if (guy.vy > 4) { guy.vy = -guy.vy * 0.25; if (!guy.inert) addSymbol('!'); }
+    else guy.vy = 0;
+    guy.y = currentGroundY;
     guy.grounded = true;
   }
+  // For pit scene: allow falling below groundY but catch at bottom
+  if (guy.y > H + 50) { guy.y = H - 20; guy.vy = 0; guy.grounded = true; }
 
-  // Walls — bounce
-  if (guy.x < 20) { guy.x = 20; guy.vx = Math.abs(guy.vx) * 0.4; if (!guy.inert) addSymbol('!'); }
-  if (guy.x > W - 20) { guy.x = W - 20; guy.vx = -Math.abs(guy.vx) * 0.4; if (!guy.inert) addSymbol('!'); }
+  if (guy.x < 20) { guy.x = 20; guy.vx = Math.abs(guy.vx) * 0.4; }
+  if (guy.x > W - 20) { guy.x = W - 20; guy.vx = -Math.abs(guy.vx) * 0.4; }
 }
 
 // ============================================================
 // GUY AI
 // ============================================================
 function updateGuyAI() {
-  if (guy.inert || draggingGuy) return;
-
-  // If moving fast (thrown), don't wander — just react
+  if (guy.inert || draggingGuy || guy.sitting) return;
   const speed = Math.sqrt(guy.vx ** 2 + guy.vy ** 2);
-  if (speed > 2) {
-    guy.idleTime = 0;
-    guy.wanderTarget = null;
-    return;
-  }
+  if (speed > 2) { guy.idleTime = 0; guy.wanderTarget = null; return; }
 
   guy.wanderTimer--;
   if (guy.wanderTimer <= 0) {
@@ -584,7 +1044,12 @@ function updateGuyAI() {
       guy.wanderTarget = null;
       guy.wanderTimer = 80 + Math.random() * 120 | 0;
     } else {
-      guy.wanderTarget = 40 + Math.random() * (W - 80);
+      let target = 40 + Math.random() * (W - 80);
+      // Respect avoidX
+      if (guy.avoidX !== null) {
+        if (target > guy.avoidX - 30) target = guy.avoidX - 80;
+      }
+      guy.wanderTarget = target;
       guy.wanderTimer = 100 + Math.random() * 150 | 0;
       guy.idleTime = 0;
     }
@@ -594,9 +1059,7 @@ function updateGuyAI() {
     const dx = guy.wanderTarget - guy.x;
     if (Math.abs(dx) > 8) {
       guy.vx += (dx > 0 ? 0.15 : -0.15);
-      if (state.learnedJump && guy.grounded && Math.abs(guy.vx) < 0.3 && Math.abs(dx) > 15) {
-        guy.vy = -7;
-      }
+      if (state.learnedJump && guy.grounded && Math.abs(guy.vx) < 0.3 && Math.abs(dx) > 15) guy.vy = -7;
     } else {
       guy.wanderTarget = null;
     }
@@ -605,27 +1068,63 @@ function updateGuyAI() {
 }
 
 // ============================================================
-// LOOK DIRECTION
+// LOOK
 // ============================================================
 function updateLook() {
-  // Smooth head tilt toward target
   guy.headTilt += (guy.headTiltTarget - guy.headTilt) * 0.08;
-
   if (guy.lookTarget) {
     const dx = guy.lookTarget.x - guy.x;
-    const dy = guy.lookTarget.y - (guy.y - 26); // head position
+    const dy = guy.lookTarget.y - (guy.y - 26);
     guy.eyeDir += ((dx > 5 ? 1 : dx < -5 ? -1 : 0) - guy.eyeDir) * 0.12;
     guy.eyeY += (Math.max(-2, Math.min(2, dy * 0.02)) - guy.eyeY) * 0.1;
   } else if (!guy.inert) {
-    // Default: look in movement direction
-    const targetDir = guy.vx > 0.3 ? 1 : guy.vx < -0.3 ? -1 : 0;
-    guy.eyeDir += (targetDir - guy.eyeDir) * 0.06;
+    const td = guy.vx > 0.3 ? 1 : guy.vx < -0.3 ? -1 : 0;
+    guy.eyeDir += (td - guy.eyeDir) * 0.06;
     guy.eyeY += (0 - guy.eyeY) * 0.05;
   }
+  if (!guy.currentBark) guy.headTiltTarget = 0;
+}
 
-  // Reset tilt when no bark active
-  if (!guy.currentBark) {
-    guy.headTiltTarget = 0;
+// ============================================================
+// TRIGGERS
+// ============================================================
+const triggerDelays = {}; // "scene_id" → frames remaining
+
+function updateTriggers() {
+  if (!currentScene || !currentScene.triggers) return;
+  
+  for (const t of currentScene.triggers) {
+    const key = state.scene + '_' + t.id;
+    if (t.once && state.sceneTriggered[key]) continue;
+    
+    if (t.condition()) {
+      if (t.delay && !triggerDelays[key]) {
+        triggerDelays[key] = t.delay;
+        continue;
+      }
+      if (triggerDelays[key]) {
+        triggerDelays[key]--;
+        if (triggerDelays[key] > 0) continue;
+        delete triggerDelays[key];
+      }
+      
+      state.sceneTriggered[key] = true;
+      t.action();
+    }
+  }
+}
+
+// ============================================================
+// WORD BLOCK PROXIMITY (auto-learn when grounded near guy)
+// ============================================================
+function checkWordProximity() {
+  if (guy.inert) return;
+  for (const b of currentBodies) {
+    if (b.type === 'word' && b.label && !state.wordsLearned.includes(b.label)) {
+      if (Math.abs(b.cx - guy.x) < 50 && b.grounded) {
+        learnWord(b.label);
+      }
+    }
   }
 }
 
@@ -633,33 +1132,27 @@ function updateLook() {
 // UPDATE
 // ============================================================
 function update() {
+  state.frameCount++;
+  state.sceneFrames++;
+  
+  updateTransition();
+  if (state.transitioning && state.transitionAlpha >= 1) return; // fully black, loading
+  
   resolveGuy();
-
-  for (const b of dynamicBodies) {
-    if (b !== dragging) resolveBody(b);
-  }
-
-  // Check proximity: word blocks landing near guy
-  for (const wb of wordBlocks) {
-    if (wb.type === 'word' && wb.label && !state.wordsLearned.includes(wb.label)) {
-      const dist = Math.abs(wb.cx - guy.x);
-      if (dist < 50 && wb.grounded && !guy.inert) {
-        learnWord(wb.label);
-      }
-    }
-  }
-
+  for (const b of currentBodies) { if (b !== dragging && b.visible) resolveBody(b); }
+  
   updateGuyAI();
   updateBarks();
   updateLook();
-
-  // Update symbols
+  updateTriggers();
+  checkWordProximity();
+  
+  // Symbols
   for (let i = guy.symbols.length - 1; i >= 0; i--) {
     guy.symbols[i].life--;
     guy.symbols[i].y -= 0.6;
     if (guy.symbols[i].life <= 0) guy.symbols.splice(i, 1);
   }
-
   if (guy.speechFade > 0) guy.speechFade--;
 }
 
@@ -667,114 +1160,173 @@ function update() {
 // RENDER
 // ============================================================
 function render() {
-  ctx.fillStyle = '#0f0f1a';
+  const s = currentScene || scenes[0];
+  
+  // Background
+  ctx.fillStyle = s.bgColor || '#0f0f1a';
   ctx.fillRect(0, 0, W, H);
-
+  
   // Ground
-  ctx.fillStyle = '#1a1a2a';
-  ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
-  ctx.strokeStyle = '#2a2a3e';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, GROUND_Y); ctx.lineTo(W, GROUND_Y); ctx.stroke();
-
-  // Static platforms
-  for (const p of platforms) {
-    if (p === ground) continue;
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x, p.y, p.w, p.h);
+  if (!s.customGround) {
+    ctx.fillStyle = s.groundColor || '#1a1a2a';
+    ctx.fillRect(0, currentGroundY, W, H - currentGroundY);
+    ctx.strokeStyle = '#2a2a3e'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, currentGroundY); ctx.lineTo(W, currentGroundY); ctx.stroke();
   }
-
+  
+  // Static platforms (skip ground)
+  for (const p of currentPlatforms) {
+    if (p.y === currentGroundY && p.w === W) continue; // skip ground body
+    ctx.fillStyle = p.color || '#2a2a3e';
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    // Top edge line
+    ctx.strokeStyle = '#3a3a4e'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.right, p.y); ctx.stroke();
+  }
+  
   // Drawn platforms
   for (const p of drawnPlatforms) {
     ctx.fillStyle = 'rgba(80,110,140,0.3)';
     ctx.fillRect(p.x, p.y, p.w, p.h);
-    ctx.strokeStyle = 'rgba(80,110,140,0.5)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(80,110,140,0.5)'; ctx.lineWidth = 1;
     ctx.strokeRect(p.x, p.y, p.w, p.h);
   }
-
+  
   // Draw preview
-  if (drawMode && drawStart && state.bookPageUnlocked >= 4) {
-    ctx.strokeStyle = 'rgba(80,110,140,0.3)';
-    ctx.setLineDash([4, 4]);
-    ctx.strokeRect(
-      Math.min(drawStart.x, mouse.x), Math.min(drawStart.y, mouse.y),
-      Math.abs(mouse.x - drawStart.x), Math.max(Math.abs(mouse.y - drawStart.y), 8)
-    );
+  if (drawMode && drawStart && state.bookPagesUnlocked >= 4) {
+    ctx.strokeStyle = 'rgba(80,110,140,0.3)'; ctx.setLineDash([4, 4]);
+    ctx.strokeRect(Math.min(drawStart.x, mouse.x), Math.min(drawStart.y, mouse.y),
+      Math.abs(mouse.x - drawStart.x), Math.max(Math.abs(mouse.y - drawStart.y), 8));
     ctx.setLineDash([]);
   }
-
-  // Dynamic bodies
-  for (const b of dynamicBodies) {
+  
+  // Scene-specific rendering
+  if (state.scene === 4) renderPitScene();
+  if (state.scene === 7) renderEdgeScene();
+  
+  // Bodies
+  for (const b of currentBodies) {
+    if (!b.visible) continue;
     ctx.save();
     ctx.translate(b.cx, b.cy);
     ctx.rotate(b.rotation);
-
+    
     if (b.type === 'book') {
       ctx.fillStyle = b.color;
-      ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
-      ctx.strokeStyle = '#8a7a5a';
-      ctx.lineWidth = 1;
+      ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
+      ctx.strokeStyle = '#8a7a5a'; ctx.lineWidth = 1;
       for (let i = 0; i < 3; i++) {
-        ctx.beginPath();
-        ctx.moveTo(-b.w / 2 + 4, -b.h / 2 + 4 + i * 5);
-        ctx.lineTo(b.w / 2 - 4, -b.h / 2 + 4 + i * 5);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-b.w/2 + 4, -b.h/2 + 4 + i * 5);
+        ctx.lineTo(b.w/2 - 4, -b.h/2 + 4 + i * 5); ctx.stroke();
       }
+    } else if (b.type === 'key') {
+      ctx.fillStyle = b.color;
+      ctx.beginPath(); ctx.arc(0, -4, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(-2, 0, 4, 12);
+      ctx.fillRect(-4, 8, 8, 3);
+    } else if (b.type === 'door') {
+      ctx.fillStyle = b.color;
+      ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
+      // Doorknob
+      ctx.fillStyle = '#887766';
+      ctx.beginPath(); ctx.arc(b.w/2 - 8, 0, 3, 0, Math.PI * 2); ctx.fill();
     } else {
       ctx.fillStyle = b.color;
-      ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
-      if (b.label) {
-        ctx.fillStyle = '#aabbcc';
-        ctx.font = '9px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(b.label, 0, 3);
-      }
+      ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
+    }
+    
+    if (b.label) {
+      ctx.fillStyle = '#aabbcc'; ctx.font = '9px monospace'; ctx.textAlign = 'center';
+      ctx.fillText(b.label, 0, 3); ctx.textAlign = 'left';
     }
     ctx.restore();
   }
-
+  
   // Character
   drawCharacter();
-
+  
   // Symbols
   for (const s of guy.symbols) {
     const alpha = Math.min(1, s.life / 20);
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.font = 'bold 14px monospace';
-    ctx.fillStyle = '#fff';
-    ctx.textAlign = 'center';
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.font = 'bold 14px monospace'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
     ctx.fillText(s.text, guy.x + (s.x || 0), guy.y - guy.h - 10 + s.y);
     ctx.restore();
   }
-
-  // Speech bubble
+  
+  // Speech
   if (guy.currentSpeech && guy.speechFade > 0) {
     const alpha = Math.min(1, guy.speechFade / 20);
-    ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.save(); ctx.globalAlpha = alpha;
     ctx.font = '13px monospace';
     const tw = ctx.measureText(guy.currentSpeech).width;
-    const bx = guy.x - tw / 2 - 10;
-    const by = guy.y - guy.h - 40;
-    ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(bx, by, tw + 20, 24, 4); ctx.fill(); }
-    else ctx.fillRect(bx, by, tw + 20, 24);
-    ctx.fillStyle = '#ddd';
-    ctx.textAlign = 'center';
-    ctx.fillText(guy.currentSpeech, guy.x, by + 16);
+    const bx = Math.max(5, Math.min(W - tw - 25, guy.x - tw / 2 - 10));
+    const by = Math.max(5, guy.y - guy.h - 45);
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(bx, by, tw + 20, 26, 5); ctx.fill(); }
+    else ctx.fillRect(bx, by, tw + 20, 26);
+    ctx.fillStyle = '#ddd'; ctx.textAlign = 'center';
+    ctx.fillText(guy.currentSpeech, bx + tw / 2 + 10, by + 17);
     ctx.restore();
   }
-
+  
   // Hint
-  if (guy.inert && state.dragCount === 0) {
+  if (currentScene && currentScene.hint) {
+    const h = currentScene.hint();
+    if (h) {
+      ctx.save();
+      ctx.globalAlpha = 0.3 + 0.1 * Math.sin(Date.now() / 1000);
+      ctx.font = '11px monospace'; ctx.fillStyle = '#666'; ctx.textAlign = 'center';
+      ctx.fillText(h.text, h.x, h.y);
+      ctx.restore();
+    }
+  }
+  
+  // Scene indicator (subtle)
+  if (state.scene > 0) {
+    ctx.save(); ctx.globalAlpha = 0.15;
+    ctx.font = '10px monospace'; ctx.fillStyle = '#888';
+    ctx.fillText((state.scene + 1) + '/9', 10, H - 8);
+    ctx.restore();
+  }
+  
+  // Transition overlay
+  if (state.transitioning || state.transitionAlpha > 0) {
+    ctx.fillStyle = `rgba(0,0,0,${state.transitionAlpha})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function renderPitScene() {
+  // Draw the pit darkness
+  ctx.fillStyle = '#050508';
+  ctx.fillRect(300, GROUND_Y_DEFAULT, 150, H - GROUND_Y_DEFAULT);
+  // The other side has warm light
+  if (hasFired(4, 'landed_other_side')) {
+    const grd = ctx.createRadialGradient(600, GROUND_Y_DEFAULT + 40, 10, 600, GROUND_Y_DEFAULT + 40, 200);
+    grd.addColorStop(0, 'rgba(60,50,30,0.15)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+  }
+  // Ground surfaces
+  ctx.fillStyle = '#141420';
+  ctx.fillRect(0, GROUND_Y_DEFAULT, 300, H - GROUND_Y_DEFAULT);
+  ctx.fillStyle = '#1e1e2e';
+  ctx.fillRect(450, GROUND_Y_DEFAULT + 60, 350, H - GROUND_Y_DEFAULT - 60);
+  // Edge lines
+  ctx.strokeStyle = '#2a2a3e'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, GROUND_Y_DEFAULT); ctx.lineTo(300, GROUND_Y_DEFAULT); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(450, GROUND_Y_DEFAULT + 60); ctx.lineTo(W, GROUND_Y_DEFAULT + 60); ctx.stroke();
+}
+
+function renderEdgeScene() {
+  // Subtle indication at center when exit is ready
+  if (state.sceneTriggered['7_exit_ready']) {
     ctx.save();
-    ctx.globalAlpha = 0.3 + 0.1 * Math.sin(Date.now() / 1000);
-    ctx.font = '11px monospace';
-    ctx.fillStyle = '#666';
-    ctx.textAlign = 'center';
-    ctx.fillText('double-click the book', book.cx, book.y - 8);
+    ctx.globalAlpha = 0.3 + 0.15 * Math.sin(Date.now() / 800);
+    ctx.fillStyle = '#334';
+    ctx.fillRect(385, currentGroundY - 2, 30, 6);
     ctx.restore();
   }
 }
@@ -782,46 +1334,43 @@ function render() {
 function drawCharacter() {
   const x = guy.x;
   const footY = guy.y;
-  const bodyY = footY - 12;
-  const headY = footY - 26;
-
-  // Legs — slight animation when moving
-  const legAnim = guy.grounded ? Math.sin(Date.now() / 120) * Math.min(3, Math.abs(guy.vx) * 2) : 0;
-  ctx.strokeStyle = '#999';
-  ctx.lineWidth = 2;
+  const bodyY = guy.sitting ? footY - 8 : footY - 12;
+  const headY = guy.sitting ? footY - 20 : footY - 26;
+  
+  // Legs
+  ctx.strokeStyle = '#999'; ctx.lineWidth = 2;
+  if (guy.sitting) {
+    // Sitting legs — stretched forward
+    ctx.beginPath();
+    ctx.moveTo(x - 4, bodyY + 4); ctx.lineTo(x - 8, footY);
+    ctx.moveTo(x + 4, bodyY + 4); ctx.lineTo(x + 8, footY);
+    ctx.stroke();
+  } else {
+    const legAnim = guy.grounded ? Math.sin(Date.now() / 120) * Math.min(3, Math.abs(guy.vx) * 2) : 0;
+    ctx.beginPath();
+    ctx.moveTo(x - 4, bodyY + 5); ctx.lineTo(x - 5 - legAnim, footY);
+    ctx.moveTo(x + 4, bodyY + 5); ctx.lineTo(x + 5 + legAnim, footY);
+    ctx.stroke();
+  }
+  
+  // Arms
+  const armAnim = guy.sitting ? 0 : Math.sin(Date.now() / 140) * Math.min(4, Math.abs(guy.vx) * 2);
   ctx.beginPath();
-  ctx.moveTo(x - 4, bodyY + 5);
-  ctx.lineTo(x - 5 - legAnim, footY);
-  ctx.moveTo(x + 4, bodyY + 5);
-  ctx.lineTo(x + 5 + legAnim, footY);
+  ctx.moveTo(x - guy.bodyR, bodyY); ctx.lineTo(x - guy.bodyR - 4 - armAnim, bodyY + 10);
+  ctx.moveTo(x + guy.bodyR, bodyY); ctx.lineTo(x + guy.bodyR + 4 + armAnim, bodyY + 10);
   ctx.stroke();
-
-  // Arms — slight swing
-  const armAnim = Math.sin(Date.now() / 140) * Math.min(4, Math.abs(guy.vx) * 2);
-  ctx.beginPath();
-  ctx.moveTo(x - guy.bodyR, bodyY);
-  ctx.lineTo(x - guy.bodyR - 4 - armAnim, bodyY + 10);
-  ctx.moveTo(x + guy.bodyR, bodyY);
-  ctx.lineTo(x + guy.bodyR + 4 + armAnim, bodyY + 10);
-  ctx.stroke();
-
+  
   // Body
   ctx.fillStyle = guy.inert ? '#777' : '#bbb';
-  ctx.beginPath();
-  ctx.arc(x, bodyY, guy.bodyR, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Head (with tilt)
+  ctx.beginPath(); ctx.arc(x, bodyY, guy.bodyR, 0, Math.PI * 2); ctx.fill();
+  
+  // Head
   ctx.save();
   ctx.translate(x, headY);
-  ctx.rotate(guy.headTilt * 0.3); // convert tilt to radians range
-
+  ctx.rotate(guy.headTilt * 0.3);
   ctx.fillStyle = guy.inert ? '#888' : '#ccc';
-  ctx.beginPath();
-  ctx.arc(0, 0, guy.headR, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Eyes
+  ctx.beginPath(); ctx.arc(0, 0, guy.headR, 0, Math.PI * 2); ctx.fill();
+  
   if (!guy.inert) {
     const ex = guy.eyeDir * 2.5;
     const ey = guy.eyeY;
@@ -831,8 +1380,7 @@ function drawCharacter() {
     ctx.arc(3 + ex, -1 + ey, 1.5, 0, Math.PI * 2);
     ctx.fill();
   } else {
-    ctx.strokeStyle = '#555';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(-5, 0); ctx.lineTo(-2, 0);
     ctx.moveTo(2, 0); ctx.lineTo(5, 0);
@@ -841,7 +1389,11 @@ function drawCharacter() {
   ctx.restore();
 }
 
-// --- Loop ---
+// ============================================================
+// LOOP
+// ============================================================
+loadScene(0);
+
 function loop() {
   update();
   render();
