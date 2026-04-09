@@ -1197,6 +1197,7 @@ document.addEventListener('keydown', e => {
   // DEV: 0 to wipe memory and restart (remove for release)
   if (e.key === '0') {
     if (confirm('Wipe the little guy\'s memory and start over?')) {
+      window.removeEventListener('beforeunload', saveGame);
       localStorage.removeItem('littleguy_save');
       location.reload();
     }
