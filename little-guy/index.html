@@ -1087,6 +1087,7 @@ function loadScene(idx) {
   if (s.guyStart) { guy.x = s.guyStart.x; guy.y = s.guyStart.y; }
   guy.vx = 0; guy.vy = 0; guy.wanderTarget = null; guy.wanderTimer = 60;
   guy.sitting = false; guy.sleeping = false; guy.thinker = false;
+  guy.wakingUp = false; guy.wakeTimer = 0;
   guy.avoidX = null; guy.avoidDir = 0;
   guy.barkQueue = []; guy.currentBark = null;
   guy.idleTime = 0; guy.eyesClosed = false; guy.eyesCloseTimer = 0; guy.idlePhase = 0;
@@ -1187,7 +1188,7 @@ canvas.addEventListener('mousemove', e => {
   mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top;
   state.lastMouseMove = state.frameCount; state.playerAbsentFrames = 0;
   recordMouse();
-  if (draggingGuy) { guy.x = mouse.x - dragOffset.x; guy.y = mouse.y - dragOffset.y; guy.vx = 0; guy.vy = 0; }
+  if (draggingGuy) { guy.x = mouse.x - dragOffset.x; guy.y = mouse.y - dragOffset.y; guy.vx = 0; guy.vy = 0; if (state.firstGrabResist > 0) { guy.x += (Math.random() - 0.5) * 3; guy.y += (Math.random() - 0.5) * 2; state.firstGrabResist--; } }
   else if (dragging) { dragging.x = mouse.x - dragOffset.x; dragging.y = mouse.y - dragOffset.y; dragging.vx = 0; dragging.vy = 0; }
   updateCursor();
 });
@@ -1289,7 +1290,27 @@ canvas.addEventListener('mouseup', e => {
       const pw = Math.min(W - px, Math.abs(dx)), ph = Math.max(Math.abs(dy), 8);
       if (pw > 5) {
         if (currentScene?.drawingFails) state.fadingPlatforms.push({ x: px, y: py, w: pw, h: ph, life: 60 });
-        else drawnPlatforms.push(new Body(px, py, pw, ph, { isStatic: true, color: 'rgba(80,110,140,0.4)' }));
+        else {
+          const newPlat = new Body(px, py, pw, ph, { isStatic: true, color: 'rgba(80,110,140,0.4)' });
+          newPlat.fadeIn = 30;
+          drawnPlatforms.push(newPlat);
+          spawnDust(px + pw/2, py, 8, { spread: pw/20, upward: 1.2, life: 25, color: '#6688aa', size: 1.2 });
+          if (audioCtx) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine'; osc.frequency.value = 220;
+            osc.frequency.linearRampToValueAtTime(330, audioCtx.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+            osc.connect(gain); gain.connect(masterGain);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.6);
+          }
+          const dist = Math.abs(guy.x - (px + pw/2)) + Math.abs(guy.y - py);
+          if (dist < 200 && !guy.inert) {
+            queueBark({ lookAt: { x: px + pw/2, y: py }, duration: 60 });
+            if (getAwareness() >= 1) addSymbol('?');
+          }
+        }
       }
     }
     drawMode = false; drawStart = null;
@@ -1458,10 +1479,25 @@ function updatePostMonologue() {
     if (state.postMonologueTimer % 600 === 300) {
       queueBark({ lookAt: { x: guy.x + (Math.random() - 0.5) * 200, y: guy.y - 40 + Math.random() * 30 }, duration: 120 });
     }
-    // Very rarely, a single word
-    if (state.postMonologueTimer === 900 && state.wordsLearned.length > 0) {
-      const w = state.wordsLearned[Math.random() * state.wordsLearned.length | 0];
-      showSpeech(w + '...');
+    // Very rarely, degrading speech over time
+    const t = state.postMonologueTimer;
+    if (state.wordsLearned.length > 0) {
+      if (t < 1800 && t % 600 === 0 && t > 0) {
+        const phrase = generatePhrase();
+        if (phrase) showSpeech(phrase);
+      } else if (t >= 1800 && t < 3600 && t % 900 === 0) {
+        const w1 = state.wordsLearned[Math.random() * state.wordsLearned.length | 0];
+        const w2 = state.wordsLearned[Math.random() * state.wordsLearned.length | 0];
+        showSpeech(w1 + '...' + w2);
+      } else if (t >= 3600 && t < 7200 && t % 1200 === 0) {
+        const w = state.wordsLearned[Math.random() * state.wordsLearned.length | 0];
+        showSpeech(w + '...');
+      } else if (t >= 7200 && t < 14400 && t % 2400 === 0) {
+        if (Math.random() < 0.4) showSpeech('...');
+        else { const w = state.wordsLearned[Math.random() * state.wordsLearned.length | 0]; showSpeech(w); }
+      } else if (t >= 14400 && t % 3600 === 0 && t < 28800) {
+        showSpeech('...');
+      }
     }
     // Tab title changes after long silence
     if (state.postMonologueTimer === 600) document.title = 'little guy is here';
@@ -1971,6 +2007,34 @@ function update() {
   else guy.breathRate += (0.03 - guy.breathRate) * 0.02;
   guy.breathPhase = (guy.breathPhase || 0) + guy.breathRate;
   guy.breathOffset = Math.sin(guy.breathPhase) * guy.breathAmp;
+  // Audible breathing in post-monologue
+  if (state.postMonologue && audioCtx && !guy.sleeping && Math.sin(guy.breathPhase) > 0.95 && state.frameCount - state.lastBreathSound > 90) {
+    state.lastBreathSound = state.frameCount;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    osc.type = 'sine'; osc.frequency.value = 60 + Math.random() * 20;
+    filter.type = 'lowpass'; filter.frequency.value = 120;
+    gain.gain.setValueAtTime(0.015, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+    osc.connect(filter); filter.connect(gain); gain.connect(masterGain);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+  }
+  // Wake-up animation
+  if (guy.wakingUp) {
+    guy.wakeTimer++;
+    if (guy.wakeTimer === 1) { guy.eyesClosed = false; }
+    if (guy.wakeTimer === 30) { guy.squashTarget = 0.85; }
+    if (guy.wakeTimer === 45) { guy.squashTarget = 1.1; }
+    if (guy.wakeTimer === 55) { guy.squashTarget = 1.0; }
+    if (guy.wakeTimer === 40) { queueBark({ lookAt: { x: guy.x + 100, y: guy.y - 20 }, duration: 30 }); }
+    if (guy.wakeTimer >= 60) {
+      guy.sleeping = false; guy.wakingUp = false;
+      guy.sitting = false; guy.thinker = false;
+      guy.idlePhase = 0; guy.idleTime = 0;
+      addSymbol('!'); updateTabTitle();
+    }
+  }
   // Squash & stretch
   guy.squash += (guy.squashTarget - guy.squash) * 0.15;
   guy.squashTarget += (1.0 - guy.squashTarget) * 0.08;
@@ -2041,8 +2105,11 @@ function render() {
     ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.right, p.y); ctx.stroke();
   }
   for (const p of drawnPlatforms) {
+    ctx.save();
+    if (p.fadeIn > 0) { p.fadeIn--; ctx.globalAlpha *= (1 - p.fadeIn/30); }
     ctx.fillStyle = 'rgba(80,110,140,0.3)'; ctx.fillRect(p.x, p.y, p.w, p.h);
     ctx.strokeStyle = 'rgba(80,110,140,0.5)'; ctx.lineWidth = 1; ctx.strokeRect(p.x, p.y, p.w, p.h);
+    ctx.restore();
   }
   for (const fp of state.fadingPlatforms) {
     const a = fp.life / 60;
