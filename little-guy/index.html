@@ -1061,7 +1061,7 @@ function loadScene(idx) {
   const s = scenes[idx]; if (!s) return;
   state.scene = idx; state.sceneFrames = 0;
   currentScene = s; currentGroundY = s.groundY || GROUND_Y_DEFAULT;
-  currentPlatforms = [makeGround(currentGroundY)];
+  currentPlatforms = s.customGround ? [] : [makeGround(currentGroundY)];
   if (s.platforms) for (const pf of s.platforms) currentPlatforms.push(typeof pf === 'function' ? pf() : pf);
   currentBodies = [];
   if (s.bodies) for (const bf of s.bodies) currentBodies.push(typeof bf === 'function' ? bf() : bf);
