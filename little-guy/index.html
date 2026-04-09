@@ -253,6 +253,7 @@ const state = {
   lastBreathSound: 0,
   firstGrabResist: 0,
   scene8Warm: false,
+  triedGoBack: false,
   transitionShowCode: false,
   returnFlinch: false,
   scene8Phase: 0, scene8PhaseTimer: 0,
@@ -1090,6 +1091,8 @@ function loadScene(idx) {
   guy.wakingUp = false; guy.wakeTimer = 0;
   guy.avoidX = null; guy.avoidDir = 0;
   guy.barkQueue = []; guy.currentBark = null;
+  guy.touchingWall = false; guy.wallTouchTimer = 0; guy.wakingUp = false; guy.wakeTimer = 0;
+  state.triedGoBack = false;
   guy.idleTime = 0; guy.eyesClosed = false; guy.eyesCloseTimer = 0; guy.idlePhase = 0;
   state.guyReadingWriting = null; state.guyReadTimer = 0; state.guyReadCooldown = 0;
   state.postMonologue = false; state.postMonologuePhase = 0; state.postMonologueTimer = 0;
@@ -1182,6 +1185,17 @@ function getThrowVelocity() {
 }
 
 canvas.addEventListener('click', () => { initAudio(); }, { once: true });
+
+// DEV: number keys 1-9 to jump to scenes (remove for release)
+document.addEventListener('keydown', e => {
+  if (e.key >= '1' && e.key <= '9') {
+    const target = parseInt(e.key) - 1;
+    if (target < scenes.length) { initAudio(); startAmbient(); loadScene(target); }
+  }
+});
+
+// Player tries to go back (walk to left edge in scene > 0)
+// Handled via trigger-like check in update
 
 canvas.addEventListener('mousemove', e => {
   const r = canvas.getBoundingClientRect();
@@ -1613,7 +1627,19 @@ function resolveGuy() {
     guy.y = currentGroundY; guy.grounded = true;
   }
   if (guy.y > H + 50) { guy.y = H - 20; guy.vy = 0; guy.grounded = true; }
-  if (guy.x < 20) { guy.x = 20; guy.vx = Math.abs(guy.vx) * 0.4; }
+  if (guy.x < 20) {
+    guy.x = 20; guy.vx = Math.abs(guy.vx) * 0.4;
+    // "You can't go back" moment
+    if (state.scene > 0 && !guy.inert && !state.triedGoBack) {
+      state.triedGoBack = true;
+      queueBark({ lookAt: { x: -50, y: guy.y - 20 }, duration: 80 });
+      if (state.learnedSpeak) {
+        if (state.wordsLearned.includes('GO') && state.wordsLearned.includes('NO')) setTimeout(() => showSpeech('NO... GO.'), 500);
+        else if (state.wordsLearned.includes('WHY')) setTimeout(() => showSpeech('WHY...'), 500);
+        else setTimeout(() => showSpeech('...'), 500);
+      } else { addSymbol('...'); }
+    }
+  }
   if (guy.x > W - 20) { guy.x = W - 20; guy.vx = -Math.abs(guy.vx) * 0.4; }
   if (guy.grounded && Math.abs(guy.vx) > 0.8 && !guy.inert) spawnWalkDust(guy.x, guy.y);
 }
