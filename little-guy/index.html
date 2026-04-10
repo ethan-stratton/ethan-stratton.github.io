@@ -922,33 +922,26 @@ const scenes = [
     guyStart: { x: 400, y: GROUND_Y_DEFAULT },
     platforms: [], bodies: [],
     wallWritings: [
-      { x: 350, y: 40, lines: [
+      { x: 300, y: 50, lines: [
         '// This is the last room.',
+      ], color: '#88aa88', reveal: 'always' },
+      { x: 100, y: 400, lines: [
         '// Just wait.',
       ], color: '#88aa88', reveal: 'always' },
-      { x: 200, y: 120, lines: [
-        '// I don\'t know if this is right.',
-        '// I just wanted to see what would happen.',
-      ], color: '#88aa88', reveal: 'always' },
-      { x: 100, y: 230, lines: [
+      { x: 30, y: 180, lines: [
         '// He\'s going to ask why.',
         '// I can\'t answer that.',
         '// Can you?',
-      ], color: '#908878', reveal: 'always' },
-      { x: 400, y: 300, lines: [
-        '//                        ...',
-        '//',
-        '// Maybe the answer is that he asked at all.',
-        '// Maybe that\'s enough.',
-        '// I hope it\'s enough.',
-      ], color: '#7a7a74', reveal: 'after:sit_down' },
+      ], color: '#908878', reveal: 'after:scene8_sit' },
+      { x: 500, y: 80, lines: [
+        '// I don\'t know if this is right.',
+        '// I just wanted to see what would happen.',
+      ], color: '#7a7a8a', reveal: 'after:scene8_speak' },
       {
-        x: 440, y: 140,
+        x: 250, y: 280,
         lines: [
           '// I think I made this because I was lonely.',
           '// Is that a good enough reason?',
-          '//',
-          '// ...',
           '//',
           '// I think it has to be.',
         ],
@@ -980,11 +973,13 @@ const scenes = [
           guy.sitting = true;
           state.scene8Phase = 2;
           state.scene8PhaseTimer = 0;
+          setAmbientTone(55, 0.012);
         }
       },
       { id: 'scene8_speak', condition: () => state.scene8Phase === 2 && state.scene8PhaseTimer > 150,
         once: true, action: () => {
           state.scene8Phase = 3;
+          setAmbientTone(65, 0.02);
           const gentleRatio = state.gentlePlaces / Math.max(1, state.gentlePlaces + state.thrownHard);
           const totalInteractions = state.totalInteractions || 1;
           const words = state.wordsLearned;
@@ -1064,6 +1059,21 @@ const scenes = [
             showSpeech(l.text);
             if (l.text === '...' || l.sigh) queueBark({ headTilt: -0.4, duration: 100, eyesClosed: true });
             else if (l.eyesClosed) queueBark({ headTilt: -0.2, duration: 80, eyesClosed: true });
+            else {
+              // Particle burst on meaningful speech
+              for (let i = 0; i < 8; i++) {
+                particles.push({
+                  x: guy.x + (Math.random() - 0.5) * 20,
+                  y: guy.y - 20 + (Math.random() - 0.5) * 10,
+                  vx: (Math.random() - 0.5) * 0.8,
+                  vy: -(Math.random() * 0.5 + 0.2),
+                  life: 150 + Math.random() * 100 | 0,
+                  maxLife: 250,
+                  size: 0.6 + Math.random() * 1.0,
+                  color: '#8899aa',
+                });
+              }
+            }
           }, l.t));
 
           // After monologue: long silence, then get up
@@ -2436,6 +2446,7 @@ function render() {
   }
   if (state.scene === 4) renderPitScene();
   if (state.scene === 7) renderEdgeScene();
+  if (state.scene === 8) renderWhyScene();
 
   // Cursor presence glow
   if (state.playerAbsentFrames < 60 && !guy.inert) {
@@ -2598,6 +2609,42 @@ function renderPitScene() {
     const g = ctx.createRadialGradient(600, GROUND_Y_DEFAULT - 20, 10, 600, GROUND_Y_DEFAULT - 20, 150);
     g.addColorStop(0, 'rgba(50,60,40,0.12)'); g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g; ctx.fillRect(450, 0, 350, H);
+  }
+}
+
+function renderWhyScene() {
+  // Vignette that intensifies during monologue
+  const vignetteStrength = state.scene8Phase >= 2 ? 0.6 : state.scene8Phase >= 1 ? 0.3 : 0.15;
+  const grad = ctx.createRadialGradient(guy.x, guy.y - 15, 30, guy.x, guy.y - 15, 350);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(0.6, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, `rgba(0,0,0,${vignetteStrength})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Glow around the guy during monologue (phase 3 = speaking)
+  if (state.scene8Phase === 3 || state.postMonologue) {
+    const pulseA = 0.04 + 0.03 * Math.sin(Date.now() / 1200);
+    const glow = ctx.createRadialGradient(guy.x, guy.y - 15, 5, guy.x, guy.y - 15, 80);
+    glow.addColorStop(0, `rgba(180,190,210,${pulseA})`);
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(guy.x - 80, guy.y - 95, 160, 160);
+  }
+
+  // Post-monologue: final writing fades in slowly at center
+  if (state.postMonologue && state.postMonologueTimer > 180) {
+    const fadeIn = Math.min(1, (state.postMonologueTimer - 180) / 300);
+    ctx.save();
+    ctx.globalAlpha = fadeIn * 0.7;
+    ctx.font = '12px monospace';
+    ctx.fillStyle = '#aabbaa';
+    ctx.textAlign = 'center';
+    ctx.fillText('// Maybe the answer is that he asked at all.', W / 2, 340);
+    ctx.fillText('// Maybe that\'s enough.', W / 2, 358);
+    ctx.globalAlpha = fadeIn * 0.5;
+    ctx.fillText('// I hope it\'s enough.', W / 2, 390);
+    ctx.restore();
   }
 }
 
