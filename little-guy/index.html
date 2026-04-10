@@ -468,6 +468,13 @@ const scenes = [
         ],
         color: '#5a7a5a', reveal: 'proximity',
       },
+      {
+        x: 620, y: GROUND_Y_DEFAULT - 30,
+        lines: [
+          '// The world continues to the right.',
+        ],
+        color: '#556655', reveal: 'after:wake',
+      },
     ],
     ambientFreq: 55, ambientVol: 0,
     triggers: [
@@ -477,6 +484,8 @@ const scenes = [
           queueBark({ lookAt: { x: guy.x + 100, y: guy.y - 20 }, duration: 60, symbol: '...' });
           queueBark({ lookAt: { x: guy.x - 80, y: guy.y }, duration: 50 });
           queueBark({ headTilt: -0.3, duration: 50, symbol: '?' });
+          // After a moment, drift toward the right
+          setTimeout(() => { if (state.scene === 0 && !draggingGuy) guy.wanderTarget = W - 60; }, 4000);
         }
       },
       { id: 'exit', condition: () => state.learnedMove && state.sceneFrames > 300 && guy.x > W - 40,
@@ -516,6 +525,8 @@ const scenes = [
           queueBark({ duration: 40, symbol: '!' });
           setTimeout(() => { if (!draggingGuy) guy.vy = -7; }, 600);
           setTimeout(() => { if (!draggingGuy) guy.vy = -7; }, 1200);
+          // After celebrating, drift right
+          setTimeout(() => { if (state.scene === 1 && !draggingGuy) guy.wanderTarget = W - 60; }, 3000);
         }
       },
       { id: 'exit', condition: () => state.learnedJump && guy.x > W - 40,
@@ -619,6 +630,8 @@ const scenes = [
           setTimeout(() => {
             if (state.learnedSpeak && state.wordsLearned.length > 0) showSpeech('...');
             queueBark({ headTilt: -0.2, duration: 80 });
+            // After reflecting, drift right
+            setTimeout(() => { if (state.scene === 3 && !draggingGuy) guy.wanderTarget = W - 60; }, 2000);
           }, 2000);
         }
       },
