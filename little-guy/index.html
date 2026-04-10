@@ -260,6 +260,7 @@ const state = {
   returnFlinch: false,
   scene8Phase: 0, scene8PhaseTimer: 0,
   bookReadPhase: 0, bookReadTimer: 0, bookReadInterrupted: false,
+  bookHeld: false, // guy is holding/reading the book
 };
 
 const behavior = {
@@ -949,7 +950,7 @@ const scenes = [
     ],
     ambientFreq: 50, ambientVol: 0.01,
     triggers: [
-      { id: 'sit_down', condition: () => state.sceneFrames > 900 && guy.grounded && !state.postMonologue && state.scene8Phase === 0,
+      { id: 'sit_down', condition: () => state.sceneFrames > 360 && guy.grounded && !state.postMonologue && state.scene8Phase === 0 && !draggingGuy,
         once: true, action: () => {
           // Phase 1: walk slowly to center
           state.scene8Phase = 1;
@@ -966,7 +967,7 @@ const scenes = [
           state.scene8PhaseTimer = 0;
         }
       },
-      { id: 'scene8_speak', condition: () => state.scene8Phase === 2 && state.scene8PhaseTimer > 300,
+      { id: 'scene8_speak', condition: () => state.scene8Phase === 2 && state.scene8PhaseTimer > 150,
         once: true, action: () => {
           state.scene8Phase = 3;
           const gentleRatio = state.gentlePlaces / Math.max(1, state.gentlePlaces + state.thrownHard);
@@ -1184,7 +1185,7 @@ function loadScene(idx) {
   state.guyReadingWriting = null; state.guyReadTimer = 0; state.guyReadCooldown = 0;
   state.postMonologue = false; state.postMonologuePhase = 0; state.postMonologueTimer = 0;
   state.scene8Phase = 0; state.scene8PhaseTimer = 0;
-  state.bookReadPhase = 0; state.bookReadTimer = 0; state.bookReadInterrupted = false;
+  state.bookReadPhase = 0; state.bookReadTimer = 0; state.bookReadInterrupted = false; state.bookHeld = false;
   if (s.bookPage && idx > 0) state.bookPagesUnlocked = idx + 1;
   if (s.ambientFreq && ambientActive) setAmbientTone(s.ambientFreq, s.ambientVol || 0.02);
   updateTabTitle();
@@ -1324,6 +1325,12 @@ canvas.addEventListener('mousedown', e => {
     mouseDownPos = {x: mouse.x, y: mouse.y};
     guy.sleeping = false; guy.thinker = false; guy.sitting = false;
     guy.idlePhase = 0; guy.idleTime = 0; guy.eyesClosed = false; guy.eyesCloseTimer = 0;
+    // Reset Scene 8 phases if interrupted before monologue
+    if (state.scene === 8 && state.scene8Phase > 0 && state.scene8Phase < 3) {
+      state.scene8Phase = 0; state.scene8PhaseTimer = 0;
+      state.sceneTriggered['8_sit_down'] = false;
+      state.sceneTriggered['8_scene8_sit'] = false;
+    }
     if (guy.inert) { addSymbol('!'); setTimeout(() => addSymbol('?'), 200); }
     else {
       addSymbol('!'); guy.currentBark = null; guy.barkQueue.length = 0;
@@ -2164,45 +2171,130 @@ function updateAmbientChord() {
 function updateBookReading() {
   if (state.bookReadPhase === 0) return;
   if (state.scene !== 6) return;
+  const book = findBody('his_book');
+
+  // Interrupt: dragging guy away from book
   if (draggingGuy) {
-    state.bookReadInterrupted = true;
+    if (state.bookHeld) {
+      state.bookHeld = false;
+      if (book) { book.visible = true; book.x = guy.x - 5; book.y = guy.y - 4; }
+      guy.sitting = false;
+    }
     state.bookReadPhase = 0;
     state.bookReadTimer = 0;
+    addSymbol('!');
+    const gentleRatio = state.gentlePlaces / Math.max(1, state.gentlePlaces + state.thrownHard);
+    if (gentleRatio < 0.4) {
+      queueBark({ headTilt: -0.2, duration: 60 });
+      if (state.wordsLearned.includes('NO')) setTimeout(() => showSpeech('NO...'), 300);
+    } else {
+      queueBark({ headTilt: -0.1, duration: 40, symbol: '?' });
+    }
     return;
   }
+
+  // Interrupt: book dragged away from guy
+  if (book && state.bookHeld && (Math.abs(book.cx - guy.x) > 60 || dragging === book)) {
+    state.bookHeld = false;
+    guy.sitting = false;
+    state.bookReadPhase = 0;
+    state.bookReadTimer = 0;
+    addSymbol('?');
+    queueBark({ lookAt: { x: book.cx, y: book.cy }, duration: 80, symbol: '...' });
+    if (state.wordsLearned.includes('WHY')) setTimeout(() => showSpeech('WHY...'), 500);
+    return;
+  }
+
   state.bookReadTimer++;
   const words = state.wordsLearned;
   const t = state.bookReadTimer;
-  const interrupted = state.bookReadInterrupted;
 
-  if (state.bookReadPhase === 1 && t === 30) { showSpeech('...'); }
-  if (state.bookReadPhase === 1 && t >= 90) { state.bookReadPhase = 2; }
-  if (state.bookReadPhase === 2 && t === 95) {
-    if (interrupted) { showSpeech('... ...'); }
-    else showSpeech('walk... speed... 3...');
+  // Phase 1: approach and look at book
+  if (state.bookReadPhase === 1) {
+    if (t === 1 && book) {
+      queueBark({ lookAt: { x: book.cx, y: book.cy }, duration: 60 });
+    }
+    if (t === 30) showSpeech('...');
+    if (t >= 60) {
+      // Behavioral gate: aggressive players — guy hesitates
+      const gentleRatio = state.gentlePlaces / Math.max(1, state.gentlePlaces + state.thrownHard);
+      if (behavior.aggression > behavior.patience * 2 && state.thrownHard > 5) {
+        // Too scared to read — backs away
+        state.bookReadPhase = 0;
+        state.bookReadTimer = 0;
+        guy.wanderTarget = guy.x - 40;
+        queueBark({ headTilt: -0.3, duration: 80 });
+        if (words.includes('NO')) { setTimeout(() => showSpeech('NO... NO.'), 300); }
+        else { addSymbol('...'); }
+        // Can re-trigger if player brings book close again
+        state.sceneTriggered['6_book_near_guy'] = false;
+        return;
+      }
+      state.bookReadPhase = 2;
+      state.bookReadTimer = 0;
+    }
   }
-  if (state.bookReadPhase === 2 && t >= 200) { state.bookReadPhase = 3; }
-  if (state.bookReadPhase === 3 && t === 205) {
-    if (interrupted) showSpeech('... created...');
-    else showSpeech('created... by...');
+
+  // Phase 2: sit down and pick up book
+  if (state.bookReadPhase === 2) {
+    if (t === 1) {
+      guy.sitting = true;
+      guy.vx = 0;
+      guy.wanderTarget = null;
+    }
+    if (t === 40) {
+      // Pick up book — hide the body, guy is now "holding" it
+      state.bookHeld = true;
+      if (book) book.visible = false;
+      addSymbol('...');
+    }
+    if (t >= 70) {
+      state.bookReadPhase = 3;
+      state.bookReadTimer = 0;
+    }
   }
-  if (state.bookReadPhase === 3 && t >= 380) { state.bookReadPhase = 4; }
-  if (state.bookReadPhase === 4 && t === 385) {
-    showSpeech(words.includes('WHO') ? 'WHO?' : '...');
+
+  // Phase 3: reading — fragments of his own code
+  if (state.bookReadPhase === 3) {
+    if (t === 30) showSpeech('walk... speed... 3...');
+    if (t >= 140) { state.bookReadPhase = 4; state.bookReadTimer = 0; }
   }
-  if (state.bookReadPhase === 4 && t >= 520) { state.bookReadPhase = 5; }
-  if (state.bookReadPhase === 5 && t === 525) {
-    showSpeech(words.includes('MADE') && words.includes('ME') ? 'SOMEONE... MADE... ME.' : 'SOMEONE...');
+
+  // Phase 4: finds "created_by"
+  if (state.bookReadPhase === 4) {
+    if (t === 10) showSpeech('created... by...');
+    if (t >= 140) { state.bookReadPhase = 5; state.bookReadTimer = 0; }
   }
-  if (state.bookReadPhase === 5 && t >= 700) { state.bookReadPhase = 6; }
-  if (state.bookReadPhase === 6 && t === 705) {
-    showSpeech(words.includes('WHY') ? 'WHY?' : '...');
+
+  // Phase 5: the question
+  if (state.bookReadPhase === 5) {
+    if (t === 10) showSpeech(words.includes('WHO') ? 'WHO?' : '...');
+    if (t >= 140) { state.bookReadPhase = 6; state.bookReadTimer = 0; }
   }
-  if (state.bookReadPhase === 6 && t >= 850) {
-    state.bookReadPhase = 0;
-    state.bookReadTimer = 0;
-    state.bookReadInterrupted = false;
-    queueBark({ headTilt: -0.4, duration: 120, symbol: '...' });
+
+  // Phase 6: the realization
+  if (state.bookReadPhase === 6) {
+    if (t === 10) {
+      showSpeech(words.includes('MADE') && words.includes('ME') ? 'SOMEONE... MADE... ME.' : 'SOMEONE...');
+      playBookTone();
+    }
+    if (t >= 180) { state.bookReadPhase = 7; state.bookReadTimer = 0; }
+  }
+
+  // Phase 7: final reaction
+  if (state.bookReadPhase === 7) {
+    if (t === 10) showSpeech(words.includes('WHY') ? 'WHY?' : '...');
+    if (t >= 140) {
+      // Done reading — put book down, stand up
+      state.bookReadPhase = 0;
+      state.bookReadTimer = 0;
+      state.bookHeld = false;
+      guy.sitting = false;
+      if (book) { book.visible = true; book.x = guy.x - 14; book.y = currentGroundY - book.h; }
+      queueBark({ headTilt: -0.4, duration: 120, symbol: '...' });
+      // Drift right after reading
+      setTimeout(() => { if (state.scene === 6 && !draggingGuy) guy.wanderTarget = W - 60; }, 3000);
+    }
   }
 }
 
@@ -2558,8 +2650,25 @@ function drawCharacter() {
   } else {
   ctx.beginPath();
   ctx.moveTo(x-guy.bodyR, bodyY+breath); ctx.lineTo(x-guy.bodyR-4-aa, bodyY+breath+10);
-  ctx.moveTo(x+guy.bodyR, bodyY+breath); ctx.lineTo(x+guy.bodyR+4+aa, bodyY+breath+10);
+  if (state.bookHeld) {
+    // Right arm holding book in front
+    ctx.moveTo(x+guy.bodyR, bodyY+breath); ctx.lineTo(x+guy.bodyR+6, bodyY+breath-2);
+  } else {
+    ctx.moveTo(x+guy.bodyR, bodyY+breath); ctx.lineTo(x+guy.bodyR+4+aa, bodyY+breath+10);
+  }
   ctx.stroke();
+  }
+  // Draw book in hands if held
+  if (state.bookHeld) {
+    ctx.fillStyle = '#6b5b3a';
+    const bx = x + guy.bodyR + 3, by = bodyY + breath - 6;
+    ctx.fillRect(bx, by, 10, 12);
+    ctx.strokeStyle = '#8a7a5a'; ctx.lineWidth = 0.5;
+    ctx.strokeRect(bx, by, 10, 12);
+    // Pages
+    ctx.fillStyle = '#e8e0c8'; ctx.fillRect(bx+2, by+1, 6, 10);
+    // Tiny text lines
+    ctx.fillStyle = '#887a60'; ctx.fillRect(bx+3, by+3, 4, 0.8); ctx.fillRect(bx+3, by+5, 3, 0.8); ctx.fillRect(bx+3, by+7, 4, 0.8);
   }
   let bodyColor = guy.inert ? '#777' : '#bbb';
   if (!guy.inert && getAwareness() >= 2) {
