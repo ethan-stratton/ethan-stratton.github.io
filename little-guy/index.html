@@ -1104,15 +1104,27 @@ function updateTransition() {
       state.transitionTimer = 0;
     }
   } else if (state.transitionPhase === 'fadeout') {
-    state.transitionAlpha += 0.025;
-    state.transitionShowCode = state.transitionAlpha > 0.4 && state.transitionAlpha < 0.95;
+    state.transitionAlpha += 0.02;
+    state.transitionShowCode = state.transitionAlpha > 0.3;
     if (state.transitionAlpha >= 1) {
       state.transitionAlpha = 1;
+      state.transitionPhase = 'hold';
+      state.transitionTimer = 0;
+    }
+  } else if (state.transitionPhase === 'hold') {
+    state.transitionShowCode = true;
+    // Hold on the programmer's comment so player can read it
+    const comment = transitionComments[transitionSourceScene] || transitionComments[0];
+    const lineCount = comment.split('\n').length;
+    const holdFrames = Math.max(180, lineCount * 40); // ~3s minimum, longer for more text
+    if (state.transitionTimer >= holdFrames) {
       loadScene(state.transitionTarget);
       state.transitionPhase = 'fadein';
       state.transitionTarget = -1;
+      state.transitionShowCode = false;
     }
   } else if (state.transitionPhase === 'fadein') {
+    state.transitionShowCode = false;
     state.transitionAlpha -= 0.015;
     if (state.transitionAlpha <= 0) {
       state.transitionAlpha = 0;
@@ -1692,7 +1704,7 @@ function resolveBody(body) {
   const allPlats = [...currentPlatforms, ...drawnPlatforms];
   for (const p of allPlats) {
     if (body === p || !p.solid) continue;
-    if (body.right > p.left && body.left < p.right && body.bottom >= p.top && body.bottom <= p.top + 16 && body.vy >= 0) {
+    if (body.right > p.left && body.left < p.right && body.bottom >= p.top && body.bottom <= p.top + Math.max(16, body.vy + 2) && body.vy >= 0) {
       body.y = p.top - body.h;
       if (body.vy > 2) { body.vy = -body.vy * BOUNCE; playImpact(body.vy); spawnImpactDust(body.cx, p.top, body.vy); }
       else body.vy = 0;
@@ -1700,7 +1712,7 @@ function resolveBody(body) {
       if (Math.abs(body.vx) > 0.5) body.rotV = body.vx * 0.03;
     }
   }
-  if (body.bottom >= currentGroundY) {
+  if (body.bottom >= currentGroundY && !currentScene?.customGround) {
     body.y = currentGroundY - body.h;
     if (body.vy > 2) { body.vy = -body.vy * BOUNCE; playImpact(body.vy); spawnImpactDust(body.cx, currentGroundY, body.vy); }
     else body.vy = 0;
@@ -1708,7 +1720,7 @@ function resolveBody(body) {
   }
   if (body.x < 0) { body.x = 0; body.vx = Math.abs(body.vx) * BOUNCE; body.rotV *= -0.5; }
   if (body.right > W) { body.x = W - body.w; body.vx = -Math.abs(body.vx) * BOUNCE; body.rotV *= -0.5; }
-  if (body.grounded && Math.abs(body.vx) < 0.3) { body.rotation *= 0.9; body.rotV *= 0.8; }
+  if (body.grounded && Math.abs(body.vx) < 0.3) { body.rotV *= 0.8; }
 
   // Body bounces off guy's head
   if (!draggingGuy && !guy.inert && body.visible && body !== dragging) {
@@ -1781,7 +1793,7 @@ function resolveGuy() {
   }
   for (const p of allPlats) {
     if (!p.solid) continue;
-    if (guy.x + hw > p.x && guy.x - hw < p.right && guy.y >= p.y && guy.y <= p.y + 16 && guy.vy >= 0) {
+    if (guy.x + hw > p.x && guy.x - hw < p.right && guy.y >= p.y && guy.y <= p.y + Math.max(16, guy.vy + 2) && guy.vy >= 0) {
       guy.y = p.y;
       if (guy.vy > 4) { guy.vy = -guy.vy * 0.25; guy.squashTarget = 0.7; if (!guy.inert) { addSymbol('!'); playImpact(4); spawnImpactDust(guy.x, p.y, 5); } }
       else guy.vy = 0;
@@ -1793,7 +1805,18 @@ function resolveGuy() {
     else { if (prevVy > 2 && !guy.inert) spawnDust(guy.x, currentGroundY, 3, { spread: 1, upward: 0.8, life: 15, color: '#555' }); guy.vy = 0; }
     guy.y = currentGroundY; guy.grounded = true;
   }
-  if (guy.y > H + 50) { guy.y = H - 20; guy.vy = 0; guy.grounded = true; }
+  if (guy.y > H + 50) {
+    // In custom ground scenes, find the lowest platform to land on
+    if (currentScene?.customGround) {
+      let lowestY = GROUND_Y_DEFAULT;
+      for (const p of [...currentPlatforms, ...drawnPlatforms]) {
+        if (p.solid && p.y > lowestY && p.y < H) lowestY = p.y;
+      }
+      guy.y = lowestY; guy.vy = 0; guy.grounded = true;
+    } else {
+      guy.y = currentGroundY; guy.vy = 0; guy.grounded = true;
+    }
+  }
   if (guy.x < 20) {
     guy.x = 20; guy.vx = Math.abs(guy.vx) * 0.4;
     // "You can't go back" moment
@@ -2398,9 +2421,9 @@ function render() {
   if (state.transitioning || state.transitionAlpha > 0) { ctx.fillStyle = `rgba(0,0,0,${state.transitionAlpha})`; ctx.fillRect(0, 0, W, H);
     if (state.transitionShowCode) {
       ctx.save();
-      ctx.globalAlpha = 0.4;
-      ctx.font = '10px monospace';
-      ctx.fillStyle = '#446644';
+      ctx.globalAlpha = 0.7;
+      ctx.font = '12px monospace';
+      ctx.fillStyle = '#669966';
       ctx.textAlign = 'center';
       const comment = transitionComments[transitionSourceScene] || transitionComments[0];
       const codeLines = comment.split('\n');
