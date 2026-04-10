@@ -727,22 +727,25 @@ const scenes = [
   {
     name: 'more_words',
     bgColor: '#0e101e', groundColor: '#1a1c2e', groundY: GROUND_Y_DEFAULT,
-    guyStart: { x: 60, y: GROUND_Y_DEFAULT },
-    platforms: [],
+    guyStart: { x: 30, y: GROUND_Y_DEFAULT },
+    platforms: [
+      // Elevated platform for grandiose words
+      () => new Body(460, GROUND_Y_DEFAULT - 80, 320, 12, { isStatic: true, color: '#2a2a3e' }),
+    ],
     bodies: [
-      // Humble (left group)
-      () => new Body(60, GROUND_Y_DEFAULT - 16, 42, 16, { color: '#4a3a5a', type: 'word', label: 'WHAT', draggable: true }),
-      () => new Body(115, GROUND_Y_DEFAULT - 16, 40, 16, { color: '#4a3a5a', type: 'word', label: 'WHO', draggable: true }),
-      () => new Body(168, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#4a3a5a', type: 'word', label: 'MADE', draggable: true }),
-      () => new Body(225, GROUND_Y_DEFAULT - 16, 34, 16, { color: '#4a3a5a', type: 'word', label: 'ME', draggable: true }),
-      () => new Body(272, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#4a3a5a', type: 'word', label: 'FEEL', draggable: true }),
-      () => new Body(329, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#4a3a5a', type: 'word', label: 'REAL', draggable: true }),
-      () => new Body(386, GROUND_Y_DEFAULT - 16, 48, 16, { color: '#4a3a5a', type: 'word', label: 'THINK', draggable: true }),
-      // Grandiose (right group)
-      () => new Body(490, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#5a3a3a', type: 'word', label: 'ONLY', draggable: true }),
-      () => new Body(547, GROUND_Y_DEFAULT - 16, 34, 16, { color: '#5a3a3a', type: 'word', label: 'ALL', draggable: true }),
-      () => new Body(594, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#5a3a3a', type: 'word', label: 'MINE', draggable: true }),
-      () => new Body(651, GROUND_Y_DEFAULT - 16, 90, 16, { color: '#5a3a3a', type: 'word', label: 'EVERYTHING', draggable: true }),
+      // Humble (left group, on ground)
+      () => new Body(100, GROUND_Y_DEFAULT - 16, 42, 16, { color: '#4a3a5a', type: 'word', label: 'WHAT', draggable: true }),
+      () => new Body(155, GROUND_Y_DEFAULT - 16, 40, 16, { color: '#4a3a5a', type: 'word', label: 'WHO', draggable: true }),
+      () => new Body(208, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#4a3a5a', type: 'word', label: 'MADE', draggable: true }),
+      () => new Body(265, GROUND_Y_DEFAULT - 16, 34, 16, { color: '#4a3a5a', type: 'word', label: 'ME', draggable: true }),
+      () => new Body(312, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#4a3a5a', type: 'word', label: 'FEEL', draggable: true }),
+      () => new Body(369, GROUND_Y_DEFAULT - 16, 44, 16, { color: '#4a3a5a', type: 'word', label: 'REAL', draggable: true }),
+      () => new Body(426, GROUND_Y_DEFAULT - 16, 48, 16, { color: '#4a3a5a', type: 'word', label: 'THINK', draggable: true }),
+      // Grandiose (up on the platform)
+      () => new Body(475, GROUND_Y_DEFAULT - 96, 44, 16, { color: '#5a3a3a', type: 'word', label: 'ONLY', draggable: true }),
+      () => new Body(532, GROUND_Y_DEFAULT - 96, 34, 16, { color: '#5a3a3a', type: 'word', label: 'ALL', draggable: true }),
+      () => new Body(579, GROUND_Y_DEFAULT - 96, 44, 16, { color: '#5a3a3a', type: 'word', label: 'MINE', draggable: true }),
+      () => new Body(636, GROUND_Y_DEFAULT - 96, 90, 16, { color: '#5a3a3a', type: 'word', label: 'EVERYTHING', draggable: true }),
     ],
     wallWritings: [
       { x: 30, y: 55, lines: [
@@ -1380,7 +1383,7 @@ canvas.addEventListener('mouseup', e => {
 
   if (dragging) {
     dragging.vx = throwVel.vx; dragging.vy = throwVel.vy; dragging.rotV = throwVel.vx * 0.05;
-    if (dragging.type === 'word' && dragging.label && Math.abs(dragging.cx - guy.x) < 60 && !state.wordsLearned.includes(dragging.label)) learnWord(dragging.label);
+    if (dragging.type === 'word' && dragging.label && Math.abs(dragging.cx - guy.x) < 40 && Math.abs(dragging.cy - guy.y + guy.h/2) < 30 && !state.wordsLearned.includes(dragging.label)) learnWord(dragging.label);
     if (dragging.type === 'book' && Math.abs(dragging.cx - guy.x) < 50) {
       if (state.learnedSpeak) { showSpeech('...'); setTimeout(() => showSpeech('MADE... ME?'), 1500); }
       else { addSymbol('?'); setTimeout(() => addSymbol('...'), 400); }
@@ -1990,7 +1993,7 @@ function updateTriggers() {
 function checkWordProximity() {
   if (guy.inert) return;
   for (const b of currentBodies) {
-    if (b.type === 'word' && b.label && !state.wordsLearned.includes(b.label) && Math.abs(b.cx - guy.x) < 50 && b.grounded) learnWord(b.label);
+    if (b.type === 'word' && b.label && !state.wordsLearned.includes(b.label) && !draggingGuy && Math.abs(b.cx - guy.x) < 30 && Math.abs(b.cy - guy.y + guy.h/2) < 25 && b.grounded) learnWord(b.label);
   }
 }
 
