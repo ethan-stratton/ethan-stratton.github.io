@@ -256,6 +256,7 @@ const state = {
   triedGoBack: false,
   memoryNotice: 0,
   transitionShowCode: false,
+  transitionAdvance: false,
   monologueBehavior: 'mixed',
   returnFlinch: false,
   scene8Phase: 0, scene8PhaseTimer: 0,
@@ -1140,11 +1141,9 @@ function updateTransition() {
     }
   } else if (state.transitionPhase === 'hold') {
     state.transitionShowCode = true;
-    // Hold on the programmer's comment so player can read it
-    const comment = transitionComments[transitionSourceScene] || transitionComments[0];
-    const lineCount = comment.split('\n').length;
-    const holdFrames = Math.max(120, lineCount * 30); // ~2s minimum, longer for more text
-    if (state.transitionTimer >= holdFrames) {
+    // Wait for click or keypress to advance (set by event listeners)
+    if (state.transitionAdvance) {
+      state.transitionAdvance = false;
       loadScene(state.transitionTarget);
       state.transitionPhase = 'fadein';
       state.transitionTarget = -1;
@@ -1285,6 +1284,7 @@ canvas.addEventListener('click', () => { initAudio(); }, { once: true });
 
 // DEV: number keys 1-9 to jump to scenes (remove for release)
 document.addEventListener('keydown', e => {
+  if (state.transitioning && state.transitionPhase === 'hold') { state.transitionAdvance = true; return; }
   // DEV: number keys 1-9 to jump to scenes (remove for release)
   if (e.key >= '1' && e.key <= '9') {
     const target = parseInt(e.key) - 1;
@@ -1314,6 +1314,7 @@ canvas.addEventListener('mousemove', e => {
 });
 
 canvas.addEventListener('mousedown', e => {
+  if (state.transitioning && state.transitionPhase === 'hold') { state.transitionAdvance = true; return; }
   if (state.transitioning) return;
   initAudio(); mouse.down = true;
   state.playerAbsentFrames = 0; state.lastMouseMove = state.frameCount;
@@ -2549,6 +2550,14 @@ function render() {
       const startY = H / 2 - (codeLines.length * 18) / 2;
       for (let i = 0; i < codeLines.length; i++) {
         ctx.fillText(codeLines[i], W / 2, startY + i * 18);
+      }
+      // "click to continue" hint
+      if (state.transitionPhase === 'hold') {
+        const blink = Math.sin(Date.now() / 500) * 0.3 + 0.4;
+        ctx.globalAlpha = blink;
+        ctx.font = '10px monospace';
+        ctx.fillStyle = '#556655';
+        ctx.fillText('[ click to continue ]', W / 2, H - 30);
       }
       ctx.restore();
     }
