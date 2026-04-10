@@ -877,7 +877,17 @@ const scenes = [
     ],
     ambientFreq: 45, ambientVol: 0.015,
     triggers: [
-      { id: 'hit_right', condition: () => guy.x > W - 30 && !hasFired(7, 'hit_right') && guy.wallTouchTimer === 0, once: true, delay: 30, action: () => {
+      { id: 'explore_right', condition: () => state.sceneFrames > 60 && !hasFired(7, 'hit_right') && !hasFired(7, 'explore_right'),
+        once: true, action: () => {
+          guy.wanderTarget = W - 15;
+        }
+      },
+      { id: 'explore_left', condition: () => hasFired(7, 'hit_right') && !hasFired(7, 'hit_left') && !guy.touchingWall && !hasFired(7, 'explore_left'),
+        once: true, delay: 60, action: () => {
+          guy.wanderTarget = 15;
+        }
+      },
+      { id: 'hit_right', condition: () => guy.x > W - 30 && !hasFired(7, 'hit_right'), once: true, delay: 30, action: () => {
           guy.wanderTarget = null;
           const w = state.wordsLearned;
           if (w.includes('NO') && w.includes('GO')) showSpeech('NO... GO.'); else addSymbol('...');
@@ -885,7 +895,7 @@ const scenes = [
           queueBark({ headTilt: -0.3, duration: 60 });
         }
       },
-      { id: 'hit_left', condition: () => guy.x < 30 && !hasFired(7, 'hit_left') && guy.wallTouchTimer === 0, once: true, delay: 30, action: () => {
+      { id: 'hit_left', condition: () => guy.x < 30 && !hasFired(7, 'hit_left'), once: true, delay: 30, action: () => {
           const w = state.wordsLearned;
           if (w.includes('WHAT') && w.includes('HERE')) showSpeech('WHAT... HERE?');
           queueBark({ lookAt: { x: -50, y: guy.y }, duration: 60, symbol: '?' });
@@ -959,7 +969,7 @@ const scenes = [
           setAmbientTone(45, 0.008);
         }
       },
-      { id: 'scene8_sit', condition: () => state.scene8Phase === 1 && (Math.abs(guy.x - W / 2) < 20 || state.scene8PhaseTimer > 600),
+      { id: 'scene8_sit', condition: () => state.scene8Phase === 1 && (Math.abs(guy.x - W / 2) < 30 || state.scene8PhaseTimer > 300),
         once: true, action: () => {
           guy.wanderTarget = null; guy.vx = 0;
           guy.sitting = true;
@@ -1330,6 +1340,7 @@ canvas.addEventListener('mousedown', e => {
       state.scene8Phase = 0; state.scene8PhaseTimer = 0;
       state.sceneTriggered['8_sit_down'] = false;
       state.sceneTriggered['8_scene8_sit'] = false;
+      state.sceneTriggered['8_scene8_speak'] = false;
     }
     if (guy.inert) { addSymbol('!'); setTimeout(() => addSymbol('?'), 200); }
     else {
@@ -1936,7 +1947,7 @@ function updateGuyAI() {
   }
   if (guy.wanderTarget !== null) {
     const dx = guy.wanderTarget - guy.x;
-    const accel = (state.scene === 8 && state.scene8Phase === 1) ? 0.03 : 0.15;
+    const accel = (state.scene === 8 && state.scene8Phase === 1) ? 0.08 : 0.15;
     if (Math.abs(dx) > 8) {
       guy.vx += (dx > 0 ? accel : -accel) * guy.energy;
       if (state.learnedJump && guy.grounded && Math.abs(guy.vx) < 0.3 && Math.abs(dx) > 15 && state.scene8Phase !== 1) guy.vy = -7;
