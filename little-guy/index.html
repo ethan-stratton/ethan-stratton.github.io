@@ -1129,7 +1129,7 @@ function updateTransition() {
     // Hold on the programmer's comment so player can read it
     const comment = transitionComments[transitionSourceScene] || transitionComments[0];
     const lineCount = comment.split('\n').length;
-    const holdFrames = Math.max(180, lineCount * 40); // ~3s minimum, longer for more text
+    const holdFrames = Math.max(120, lineCount * 30); // ~2s minimum, longer for more text
     if (state.transitionTimer >= holdFrames) {
       loadScene(state.transitionTarget);
       state.transitionPhase = 'fadein';
