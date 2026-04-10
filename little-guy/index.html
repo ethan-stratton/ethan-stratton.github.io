@@ -1449,7 +1449,12 @@ canvas.addEventListener('mouseup', e => {
 // ============================================================
 // EXPRESSION
 // ============================================================
-function addSymbol(sym) { guy.symbols.push({ text: sym, life: 90, y: 0, x: (Math.random() - 0.5) * 10 }); playSymbol(sym); }
+let symbolCooldown = 0;
+function addSymbol(sym) {
+  if (symbolCooldown > 0) return;
+  guy.symbols.push({ text: sym, life: 90, y: 0, x: (Math.random() - 0.5) * 10 }); playSymbol(sym);
+  symbolCooldown = 20; // ~0.33s cooldown
+}
 
 function showSpeech(text) {
   guy.speechFullText = text; guy.speechDisplayed = '';
@@ -2336,6 +2341,7 @@ function updateScene8Atmosphere() {
 
 function update() {
   state.frameCount++; state.sceneFrames++; state.playerAbsentFrames++;
+  if (symbolCooldown > 0) symbolCooldown--;
   if (state.wordFreeze > 0) { state.wordFreeze--; return; }
   // Breathing
   if (guy.sleeping) guy.breathRate += (0.015 - guy.breathRate) * 0.02;
