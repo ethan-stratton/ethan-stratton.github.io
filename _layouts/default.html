@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% if page.title and page.layout == 'post' %}{{ page.title }} — strattao{% else %}strattao{% endif %}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    color: #c8c0b8;
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  canvas#starfield {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  header {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    padding: 80px 24px 40px;
+    border-bottom: 1px solid rgba(184, 156, 255, 0.08);
+  }
+
+  header h1 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 2.8rem;
+    color: #e8e0d8;
+    letter-spacing: 0.08em;
+    text-shadow: 0 0 30px rgba(180, 140, 255, 0.3);
+  }
+
+  header h1 a { color: inherit; text-decoration: none; }
+  header h1 a:hover { text-shadow: 0 0 40px rgba(180, 140, 255, 0.5); }
+
+  header .subtitle {
+    font-size: 0.9rem;
+    color: #706860;
+    letter-spacing: 0.04em;
+    margin-top: 8px;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    gap: 48px;
+  }
+
+  .main { flex: 1; min-width: 0; }
+
+  /* ── Post styles ── */
+  .post {
+    margin-bottom: 56px;
+    padding-bottom: 56px;
+    border-bottom: 1px solid rgba(184, 156, 255, 0.06);
+  }
+  .post:last-child { border-bottom: none; }
+
+  .post-date {
+    font-size: 0.75rem;
+    color: #585050;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .post h2, .post-content h2 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 1.5rem;
+    color: #e0d8f0;
+    letter-spacing: 0.04em;
+    margin-bottom: 16px;
+    text-shadow: 0 0 20px rgba(168, 152, 200, 0.2);
+  }
+
+  .post h2 a {
+    color: inherit;
+    text-decoration: none;
+    transition: text-shadow 0.3s;
+  }
+  .post h2 a:hover {
+    text-shadow: 0 0 16px rgba(184, 156, 255, 0.5);
+  }
+
+  .post-content h3 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 1.1rem;
+    color: #c0b8d8;
+    margin: 28px 0 12px;
+  }
+
+  .post-content p {
+    font-size: 0.92rem;
+    line-height: 1.75;
+    color: #a8a098;
+    margin-bottom: 14px;
+  }
+
+  .post-content ul, .post-content ol {
+    margin: 8px 0 16px 20px;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: #a8a098;
+  }
+
+  .post-content img {
+    width: 100%;
+    border-radius: 6px;
+    margin: 16px 0;
+    border: 1px solid rgba(184, 156, 255, 0.1);
+  }
+
+  .post-content a {
+    color: #b89cff;
+    text-decoration: none;
+    transition: color 0.3s, text-shadow 0.3s;
+  }
+  .post-content a:hover {
+    color: #dcc8ff;
+    text-shadow: 0 0 12px rgba(184, 156, 255, 0.6), 0 0 30px rgba(184, 156, 255, 0.3);
+  }
+
+  .post-content blockquote {
+    border-left: 2px solid rgba(184, 156, 255, 0.2);
+    padding-left: 16px;
+    margin: 16px 0;
+    color: #888078;
+    font-style: italic;
+  }
+
+  .post-content code {
+    background: rgba(184, 156, 255, 0.08);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.85em;
+  }
+
+  .post-content pre {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(184, 156, 255, 0.1);
+    border-radius: 6px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+
+  .post-content pre code {
+    background: none;
+    padding: 0;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #706068;
+    border: 1px solid rgba(184, 156, 255, 0.15);
+    border-radius: 4px;
+    padding: 2px 8px;
+    margin-right: 6px;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar { width: 220px; flex-shrink: 0; }
+
+  .sidebar h2 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 0.9rem;
+    color: #a898c8;
+    letter-spacing: 0.08em;
+    margin-bottom: 20px;
+    text-shadow: 0 0 16px rgba(168, 152, 200, 0.2);
+  }
+
+  .sidebar-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .sidebar-tile {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(184, 156, 255, 0.1);
+    transition: border-color 0.4s, box-shadow 0.4s, transform 0.3s;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.03);
+    text-decoration: none;
+  }
+
+  .sidebar-tile:hover {
+    border-color: rgba(184, 156, 255, 0.4);
+    box-shadow: 0 0 16px rgba(184, 156, 255, 0.12);
+    transform: scale(1.03);
+  }
+
+  .tile-label {
+    font-family: 'Cinzel', serif;
+    font-size: 0.6rem;
+    color: #a898c8;
+    text-align: center;
+    letter-spacing: 0.06em;
+    padding: 8px 4px;
+    line-height: 1.3;
+    position: relative;
+    z-index: 1;
+  }
+
+  .tile-canvas {
+    width: 100%; height: 100%;
+    position: absolute;
+    top: 0; left: 0;
+  }
+
+  footer {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    color: #403838;
+    font-size: 0.75rem;
+    padding: 40px 0;
+    letter-spacing: 0.04em;
+    border-top: 1px solid rgba(184, 156, 255, 0.06);
+  }
+
+  @media (max-width: 768px) {
+    .page { flex-direction: column-reverse; padding: 32px 16px 60px; gap: 40px; }
+    .sidebar { width: 100%; }
+    .sidebar-grid { grid-template-columns: repeat(4, 1fr); }
+    header h1 { font-size: 2rem; }
+    header { padding: 48px 16px 32px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<header>
+  <h1><a href="/">strattao</a></h1>
+  <p class="subtitle">games · experiments · writing</p>
+</header>
+
+<div class="page">
+  <main class="main">
+    {{ content }}
+  </main>
+
+  <aside class="sidebar">
+    <h2>Projects</h2>
+    <div class="sidebar-grid">
+      <a href="https://e-man-games.itch.io/little-guy" target="_blank" rel="noopener" class="sidebar-tile" title="Little Guy">
+        <canvas class="tile-canvas" data-tile="littleguy"></canvas>
+        <div class="tile-label">Little Guy</div>
+      </a>
+      <div class="sidebar-tile" title="Earthbound Backgrounds — Coming Soon">
+        <canvas class="tile-canvas" data-tile="earthbound"></canvas>
+        <div class="tile-label">EB Backgrounds</div>
+      </div>
+      <div class="sidebar-tile" title="Visual Sandbox — Coming Soon">
+        <canvas class="tile-canvas" data-tile="sandbox"></canvas>
+        <div class="tile-label">Visual Sandbox</div>
+      </div>
+      <div class="sidebar-tile" title="Iron & Ether — In Development">
+        <canvas class="tile-canvas" data-tile="ironether"></canvas>
+        <div class="tile-label">Iron & Ether</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<footer>built by hand</footer>
+
+<script>
+(function() {
+  const canvas = document.getElementById('starfield');
+  const ctx = canvas.getContext('2d');
+  let w, h, stars;
+  const STAR_COUNT = 260;
+  const LAYERS = [
+    { speed: 0.15, sizeMin: 0.4, sizeMax: 1.0, alpha: 0.35 },
+    { speed: 0.35, sizeMin: 0.6, sizeMax: 1.4, alpha: 0.55 },
+    { speed: 0.7,  sizeMin: 1.0, sizeMax: 2.0, alpha: 0.8 },
+  ];
+  function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+  function createStars() {
+    stars = [];
+    for (let i = 0; i < STAR_COUNT; i++) {
+      const layer = LAYERS[Math.floor(Math.random() * LAYERS.length)];
+      stars.push({
+        x: Math.random() * w, y: Math.random() * h,
+        size: layer.sizeMin + Math.random() * (layer.sizeMax - layer.sizeMin),
+        speed: layer.speed + (Math.random() - 0.5) * 0.05,
+        alpha: layer.alpha * (0.6 + Math.random() * 0.4),
+        twinkleSpeed: 0.005 + Math.random() * 0.02,
+        twinkleOffset: Math.random() * Math.PI * 2,
+        hue: 240 + Math.random() * 40, sat: Math.random() * 30,
+      });
+    }
+  }
+  let time = 0;
+  function draw() {
+    ctx.clearRect(0, 0, w, h); time++;
+    for (const s of stars) {
+      s.y -= s.speed;
+      if (s.y < -4) { s.y = h + 4; s.x = Math.random() * w; }
+      const twinkle = 0.5 + 0.5 * Math.sin(time * s.twinkleSpeed + s.twinkleOffset);
+      const a = s.alpha * (0.4 + 0.6 * twinkle);
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${s.hue}, ${s.sat}%, 88%, ${a})`; ctx.fill();
+      if (s.size > 1.2) {
+        ctx.beginPath(); ctx.arc(s.x, s.y, s.size * 3, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${s.hue}, ${s.sat}%, 80%, ${a * 0.1})`; ctx.fill();
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize', () => { resize(); createStars(); });
+  resize(); createStars(); draw();
+})();
+
+(function() {
+  const tiles = document.querySelectorAll('.tile-canvas');
+  let time = 0;
+  tiles.forEach(c => { c.width = 200; c.height = 200; });
+  function drawTiles() {
+    time += 0.02;
+    tiles.forEach(c => {
+      const ctx = c.getContext('2d');
+      const w = c.width, h = c.height, type = c.dataset.tile;
+      ctx.clearRect(0, 0, w, h);
+      if (type === 'littleguy') {
+        ctx.fillStyle = 'rgba(10,10,20,0.9)'; ctx.fillRect(0, 0, w, h);
+        const gx = w/2 + Math.sin(time * 0.7) * 30, gy = h/2 + Math.cos(time * 0.5) * 20;
+        ctx.beginPath(); ctx.arc(gx, gy, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#e0d8f0'; ctx.fill();
+        ctx.beginPath(); ctx.arc(gx, gy, 16, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(184,156,255,0.12)'; ctx.fill();
+      } else if (type === 'earthbound') {
+        const imgData = ctx.createImageData(w, h);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const v = Math.sin(x*0.05+time)+Math.sin(y*0.04-time*0.7)+Math.sin((x+y)*0.03+time*0.5);
+          const t = (v+3)/6; const i = (y*w+x)*4;
+          imgData.data[i]=40+t*100; imgData.data[i+1]=20+t*40; imgData.data[i+2]=80+t*140; imgData.data[i+3]=255;
+        }
+        ctx.putImageData(imgData, 0, 0);
+      } else if (type === 'sandbox') {
+        ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, w, h);
+        for (let i = 0; i < 3; i++) {
+          const cx = w/2+Math.sin(time+i*2.1)*40, cy = h/2+Math.cos(time*0.8+i*1.7)*40;
+          const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 60);
+          grad.addColorStop(0, `hsla(${(time*30+i*120)%360}, 60%, 50%, 0.3)`);
+          grad.addColorStop(1, 'transparent');
+          ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
+        }
+      } else if (type === 'ironether') {
+        ctx.fillStyle = '#0a0810'; ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = `rgba(255,140,60,${0.3+0.15*Math.sin(time*1.5)})`;
+        ctx.lineWidth = 1.5; ctx.beginPath();
+        const cx = w/2, cy = h/2, r = 40;
+        for (let i = 0; i < 6; i++) {
+          const a = (Math.PI*2/6)*i - Math.PI/2 + time*0.2;
+          i===0 ? ctx.moveTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r) : ctx.lineTo(cx+Math.cos(a)*r, cy+Math.sin(a)*r);
+        }
+        ctx.closePath(); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(255,140,60,${0.2+0.1*Math.sin(time*2)})`; ctx.fill();
+      }
+    });
+    requestAnimationFrame(drawTiles);
+  }
+  drawTiles();
+})();
+</script>
+
+</body>
+</html>
