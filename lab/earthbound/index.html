@@ -219,6 +219,94 @@
 
   .color-swatch:hover .color-swatch-remove { display: flex; }
 
+  /* Audio section */
+  .audio-section {
+    margin-top: 16px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(184, 156, 255, 0.08);
+    border-radius: 6px;
+  }
+
+  .audio-section h2 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 0.85rem;
+    color: #a898c8;
+    margin-bottom: 14px;
+    letter-spacing: 0.05em;
+  }
+
+  .audio-btn-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .audio-btn {
+    flex: 1;
+    padding: 8px 4px;
+    background: rgba(184, 156, 255, 0.06);
+    border: 1px solid rgba(184, 156, 255, 0.15);
+    border-radius: 4px;
+    color: #908880;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .audio-btn:hover {
+    background: rgba(184, 156, 255, 0.12);
+    color: #dcc8ff;
+    border-color: rgba(184, 156, 255, 0.3);
+  }
+
+  .audio-btn.active {
+    background: rgba(184, 156, 255, 0.15);
+    color: #dcc8ff;
+    border-color: rgba(184, 156, 255, 0.4);
+    box-shadow: 0 0 10px rgba(184, 156, 255, 0.1);
+  }
+
+  .meter-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .meter-label {
+    font-size: 0.65rem;
+    color: #706860;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    width: 40px;
+    flex-shrink: 0;
+  }
+
+  .meter-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(184, 156, 255, 0.08);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .meter-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.05s;
+    width: 0%;
+  }
+
+  .meter-fill.bass { background: #ff6080; }
+  .meter-fill.mid { background: #b89cff; }
+  .meter-fill.treble { background: #60d0ff; }
+
+  #audio-file-input { display: none; }
+
   /* Buttons */
   .btn-row {
     display: flex;
@@ -407,6 +495,61 @@
 
     <label>Opacity <span class="val" id="v-op2">0.5</span></label>
     <input type="range" id="opacity2" min="0" max="1" step="0.05" value="0.5">
+  </div>
+
+  <!-- Audio Reactive -->
+  <div class="audio-section">
+    <h2>🎵 Audio Reactive</h2>
+    <div class="audio-btn-row">
+      <button class="audio-btn" id="mic-btn">🎤 Mic</button>
+      <button class="audio-btn" id="file-btn">🎵 File</button>
+      <button class="audio-btn" id="audio-stop-btn">⏹ Off</button>
+    </div>
+    <input type="file" id="audio-file-input" accept="audio/*">
+    <audio id="audio-el" crossorigin="anonymous" style="display:none;"></audio>
+
+    <div class="meter-row">
+      <span class="meter-label">Bass</span>
+      <div class="meter-bar"><div class="meter-fill bass" id="meter-bass"></div></div>
+    </div>
+    <div class="meter-row">
+      <span class="meter-label">Mid</span>
+      <div class="meter-bar"><div class="meter-fill mid" id="meter-mid"></div></div>
+    </div>
+    <div class="meter-row">
+      <span class="meter-label">Treble</span>
+      <div class="meter-bar"><div class="meter-fill treble" id="meter-treble"></div></div>
+    </div>
+
+    <label>Reactivity <span class="val" id="v-reactivity">0.7</span></label>
+    <input type="range" id="reactivity" min="0" max="1" step="0.05" value="0.7">
+
+    <label>Bass → <span class="val" id="v-bass-target">amplitude</span></label>
+    <select id="bass-target">
+      <option value="amplitude">Amplitude</option>
+      <option value="palette">Palette Speed</option>
+      <option value="scroll">Scroll Speed</option>
+      <option value="scale">Scale</option>
+      <option value="frequency">Frequency</option>
+    </select>
+
+    <label>Mid → <span class="val" id="v-mid-target">palette</span></label>
+    <select id="mid-target">
+      <option value="amplitude">Amplitude</option>
+      <option value="palette" selected>Palette Speed</option>
+      <option value="scroll">Scroll Speed</option>
+      <option value="scale">Scale</option>
+      <option value="frequency">Frequency</option>
+    </select>
+
+    <label>Treble → <span class="val" id="v-treble-target">scroll</span></label>
+    <select id="treble-target">
+      <option value="amplitude">Amplitude</option>
+      <option value="palette">Palette Speed</option>
+      <option value="scroll" selected>Scroll Speed</option>
+      <option value="scale">Scale</option>
+      <option value="frequency">Frequency</option>
+    </select>
   </div>
 
   <!-- Presets -->
@@ -690,6 +833,16 @@
     const l1 = getLayer(1);
     const l2 = getLayer(2);
 
+    // Audio reactivity
+    const bands = getAudioBands();
+    if (audioActive) {
+      el('meter-bass').style.width = (bands.bass * 100) + '%';
+      el('meter-mid').style.width = (bands.mid * 100) + '%';
+      el('meter-treble').style.width = (bands.treble * 100) + '%';
+      applyAudioToLayer(l1, bands);
+      applyAudioToLayer(l2, bands);
+    }
+
     const p1 = renderLayer(l1, time, 1);
     const p2 = renderLayer(l2, time, 2);
 
@@ -808,6 +961,141 @@
     el('panel').classList.toggle('hidden');
     el('toggle-panel').style.right = el('panel').classList.contains('hidden') ? '16px' : '336px';
   });
+
+  // ── Audio Reactive System ──
+  let audioCtx = null;
+  let analyser = null;
+  let freqData = null;
+  let audioSource = null;
+  let audioActive = false;
+  let smoothBass = 0, smoothMid = 0, smoothTreble = 0;
+
+  function initAudioCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.8;
+      freqData = new Uint8Array(analyser.frequencyBinCount);
+    }
+  }
+
+  function stopAudio() {
+    audioActive = false;
+    if (audioSource) { try { audioSource.disconnect(); } catch {} audioSource = null; }
+    const audioEl = el('audio-el');
+    audioEl.pause();
+    audioEl.src = '';
+    el('mic-btn').classList.remove('active');
+    el('file-btn').classList.remove('active');
+    el('meter-bass').style.width = '0%';
+    el('meter-mid').style.width = '0%';
+    el('meter-treble').style.width = '0%';
+    smoothBass = 0; smoothMid = 0; smoothTreble = 0;
+  }
+
+  el('mic-btn').addEventListener('click', async () => {
+    stopAudio();
+    try {
+      initAudioCtx();
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioSource = audioCtx.createMediaStreamSource(stream);
+      audioSource.connect(analyser);
+      audioActive = true;
+      el('mic-btn').classList.add('active');
+    } catch (e) {
+      alert('Mic access denied or unavailable');
+    }
+  });
+
+  el('file-btn').addEventListener('click', () => {
+    el('audio-file-input').click();
+  });
+
+  el('audio-file-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    stopAudio();
+    initAudioCtx();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const audioEl = el('audio-el');
+    audioEl.src = URL.createObjectURL(file);
+    audioEl.play();
+    // Only create media element source once per element
+    if (!audioEl._sourceNode) {
+      audioEl._sourceNode = audioCtx.createMediaElementSource(audioEl);
+    }
+    audioSource = audioEl._sourceNode;
+    audioSource.connect(analyser);
+    analyser.connect(audioCtx.destination); // so we hear the music
+    audioActive = true;
+    el('file-btn').classList.add('active');
+  });
+
+  el('audio-stop-btn').addEventListener('click', () => {
+    stopAudio();
+    // Reconnect analyser to destination if it was connected
+    if (analyser) { try { analyser.disconnect(); } catch {} }
+  });
+
+  // Update reactivity label
+  el('reactivity').addEventListener('input', () => {
+    el('v-reactivity').textContent = parseFloat(el('reactivity').value).toFixed(2);
+  });
+  el('bass-target').addEventListener('input', () => { el('v-bass-target').textContent = el('bass-target').value; });
+  el('mid-target').addEventListener('input', () => { el('v-mid-target').textContent = el('mid-target').value; });
+  el('treble-target').addEventListener('input', () => { el('v-treble-target').textContent = el('treble-target').value; });
+
+  function getAudioBands() {
+    if (!audioActive || !analyser) return { bass: 0, mid: 0, treble: 0 };
+    analyser.getByteFrequencyData(freqData);
+    const n = freqData.length;
+    // Bass: 0-15% of spectrum, Mid: 15-50%, Treble: 50-100%
+    const bassEnd = Math.floor(n * 0.15);
+    const midEnd = Math.floor(n * 0.5);
+
+    let bass = 0, mid = 0, treble = 0;
+    for (let i = 0; i < bassEnd; i++) bass += freqData[i];
+    for (let i = bassEnd; i < midEnd; i++) mid += freqData[i];
+    for (let i = midEnd; i < n; i++) treble += freqData[i];
+
+    bass = bass / (bassEnd * 255);
+    mid = mid / ((midEnd - bassEnd) * 255);
+    treble = treble / ((n - midEnd) * 255);
+
+    // Smooth
+    const sm = 0.3;
+    smoothBass = smoothBass * (1 - sm) + bass * sm;
+    smoothMid = smoothMid * (1 - sm) + mid * sm;
+    smoothTreble = smoothTreble * (1 - sm) + treble * sm;
+
+    return { bass: smoothBass, mid: smoothMid, treble: smoothTreble };
+  }
+
+  function applyAudioToLayer(layer, bands) {
+    const r = parseFloat(el('reactivity').value);
+    const targets = {
+      bass: el('bass-target').value,
+      mid: el('mid-target').value,
+      treble: el('treble-target').value,
+    };
+
+    function apply(target, value) {
+      const v = value * r;
+      if (target === 'amplitude') layer.amp += v * 20;
+      else if (target === 'palette') layer.palSpeed += v * 4;
+      else if (target === 'scroll') { layer.scrollX += v * 3; layer.scrollY += v * 3; }
+      else if (target === 'scale') layer.scale += v * 2;
+      else if (target === 'frequency') layer.freq += v * 0.05;
+    }
+
+    apply(targets.bass, bands.bass);
+    apply(targets.mid, bands.mid);
+    apply(targets.treble, bands.treble);
+
+    return layer;
+  }
 
   // ── Save / Load / Share ──
   function getCurrentState() {
