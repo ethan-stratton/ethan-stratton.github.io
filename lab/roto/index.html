@@ -375,8 +375,8 @@
 
     <div class="tool-section">
       <h3>Reference</h3>
-      <label>Opacity <span class="val" id="v-ref-opacity">0.4</span></label>
-      <input type="range" id="ref-opacity" min="0" max="1" step="0.05" value="0.4">
+      <label>Opacity <span class="val" id="v-ref-opacity">1.0</span></label>
+      <input type="range" id="ref-opacity" min="0" max="1" step="0.05" value="1">
 
       <div class="check-row">
         <input type="checkbox" id="onion-skin" checked>
@@ -516,11 +516,8 @@ function addFrame(refImage) {
 
 function goToFrame(idx) {
   if (idx < 0 || idx >= frames.length) return;
-  // Save current drawing
-  if (frames[currentFrame]) {
-    frames[currentFrame].drawing = ctx.getImageData(0, 0, canvasW, canvasH);
-    // Only save the drawing layer — we need to separate ref from drawing
-  }
+  // Drawing is saved to frames[].drawing by brushStroke/floodFill via saveOffscreenToDrawing
+  // Do NOT capture from the display canvas — it contains ref + onion composited
   currentFrame = idx;
   renderFrame();
   updateTimeline();
