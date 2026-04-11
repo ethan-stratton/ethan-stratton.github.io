@@ -149,6 +149,76 @@
 
   .palette-preview div { flex: 1; }
 
+  /* Custom color pickers */
+  .custom-colors {
+    display: none;
+    margin-top: 8px;
+  }
+
+  .custom-colors.active { display: block; }
+
+  .color-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+
+  .color-swatch {
+    width: 28px; height: 28px;
+    border: 1px solid rgba(184, 156, 255, 0.2);
+    border-radius: 4px;
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .color-swatch input[type="color"] {
+    position: absolute;
+    top: -4px; left: -4px;
+    width: 36px; height: 36px;
+    border: none;
+    cursor: pointer;
+    opacity: 0;
+  }
+
+  .color-swatch-add {
+    width: 28px; height: 28px;
+    border: 1px dashed rgba(184, 156, 255, 0.2);
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+    color: #706068;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .color-swatch-add:hover {
+    border-color: rgba(184, 156, 255, 0.4);
+    color: #b89cff;
+  }
+
+  .color-swatch-remove {
+    position: absolute;
+    top: -2px; right: -2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: rgba(255, 60, 60, 0.8);
+    border: none;
+    color: white;
+    font-size: 0.5rem;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+  }
+
+  .color-swatch:hover .color-swatch-remove { display: flex; }
+
   /* Buttons */
   .btn-row {
     display: flex;
@@ -248,8 +318,13 @@
       <option value="void">Void</option>
       <option value="candy">Candy</option>
       <option value="aurora">Aurora</option>
+      <option value="custom">✏️ Custom</option>
     </select>
     <div class="palette-preview" id="pp1"></div>
+    <div class="custom-colors" id="custom1">
+      <div class="color-row" id="colors1"></div>
+      <button class="color-swatch-add" id="addColor1" title="Add color">+</button>
+    </div>
 
     <label>Distortion Type <span class="val" id="v-dist1">horizontal</span></label>
     <select id="distType1">
@@ -294,8 +369,13 @@
       <option value="void">Void</option>
       <option value="candy">Candy</option>
       <option value="aurora">Aurora</option>
+      <option value="custom">✏️ Custom</option>
     </select>
     <div class="palette-preview" id="pp2"></div>
+    <div class="custom-colors" id="custom2">
+      <div class="color-row" id="colors2"></div>
+      <button class="color-swatch-add" id="addColor2" title="Add color">+</button>
+    </div>
 
     <label>Distortion Type <span class="val" id="v-dist2">horizontal</span></label>
     <select id="distType2">
@@ -391,7 +471,19 @@
   };
 
   function samplePalette(pal, t) {
-    const colors = palettes[pal];
+    const colors = pal === 'custom' ? null : palettes[pal]; // handled below
+    return sampleColors(pal === 'custom' ? null : colors, t);
+  }
+
+  // Custom palette storage per layer
+  const customPalettes = {
+    1: [[148,0,211],[0,0,255],[0,255,0],[255,255,0],[255,0,0]],
+    2: [[0,5,30],[0,120,180],[120,220,255],[200,240,255],[0,60,140]],
+  };
+
+  function sampleColors(colors, t) {
+    if (!colors || colors.length === 0) colors = [[128,128,128],[128,128,128]];
+    if (colors.length === 1) return [...colors[0]];
     const n = colors.length;
     const idx = ((t % 1) + 1) % 1 * n;
     const i0 = Math.floor(idx) % n;
@@ -402,6 +494,13 @@
       colors[i0][1] + (colors[i1][1] - colors[i0][1]) * f,
       colors[i0][2] + (colors[i1][2] - colors[i0][2]) * f
     ];
+  }
+
+  function sampleLayerPalette(layerNum, palName, t) {
+    if (palName === 'custom') {
+      return sampleColors(customPalettes[layerNum], t);
+    }
+    return sampleColors(palettes[palName], t);
   }
 
   // ── Generate base pattern (tiling, stripe/checker mix) ──
@@ -450,14 +549,83 @@
   function updatePalettePreviews() {
     for (const n of [1, 2]) {
       const pp = el('pp' + n);
-      const pal = palettes[el('palette' + n).value];
+      const palName = el('palette' + n).value;
+      const pal = palName === 'custom' ? customPalettes[n] : palettes[palName];
       pp.innerHTML = '';
-      pal.forEach(c => {
+      (pal || []).forEach(c => {
         const d = document.createElement('div');
         d.style.background = `rgb(${c[0]},${c[1]},${c[2]})`;
         pp.appendChild(d);
       });
+      // Show/hide custom color editor
+      const customDiv = el('custom' + n);
+      if (palName === 'custom') {
+        customDiv.classList.add('active');
+        rebuildColorSwatches(n);
+      } else {
+        customDiv.classList.remove('active');
+      }
     }
+  }
+
+  function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1,3), 16);
+    const g = parseInt(hex.slice(3,5), 16);
+    const b = parseInt(hex.slice(5,7), 16);
+    return [r, g, b];
+  }
+
+  function rgbToHex(c) {
+    return '#' + c.map(v => v.toString(16).padStart(2, '0')).join('');
+  }
+
+  function rebuildColorSwatches(n) {
+    const row = el('colors' + n);
+    row.innerHTML = '';
+    customPalettes[n].forEach((c, i) => {
+      const swatch = document.createElement('div');
+      swatch.className = 'color-swatch';
+      swatch.style.background = `rgb(${c[0]},${c[1]},${c[2]})`;
+
+      const input = document.createElement('input');
+      input.type = 'color';
+      input.value = rgbToHex(c);
+      input.addEventListener('input', () => {
+        customPalettes[n][i] = hexToRgb(input.value);
+        swatch.style.background = `rgb(${customPalettes[n][i].join(',')})`;
+        updatePalettePreviews();
+      });
+
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'color-swatch-remove';
+      removeBtn.textContent = '×';
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (customPalettes[n].length > 2) {
+          customPalettes[n].splice(i, 1);
+          updatePalettePreviews();
+        }
+      });
+
+      swatch.appendChild(input);
+      swatch.appendChild(removeBtn);
+      row.appendChild(swatch);
+    });
+  }
+
+  // Add color buttons
+  for (const n of [1, 2]) {
+    el('addColor' + n).addEventListener('click', () => {
+      if (customPalettes[n].length < 16) {
+        // Pick a random vibrant color
+        const hue = Math.random() * 360;
+        const r = Math.round(128 + 127 * Math.cos(hue * Math.PI / 180));
+        const g = Math.round(128 + 127 * Math.cos((hue - 120) * Math.PI / 180));
+        const b = Math.round(128 + 127 * Math.cos((hue + 120) * Math.PI / 180));
+        customPalettes[n].push([r, g, b]);
+        updatePalettePreviews();
+      }
+    });
   }
 
   // Listen on all controls
@@ -468,7 +636,7 @@
   // ── Render ──
   let time = 0;
 
-  function renderLayer(layer, t) {
+  function renderLayer(layer, t, layerNum) {
     const pixels = new Float32Array(RW * RH * 3);
 
     for (let y = 0; y < RH; y++) {
@@ -499,7 +667,7 @@
 
         // Palette cycling
         const palT = v + layer.palSpeed * t * 0.001;
-        const color = samplePalette(layer.palette, palT);
+        const color = sampleLayerPalette(layerNum, layer.palette, palT);
 
         const idx = (y * RW + x) * 3;
         pixels[idx] = color[0];
@@ -516,8 +684,8 @@
     const l1 = getLayer(1);
     const l2 = getLayer(2);
 
-    const p1 = renderLayer(l1, time);
-    const p2 = renderLayer(l2, time);
+    const p1 = renderLayer(l1, time, 1);
+    const p2 = renderLayer(l2, time, 2);
 
     const op2 = l2.opacity;
     const op1 = 1;
