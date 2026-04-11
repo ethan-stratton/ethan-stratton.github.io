@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Earthbound Background Generator — strattao</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400&family=JetBrains+Mono:wght@300;400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #08080c;
+    color: #c8c0b8;
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Canvas fills viewport ── */
+  #bg {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 0;
+    image-rendering: pixelated;
+  }
+
+  /* ── Controls overlay ── */
+  .controls {
+    position: fixed;
+    top: 0; right: 0;
+    width: 320px;
+    height: 100vh;
+    z-index: 10;
+    background: rgba(8, 8, 14, 0.92);
+    border-left: 1px solid rgba(184, 156, 255, 0.12);
+    padding: 24px 20px;
+    overflow-y: auto;
+    backdrop-filter: blur(12px);
+    transition: transform 0.3s;
+  }
+
+  .controls.hidden { transform: translateX(100%); }
+
+  .controls h1 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 1.1rem;
+    color: #e0d8f0;
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+    text-shadow: 0 0 16px rgba(184, 156, 255, 0.25);
+  }
+
+  .controls .sub {
+    font-size: 0.7rem;
+    color: #585050;
+    margin-bottom: 24px;
+  }
+
+  .controls .sub a {
+    color: #b89cff;
+    text-decoration: none;
+  }
+  .controls .sub a:hover {
+    text-shadow: 0 0 8px rgba(184, 156, 255, 0.5);
+  }
+
+  .layer-section {
+    margin-bottom: 20px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(184, 156, 255, 0.08);
+    border-radius: 6px;
+  }
+
+  .layer-section h2 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 0.85rem;
+    color: #a898c8;
+    margin-bottom: 14px;
+    letter-spacing: 0.05em;
+  }
+
+  label {
+    display: block;
+    font-size: 0.72rem;
+    color: #706860;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    margin-top: 10px;
+  }
+
+  label:first-child { margin-top: 0; }
+
+  input[type="range"] {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(184, 156, 255, 0.12);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #b89cff;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(184, 156, 255, 0.4);
+  }
+
+  select {
+    width: 100%;
+    padding: 6px 8px;
+    background: rgba(184, 156, 255, 0.06);
+    border: 1px solid rgba(184, 156, 255, 0.15);
+    border-radius: 4px;
+    color: #c8c0b8;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    outline: none;
+  }
+
+  select:focus { border-color: rgba(184, 156, 255, 0.4); }
+
+  .val {
+    float: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: #b89cff;
+  }
+
+  /* Palette preview */
+  .palette-preview {
+    display: flex;
+    height: 16px;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 6px;
+    border: 1px solid rgba(184, 156, 255, 0.1);
+  }
+
+  .palette-preview div { flex: 1; }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 8px;
+    background: rgba(184, 156, 255, 0.08);
+    border: 1px solid rgba(184, 156, 255, 0.2);
+    border-radius: 4px;
+    color: #b89cff;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    letter-spacing: 0.03em;
+  }
+
+  .btn:hover {
+    background: rgba(184, 156, 255, 0.15);
+    border-color: rgba(184, 156, 255, 0.4);
+  }
+
+  /* Toggle button */
+  #toggle-panel {
+    position: fixed;
+    top: 16px; right: 16px;
+    z-index: 20;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: rgba(8, 8, 14, 0.8);
+    border: 1px solid rgba(184, 156, 255, 0.2);
+    color: #b89cff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+    backdrop-filter: blur(8px);
+  }
+
+  #toggle-panel:hover { background: rgba(184, 156, 255, 0.15); }
+
+  .presets-section { margin-top: 16px; }
+
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .preset-btn {
+    padding: 6px;
+    background: rgba(184, 156, 255, 0.04);
+    border: 1px solid rgba(184, 156, 255, 0.1);
+    border-radius: 4px;
+    color: #908880;
+    font-size: 0.68rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .preset-btn:hover {
+    background: rgba(184, 156, 255, 0.12);
+    color: #dcc8ff;
+    border-color: rgba(184, 156, 255, 0.3);
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<button id="toggle-panel">⚙</button>
+
+<div class="controls" id="panel">
+  <h1>EB Backgrounds</h1>
+  <p class="sub">Earthbound-style generator · <a href="/">← strattao</a></p>
+
+  <!-- Layer 1 -->
+  <div class="layer-section">
+    <h2>Layer 1</h2>
+
+    <label>Palette <span class="val" id="v-pal1">psychedelic</span></label>
+    <select id="palette1">
+      <option value="psychedelic">Psychedelic</option>
+      <option value="fire">Fire</option>
+      <option value="ocean">Ocean</option>
+      <option value="neon">Neon</option>
+      <option value="earthtone">Earth Tones</option>
+      <option value="void">Void</option>
+      <option value="candy">Candy</option>
+      <option value="aurora">Aurora</option>
+    </select>
+    <div class="palette-preview" id="pp1"></div>
+
+    <label>Distortion Type <span class="val" id="v-dist1">horizontal</span></label>
+    <select id="distType1">
+      <option value="0">Horizontal</option>
+      <option value="1">Interlaced</option>
+      <option value="2">Compression</option>
+    </select>
+
+    <label>Amplitude <span class="val" id="v-amp1">4.0</span></label>
+    <input type="range" id="amp1" min="0" max="20" step="0.5" value="4">
+
+    <label>Frequency <span class="val" id="v-freq1">0.02</span></label>
+    <input type="range" id="freq1" min="0.001" max="0.1" step="0.001" value="0.02">
+
+    <label>Speed <span class="val" id="v-speed1">0.03</span></label>
+    <input type="range" id="speed1" min="0" max="0.15" step="0.005" value="0.03">
+
+    <label>Scroll X <span class="val" id="v-sx1">0.5</span></label>
+    <input type="range" id="scrollX1" min="-3" max="3" step="0.1" value="0.5">
+
+    <label>Scroll Y <span class="val" id="v-sy1">0.3</span></label>
+    <input type="range" id="scrollY1" min="-3" max="3" step="0.1" value="0.3">
+
+    <label>Palette Speed <span class="val" id="v-ps1">1.0</span></label>
+    <input type="range" id="palSpeed1" min="0" max="5" step="0.1" value="1">
+
+    <label>Scale <span class="val" id="v-scale1">1.0</span></label>
+    <input type="range" id="scale1" min="0.2" max="4" step="0.1" value="1">
+  </div>
+
+  <!-- Layer 2 -->
+  <div class="layer-section">
+    <h2>Layer 2</h2>
+
+    <label>Palette <span class="val" id="v-pal2">ocean</span></label>
+    <select id="palette2">
+      <option value="psychedelic">Psychedelic</option>
+      <option value="fire">Fire</option>
+      <option value="ocean" selected>Ocean</option>
+      <option value="neon">Neon</option>
+      <option value="earthtone">Earth Tones</option>
+      <option value="void">Void</option>
+      <option value="candy">Candy</option>
+      <option value="aurora">Aurora</option>
+    </select>
+    <div class="palette-preview" id="pp2"></div>
+
+    <label>Distortion Type <span class="val" id="v-dist2">horizontal</span></label>
+    <select id="distType2">
+      <option value="0">Horizontal</option>
+      <option value="1">Interlaced</option>
+      <option value="2">Compression</option>
+    </select>
+
+    <label>Amplitude <span class="val" id="v-amp2">6.0</span></label>
+    <input type="range" id="amp2" min="0" max="20" step="0.5" value="6">
+
+    <label>Frequency <span class="val" id="v-freq2">0.015</span></label>
+    <input type="range" id="freq2" min="0.001" max="0.1" step="0.001" value="0.015">
+
+    <label>Speed <span class="val" id="v-speed2">0.02</span></label>
+    <input type="range" id="speed2" min="0" max="0.15" step="0.005" value="0.02">
+
+    <label>Scroll X <span class="val" id="v-sx2">-0.3</span></label>
+    <input type="range" id="scrollX2" min="-3" max="3" step="0.1" value="-0.3">
+
+    <label>Scroll Y <span class="val" id="v-sy2">0.5</span></label>
+    <input type="range" id="scrollY2" min="-3" max="3" step="0.1" value="0.5">
+
+    <label>Palette Speed <span class="val" id="v-ps2">0.8</span></label>
+    <input type="range" id="palSpeed2" min="0" max="5" step="0.1" value="0.8">
+
+    <label>Scale <span class="val" id="v-scale2">1.5</span></label>
+    <input type="range" id="scale2" min="0.2" max="4" step="0.1" value="1.5">
+
+    <label>Opacity <span class="val" id="v-op2">0.5</span></label>
+    <input type="range" id="opacity2" min="0" max="1" step="0.05" value="0.5">
+  </div>
+
+  <!-- Presets -->
+  <div class="presets-section">
+    <h2 style="font-family:'Cinzel',serif;font-weight:400;font-size:0.85rem;color:#a898c8;letter-spacing:0.05em;">Presets</h2>
+    <div class="preset-grid" id="presets"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn" id="randomize">🎲 Randomize</button>
+    <button class="btn" id="export">📷 Export PNG</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('bg');
+  const ctx = canvas.getContext('2d');
+
+  // Render at lower res for that chunky pixel look, then CSS scales up
+  const RW = 256, RH = 224;
+  canvas.width = RW;
+  canvas.height = RH;
+
+  const imgData = ctx.createImageData(RW, RH);
+  const buf = imgData.data;
+
+  // ── Palettes ──
+  const palettes = {
+    psychedelic: [
+      [148, 0, 211], [75, 0, 130], [0, 0, 255], [0, 255, 0],
+      [255, 255, 0], [255, 127, 0], [255, 0, 0], [148, 0, 211]
+    ],
+    fire: [
+      [20, 0, 0], [80, 0, 0], [160, 30, 0], [220, 80, 0],
+      [255, 160, 20], [255, 220, 80], [255, 255, 180], [255, 220, 80]
+    ],
+    ocean: [
+      [0, 5, 30], [0, 20, 80], [0, 60, 140], [0, 120, 180],
+      [40, 180, 220], [120, 220, 255], [200, 240, 255], [40, 180, 220]
+    ],
+    neon: [
+      [255, 0, 100], [255, 0, 255], [100, 0, 255], [0, 100, 255],
+      [0, 255, 200], [0, 255, 100], [255, 255, 0], [255, 0, 100]
+    ],
+    earthtone: [
+      [40, 25, 15], [80, 50, 25], [140, 90, 40], [180, 130, 60],
+      [200, 170, 100], [220, 200, 150], [180, 160, 120], [100, 70, 35]
+    ],
+    void: [
+      [0, 0, 0], [20, 0, 40], [50, 0, 80], [80, 20, 120],
+      [50, 0, 80], [20, 0, 40], [5, 0, 10], [0, 0, 0]
+    ],
+    candy: [
+      [255, 100, 150], [255, 150, 200], [200, 150, 255], [150, 200, 255],
+      [150, 255, 200], [200, 255, 150], [255, 255, 150], [255, 200, 150]
+    ],
+    aurora: [
+      [0, 10, 20], [0, 40, 40], [0, 120, 80], [0, 200, 100],
+      [80, 255, 140], [0, 200, 180], [40, 80, 160], [0, 20, 60]
+    ]
+  };
+
+  function samplePalette(pal, t) {
+    const colors = palettes[pal];
+    const n = colors.length;
+    const idx = ((t % 1) + 1) % 1 * n;
+    const i0 = Math.floor(idx) % n;
+    const i1 = (i0 + 1) % n;
+    const f = idx - Math.floor(idx);
+    return [
+      colors[i0][0] + (colors[i1][0] - colors[i0][0]) * f,
+      colors[i0][1] + (colors[i1][1] - colors[i0][1]) * f,
+      colors[i0][2] + (colors[i1][2] - colors[i0][2]) * f
+    ];
+  }
+
+  // ── Generate base pattern (tiling, stripe/checker mix) ──
+  function basePattern(x, y, scale) {
+    const sx = x / (32 * scale), sy = y / (32 * scale);
+    const v = (Math.sin(sx * 6.28) * Math.cos(sy * 6.28)
+             + Math.sin((sx + sy) * 4.5)
+             + Math.cos((sx - sy) * 3.7)) / 3;
+    return (v + 1) / 2; // 0..1
+  }
+
+  // ── Controls ──
+  function el(id) { return document.getElementById(id); }
+
+  function getLayer(n) {
+    return {
+      palette: el('palette' + n).value,
+      distType: parseInt(el('distType' + n).value),
+      amp: parseFloat(el('amp' + n).value),
+      freq: parseFloat(el('freq' + n).value),
+      speed: parseFloat(el('speed' + n).value),
+      scrollX: parseFloat(el('scrollX' + n).value),
+      scrollY: parseFloat(el('scrollY' + n).value),
+      palSpeed: parseFloat(el('palSpeed' + n).value),
+      scale: parseFloat(el('scale' + n).value),
+      opacity: n === 2 ? parseFloat(el('opacity2').value) : 1,
+    };
+  }
+
+  function updateLabels() {
+    for (const n of [1, 2]) {
+      el('v-pal' + n).textContent = el('palette' + n).value;
+      el('v-dist' + n).textContent = ['horizontal', 'interlaced', 'compression'][parseInt(el('distType' + n).value)];
+      el('v-amp' + n).textContent = parseFloat(el('amp' + n).value).toFixed(1);
+      el('v-freq' + n).textContent = parseFloat(el('freq' + n).value).toFixed(3);
+      el('v-speed' + n).textContent = parseFloat(el('speed' + n).value).toFixed(3);
+      el('v-sx' + n).textContent = parseFloat(el('scrollX' + n).value).toFixed(1);
+      el('v-sy' + n).textContent = parseFloat(el('scrollY' + n).value).toFixed(1);
+      el('v-ps' + n).textContent = parseFloat(el('palSpeed' + n).value).toFixed(1);
+      el('v-scale' + n).textContent = parseFloat(el('scale' + n).value).toFixed(1);
+    }
+    el('v-op2').textContent = parseFloat(el('opacity2').value).toFixed(2);
+    updatePalettePreviews();
+  }
+
+  function updatePalettePreviews() {
+    for (const n of [1, 2]) {
+      const pp = el('pp' + n);
+      const pal = palettes[el('palette' + n).value];
+      pp.innerHTML = '';
+      pal.forEach(c => {
+        const d = document.createElement('div');
+        d.style.background = `rgb(${c[0]},${c[1]},${c[2]})`;
+        pp.appendChild(d);
+      });
+    }
+  }
+
+  // Listen on all controls
+  document.querySelectorAll('.controls input, .controls select').forEach(el => {
+    el.addEventListener('input', updateLabels);
+  });
+
+  // ── Render ──
+  let time = 0;
+
+  function renderLayer(layer, t) {
+    const pixels = new Float32Array(RW * RH * 3);
+
+    for (let y = 0; y < RH; y++) {
+      // Compute offset for this scanline
+      const offset = layer.amp * Math.sin(layer.freq * y + layer.speed * t);
+      
+      for (let x = 0; x < RW; x++) {
+        let sx = x, sy = y;
+
+        // Apply distortion
+        if (layer.distType === 0) {
+          // Horizontal: shift each line
+          sx = x + offset;
+        } else if (layer.distType === 1) {
+          // Interlaced: even lines shift left, odd shift right
+          sx = x + (y % 2 === 0 ? offset : -offset);
+        } else if (layer.distType === 2) {
+          // Vertical compression
+          sy = y + offset;
+        }
+
+        // Add scrolling
+        sx += layer.scrollX * t;
+        sy += layer.scrollY * t;
+
+        // Get base pattern value
+        const v = basePattern(sx, sy, layer.scale);
+
+        // Palette cycling
+        const palT = v + layer.palSpeed * t * 0.001;
+        const color = samplePalette(layer.palette, palT);
+
+        const idx = (y * RW + x) * 3;
+        pixels[idx] = color[0];
+        pixels[idx + 1] = color[1];
+        pixels[idx + 2] = color[2];
+      }
+    }
+
+    return pixels;
+  }
+
+  function draw() {
+    time++;
+    const l1 = getLayer(1);
+    const l2 = getLayer(2);
+
+    const p1 = renderLayer(l1, time);
+    const p2 = renderLayer(l2, time);
+
+    const op2 = l2.opacity;
+    const op1 = 1;
+
+    for (let y = 0; y < RH; y++) {
+      for (let x = 0; x < RW; x++) {
+        const pi = (y * RW + x) * 3;
+        const bi = (y * RW + x) * 4;
+
+        // Blend layers
+        const r = p1[pi] * (1 - op2) + p2[pi] * op2;
+        const g = p1[pi + 1] * (1 - op2) + p2[pi + 1] * op2;
+        const b = p1[pi + 2] * (1 - op2) + p2[pi + 2] * op2;
+
+        buf[bi] = r | 0;
+        buf[bi + 1] = g | 0;
+        buf[bi + 2] = b | 0;
+        buf[bi + 3] = 255;
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    requestAnimationFrame(draw);
+  }
+
+  // ── Presets ──
+  const presets = {
+    'Giygas': {
+      l1: { palette: 'fire', distType: 2, amp: 12, freq: 0.04, speed: 0.06, scrollX: 0, scrollY: 1.5, palSpeed: 2.0, scale: 0.8 },
+      l2: { palette: 'void', distType: 1, amp: 8, freq: 0.03, speed: 0.04, scrollX: 0.5, scrollY: -0.5, palSpeed: 1.5, scale: 1.2, opacity: 0.6 }
+    },
+    'Starmen': {
+      l1: { palette: 'neon', distType: 0, amp: 3, freq: 0.025, speed: 0.03, scrollX: 1, scrollY: 0.2, palSpeed: 1.0, scale: 1.0 },
+      l2: { palette: 'void', distType: 0, amp: 5, freq: 0.015, speed: 0.02, scrollX: -0.5, scrollY: 0.8, palSpeed: 0.5, scale: 2.0, opacity: 0.4 }
+    },
+    'Moonside': {
+      l1: { palette: 'psychedelic', distType: 1, amp: 6, freq: 0.035, speed: 0.05, scrollX: 0.3, scrollY: 0.3, palSpeed: 2.5, scale: 0.6 },
+      l2: { palette: 'neon', distType: 2, amp: 10, freq: 0.02, speed: 0.03, scrollX: -0.8, scrollY: 1.0, palSpeed: 1.8, scale: 1.0, opacity: 0.55 }
+    },
+    'Magicant': {
+      l1: { palette: 'candy', distType: 0, amp: 2, freq: 0.02, speed: 0.015, scrollX: 0.2, scrollY: 0.5, palSpeed: 0.8, scale: 1.5 },
+      l2: { palette: 'aurora', distType: 0, amp: 3, freq: 0.01, speed: 0.01, scrollX: -0.1, scrollY: 0.3, palSpeed: 0.5, scale: 2.5, opacity: 0.4 }
+    },
+    'Deep Dark': {
+      l1: { palette: 'void', distType: 2, amp: 8, freq: 0.05, speed: 0.04, scrollX: 0, scrollY: 0.8, palSpeed: 0.5, scale: 1.0 },
+      l2: { palette: 'ocean', distType: 1, amp: 4, freq: 0.03, speed: 0.02, scrollX: 0.3, scrollY: -0.3, palSpeed: 0.8, scale: 1.8, opacity: 0.35 }
+    },
+    'Summers': {
+      l1: { palette: 'ocean', distType: 0, amp: 3, freq: 0.015, speed: 0.02, scrollX: 0.8, scrollY: 0.2, palSpeed: 0.6, scale: 1.2 },
+      l2: { palette: 'candy', distType: 0, amp: 2, freq: 0.01, speed: 0.015, scrollX: -0.3, scrollY: 0.4, palSpeed: 0.4, scale: 2.0, opacity: 0.3 }
+    },
+    'Fourside': {
+      l1: { palette: 'neon', distType: 1, amp: 5, freq: 0.04, speed: 0.05, scrollX: 1.5, scrollY: 0, palSpeed: 3.0, scale: 0.5 },
+      l2: { palette: 'fire', distType: 0, amp: 3, freq: 0.02, speed: 0.03, scrollX: -1.0, scrollY: 1.0, palSpeed: 1.0, scale: 1.5, opacity: 0.45 }
+    },
+    'Aurora': {
+      l1: { palette: 'aurora', distType: 0, amp: 4, freq: 0.012, speed: 0.015, scrollX: 0.1, scrollY: 0.6, palSpeed: 0.7, scale: 1.8 },
+      l2: { palette: 'psychedelic', distType: 2, amp: 6, freq: 0.025, speed: 0.02, scrollX: -0.2, scrollY: 0.4, palSpeed: 1.2, scale: 1.0, opacity: 0.3 }
+    },
+  };
+
+  function applyPreset(name) {
+    const p = presets[name];
+    if (!p) return;
+    const map1 = { palette: 'palette1', distType: 'distType1', amp: 'amp1', freq: 'freq1', speed: 'speed1', scrollX: 'scrollX1', scrollY: 'scrollY1', palSpeed: 'palSpeed1', scale: 'scale1' };
+    const map2 = { palette: 'palette2', distType: 'distType2', amp: 'amp2', freq: 'freq2', speed: 'speed2', scrollX: 'scrollX2', scrollY: 'scrollY2', palSpeed: 'palSpeed2', scale: 'scale2', opacity: 'opacity2' };
+    for (const [k, id] of Object.entries(map1)) {
+      if (p.l1[k] !== undefined) el(id).value = p.l1[k];
+    }
+    for (const [k, id] of Object.entries(map2)) {
+      if (p.l2[k] !== undefined) el(id).value = p.l2[k];
+    }
+    updateLabels();
+  }
+
+  // Build preset buttons
+  const presetGrid = el('presets');
+  for (const name of Object.keys(presets)) {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = name;
+    btn.addEventListener('click', () => applyPreset(name));
+    presetGrid.appendChild(btn);
+  }
+
+  // ── Randomize ──
+  el('randomize').addEventListener('click', () => {
+    const palNames = Object.keys(palettes);
+    for (const n of [1, 2]) {
+      el('palette' + n).value = palNames[Math.floor(Math.random() * palNames.length)];
+      el('distType' + n).value = Math.floor(Math.random() * 3);
+      el('amp' + n).value = (1 + Math.random() * 15).toFixed(1);
+      el('freq' + n).value = (0.005 + Math.random() * 0.06).toFixed(3);
+      el('speed' + n).value = (0.005 + Math.random() * 0.08).toFixed(3);
+      el('scrollX' + n).value = (-2 + Math.random() * 4).toFixed(1);
+      el('scrollY' + n).value = (-2 + Math.random() * 4).toFixed(1);
+      el('palSpeed' + n).value = (0.2 + Math.random() * 3).toFixed(1);
+      el('scale' + n).value = (0.3 + Math.random() * 3).toFixed(1);
+    }
+    el('opacity2').value = (0.2 + Math.random() * 0.6).toFixed(2);
+    updateLabels();
+  });
+
+  // ── Export ──
+  el('export').addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.download = 'earthbound-bg.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  });
+
+  // ── Toggle Panel ──
+  el('toggle-panel').addEventListener('click', () => {
+    el('panel').classList.toggle('hidden');
+    el('toggle-panel').style.right = el('panel').classList.contains('hidden') ? '16px' : '336px';
+  });
+
+  // ── Init ──
+  updateLabels();
+  draw();
+})();
+</script>
+
+</body>
+</html>
