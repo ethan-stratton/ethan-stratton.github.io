@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -27,88 +26,119 @@
     pointer-events: none;
   }
 
-  .content {
+  /* ── Header ── */
+  header {
     position: relative;
     z-index: 1;
-    max-width: 720px;
-    margin: 0 auto;
-    padding: 120px 24px 80px;
+    text-align: center;
+    padding: 80px 24px 40px;
+    border-bottom: 1px solid rgba(184, 156, 255, 0.08);
   }
 
-  h1, h2 {
+  header h1 {
     font-family: 'Cinzel', serif;
     font-weight: 400;
-    letter-spacing: 0.08em;
-  }
-
-  h1 {
     font-size: 2.8rem;
     color: #e8e0d8;
-    margin-bottom: 8px;
+    letter-spacing: 0.08em;
     text-shadow: 0 0 30px rgba(180, 140, 255, 0.3);
   }
 
-  .subtitle {
-    font-size: 0.95rem;
+  header .subtitle {
+    font-size: 0.9rem;
     color: #706860;
-    margin-bottom: 80px;
     letter-spacing: 0.04em;
+    margin-top: 8px;
   }
 
-  h2 {
-    font-size: 1.3rem;
-    color: #a898c8;
-    margin-bottom: 24px;
-    text-shadow: 0 0 20px rgba(168, 152, 200, 0.25);
+  /* ── Layout ── */
+  .page {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+    gap: 48px;
   }
 
-  section {
-    margin-bottom: 72px;
+  /* ── Main Column (posts) ── */
+  .main {
+    flex: 1;
+    min-width: 0;
   }
 
-  a {
+  .post {
+    margin-bottom: 56px;
+    padding-bottom: 56px;
+    border-bottom: 1px solid rgba(184, 156, 255, 0.06);
+  }
+
+  .post:last-child {
+    border-bottom: none;
+  }
+
+  .post-date {
+    font-size: 0.75rem;
+    color: #585050;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .post h2 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 1.5rem;
+    color: #e0d8f0;
+    letter-spacing: 0.04em;
+    margin-bottom: 16px;
+    text-shadow: 0 0 20px rgba(168, 152, 200, 0.2);
+  }
+
+  .post h3 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 1.1rem;
+    color: #c0b8d8;
+    margin: 28px 0 12px;
+  }
+
+  .post p {
+    font-size: 0.92rem;
+    line-height: 1.75;
+    color: #a8a098;
+    margin-bottom: 14px;
+  }
+
+  .post ul {
+    margin: 8px 0 16px 20px;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: #a8a098;
+  }
+
+  .post img {
+    width: 100%;
+    border-radius: 6px;
+    margin: 16px 0;
+    border: 1px solid rgba(184, 156, 255, 0.1);
+  }
+
+  .post a {
     color: #b89cff;
     text-decoration: none;
     transition: color 0.3s, text-shadow 0.3s;
-    text-shadow: 0 0 8px rgba(184, 156, 255, 0.0);
   }
 
-  a:hover {
+  .post a:hover {
     color: #dcc8ff;
     text-shadow: 0 0 12px rgba(184, 156, 255, 0.6), 0 0 30px rgba(184, 156, 255, 0.3);
   }
 
-  .card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(184, 156, 255, 0.1);
-    border-radius: 8px;
-    padding: 24px;
-    margin-bottom: 16px;
-    transition: border-color 0.4s, box-shadow 0.4s;
-  }
-
-  .card:hover {
-    border-color: rgba(184, 156, 255, 0.3);
-    box-shadow: 0 0 20px rgba(184, 156, 255, 0.08);
-  }
-
-  .card h3 {
-    font-family: 'Cinzel', serif;
-    font-weight: 400;
-    font-size: 1.1rem;
-    color: #e0d8f0;
-    margin-bottom: 8px;
-  }
-
-  .card p {
-    font-size: 0.9rem;
-    line-height: 1.6;
-    color: #908880;
-  }
-
   .tag {
     display: inline-block;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: #706068;
@@ -116,38 +146,101 @@
     border-radius: 4px;
     padding: 2px 8px;
     margin-right: 6px;
-    margin-top: 10px;
   }
 
-  .lab-grid {
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+  }
+
+  .sidebar h2 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 0.9rem;
+    color: #a898c8;
+    letter-spacing: 0.08em;
+    margin-bottom: 20px;
+    text-shadow: 0 0 16px rgba(168, 152, 200, 0.2);
+  }
+
+  .sidebar-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: 10px;
   }
 
-  @media (max-width: 560px) {
-    .lab-grid { grid-template-columns: 1fr; }
-    h1 { font-size: 2rem; }
+  .sidebar-tile {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(184, 156, 255, 0.1);
+    transition: border-color 0.4s, box-shadow 0.4s, transform 0.3s;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.03);
+    text-decoration: none;
   }
 
-  .card-coming {
-    opacity: 0.5;
-    font-style: italic;
+  .sidebar-tile:hover {
+    border-color: rgba(184, 156, 255, 0.4);
+    box-shadow: 0 0 16px rgba(184, 156, 255, 0.12);
+    transform: scale(1.03);
   }
 
-  .divider {
-    width: 40px;
-    height: 1px;
-    background: rgba(184, 156, 255, 0.2);
-    margin: 0 0 72px 0;
+  .sidebar-tile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
+  .tile-label {
+    font-family: 'Cinzel', serif;
+    font-size: 0.6rem;
+    color: #a898c8;
+    text-align: center;
+    letter-spacing: 0.06em;
+    padding: 8px 4px;
+    line-height: 1.3;
+  }
+
+  /* Placeholder canvas tiles */
+  .tile-canvas {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0; left: 0;
+  }
+
+  /* ── Footer ── */
   footer {
+    position: relative;
+    z-index: 1;
     text-align: center;
     color: #403838;
     font-size: 0.75rem;
     padding: 40px 0;
     letter-spacing: 0.04em;
+    border-top: 1px solid rgba(184, 156, 255, 0.06);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .page {
+      flex-direction: column-reverse;
+      padding: 32px 16px 60px;
+      gap: 40px;
+    }
+    .sidebar {
+      width: 100%;
+    }
+    .sidebar-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+    header h1 { font-size: 2rem; }
+    header { padding: 48px 16px 32px; }
   }
 </style>
 </head>
@@ -155,59 +248,76 @@
 
 <canvas id="starfield"></canvas>
 
-<div class="content">
-
+<header>
   <h1>strattao</h1>
   <p class="subtitle">games · experiments · writing</p>
+</header>
 
-  <div class="divider"></div>
+<div class="page">
 
-  <section>
-    <h2>Games</h2>
-    <a href="https://e-man-games.itch.io/little-guy" target="_blank" rel="noopener">
-      <div class="card">
-        <h3>Little Guy</h3>
-        <p>A small creature discovers words, edges, and why. An experimental narrative game about what happens when something made of code starts to wonder.</p>
-        <span class="tag">browser</span>
-        <span class="tag">narrative</span>
-        <span class="tag">experimental</span>
-      </div>
-    </a>
-  </section>
+  <!-- ── Main Column ── -->
+  <main class="main">
 
-  <section>
-    <h2>Lab</h2>
-    <div class="lab-grid">
-      <div class="card card-coming">
-        <h3>Earthbound Backgrounds</h3>
-        <p>Psychedelic pattern generator inspired by Earthbound's battle backgrounds. Sine waves, palette cycling, distortion.</p>
-        <span class="tag">coming soon</span>
+    <article class="post">
+      <div class="post-date">April 11, 2026</div>
+      <h2>Little Guy Is Out</h2>
+      <p>I shipped my first game. It's a small, experimental thing — a little creature made of code who discovers words, finds edges, and eventually asks <em>why</em>.</p>
+      <p>It's browser-playable, free, and takes about 10 minutes. There are four endings depending on how you treat him.</p>
+      <p>I built it in vanilla JavaScript and HTML5 Canvas. One file. No engine, no framework. Just code and a question.</p>
+      <p><a href="https://e-man-games.itch.io/little-guy" target="_blank" rel="noopener">Play it on itch.io →</a></p>
+      <span class="tag">browser</span>
+      <span class="tag">narrative</span>
+      <span class="tag">experimental</span>
+    </article>
+
+    <article class="post">
+      <div class="post-date">April 11, 2026</div>
+      <h2>Hello, World</h2>
+      <p>This site is new. I'm building it by hand — no templates, no CMS, no React. Just HTML, CSS, and JavaScript the way God intended.</p>
+      <p>The plan: games I make go here. Experiments go here. When I have something worth writing, that goes here too. No schedule, no content treadmill. Finished things on a shelf.</p>
+      <p>More soon.</p>
+    </article>
+
+  </main>
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <h2>Projects</h2>
+    <div class="sidebar-grid">
+
+      <a href="https://e-man-games.itch.io/little-guy" target="_blank" rel="noopener" class="sidebar-tile" title="Little Guy">
+        <canvas class="tile-canvas" data-tile="littleguy"></canvas>
+        <div class="tile-label" style="position:relative;z-index:1;">Little Guy</div>
+      </a>
+
+      <div class="sidebar-tile" title="Earthbound Backgrounds — Coming Soon">
+        <canvas class="tile-canvas" data-tile="earthbound"></canvas>
+        <div class="tile-label" style="position:relative;z-index:1;">EB Backgrounds</div>
       </div>
-      <div class="card card-coming">
-        <h3>Visual Sandbox</h3>
-        <p>Interactive demos of 2D game art techniques — LUT color grading, bloom, parallax, particles, noise debanding.</p>
-        <span class="tag">coming soon</span>
+
+      <div class="sidebar-tile" title="Visual Sandbox — Coming Soon">
+        <canvas class="tile-canvas" data-tile="sandbox"></canvas>
+        <div class="tile-label" style="position:relative;z-index:1;">Visual Sandbox</div>
       </div>
+
+      <div class="sidebar-tile" title="Iron & Ether — In Development">
+        <canvas class="tile-canvas" data-tile="ironether"></canvas>
+        <div class="tile-label" style="position:relative;z-index:1;">Iron & Ether</div>
+      </div>
+
     </div>
-  </section>
-
-  <section>
-    <h2>Writing</h2>
-    <div class="card card-coming">
-      <p>Something will go here when something is worth saying.</p>
-    </div>
-  </section>
+  </aside>
 
 </div>
 
 <footer>built by hand</footer>
 
 <script>
+// ── Starfield ──
 (function() {
   const canvas = document.getElementById('starfield');
   const ctx = canvas.getContext('2d');
   let w, h, stars;
-
   const STAR_COUNT = 260;
   const LAYERS = [
     { speed: 0.15, sizeMin: 0.4, sizeMax: 1.0, alpha: 0.35 },
@@ -215,18 +325,14 @@
     { speed: 0.7,  sizeMin: 1.0, sizeMax: 2.0, alpha: 0.8 },
   ];
 
-  function resize() {
-    w = canvas.width = window.innerWidth;
-    h = canvas.height = window.innerHeight;
-  }
+  function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
 
   function createStars() {
     stars = [];
     for (let i = 0; i < STAR_COUNT; i++) {
       const layer = LAYERS[Math.floor(Math.random() * LAYERS.length)];
       stars.push({
-        x: Math.random() * w,
-        y: Math.random() * h,
+        x: Math.random() * w, y: Math.random() * h,
         size: layer.sizeMin + Math.random() * (layer.sizeMax - layer.sizeMin),
         speed: layer.speed + (Math.random() - 0.5) * 0.05,
         alpha: layer.alpha * (0.6 + Math.random() * 0.4),
@@ -241,20 +347,16 @@
   let time = 0;
   function draw() {
     ctx.clearRect(0, 0, w, h);
-    time += 1;
-
+    time++;
     for (const s of stars) {
       s.y -= s.speed;
       if (s.y < -4) { s.y = h + 4; s.x = Math.random() * w; }
-
       const twinkle = 0.5 + 0.5 * Math.sin(time * s.twinkleSpeed + s.twinkleOffset);
       const a = s.alpha * (0.4 + 0.6 * twinkle);
-
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
       ctx.fillStyle = `hsla(${s.hue}, ${s.sat}%, 88%, ${a})`;
       ctx.fill();
-
       if (s.size > 1.2) {
         ctx.beginPath();
         ctx.arc(s.x, s.y, s.size * 3, 0, Math.PI * 2);
@@ -262,14 +364,108 @@
         ctx.fill();
       }
     }
-
     requestAnimationFrame(draw);
   }
 
   window.addEventListener('resize', () => { resize(); createStars(); });
-  resize();
-  createStars();
-  draw();
+  resize(); createStars(); draw();
+})();
+
+// ── Sidebar Tile Mini-Canvases ──
+(function() {
+  const tiles = document.querySelectorAll('.tile-canvas');
+  let time = 0;
+
+  tiles.forEach(c => {
+    c.width = 200; c.height = 200;
+  });
+
+  function drawTiles() {
+    time += 0.02;
+    tiles.forEach(c => {
+      const ctx = c.getContext('2d');
+      const w = c.width, h = c.height;
+      const type = c.dataset.tile;
+
+      ctx.clearRect(0, 0, w, h);
+
+      if (type === 'littleguy') {
+        // Gentle wandering dot (the little guy)
+        ctx.fillStyle = 'rgba(10,10,20,0.9)';
+        ctx.fillRect(0, 0, w, h);
+        const gx = w/2 + Math.sin(time * 0.7) * 30;
+        const gy = h/2 + Math.cos(time * 0.5) * 20;
+        ctx.beginPath();
+        ctx.arc(gx, gy, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#e0d8f0';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(gx, gy, 16, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(184,156,255,0.12)';
+        ctx.fill();
+      }
+
+      else if (type === 'earthbound') {
+        // EB-style psychedelic stripes
+        const imgData = ctx.createImageData(w, h);
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const v = Math.sin(x * 0.05 + time) + Math.sin(y * 0.04 - time * 0.7) + Math.sin((x + y) * 0.03 + time * 0.5);
+            const t = (v + 3) / 6;
+            const i = (y * w + x) * 4;
+            imgData.data[i]     = 40 + t * 100;
+            imgData.data[i + 1] = 20 + t * 40;
+            imgData.data[i + 2] = 80 + t * 140;
+            imgData.data[i + 3] = 255;
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+      }
+
+      else if (type === 'sandbox') {
+        // Animated gradient bloom
+        ctx.fillStyle = '#0a0a14';
+        ctx.fillRect(0, 0, w, h);
+        for (let i = 0; i < 3; i++) {
+          const cx = w/2 + Math.sin(time + i * 2.1) * 40;
+          const cy = h/2 + Math.cos(time * 0.8 + i * 1.7) * 40;
+          const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 60);
+          const hue = (time * 30 + i * 120) % 360;
+          grad.addColorStop(0, `hsla(${hue}, 60%, 50%, 0.3)`);
+          grad.addColorStop(1, 'transparent');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
+        }
+      }
+
+      else if (type === 'ironether') {
+        // Glowing rune-like geometry
+        ctx.fillStyle = '#0a0810';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = `rgba(255, 140, 60, ${0.3 + 0.15 * Math.sin(time * 1.5)})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        const cx = w/2, cy = h/2, r = 40;
+        for (let i = 0; i < 6; i++) {
+          const a = (Math.PI * 2 / 6) * i - Math.PI/2 + time * 0.2;
+          const px = cx + Math.cos(a) * r;
+          const py = cy + Math.sin(a) * r;
+          i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        // Inner glow
+        ctx.beginPath();
+        ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 140, 60, ${0.2 + 0.1 * Math.sin(time * 2)})`;
+        ctx.fill();
+      }
+    });
+
+    requestAnimationFrame(drawTiles);
+  }
+
+  drawTiles();
 })();
 </script>
 
