@@ -1313,14 +1313,19 @@ function getThrowVelocity() {
 canvas.addEventListener('click', () => { initAudio(); }, { once: true });
 
 // DEV: number keys 1-9 to jump to scenes (remove for release)
+let debugMode = false;
+let debugClicks = 0;
+let debugClickTimer = 0;
+
 document.addEventListener('keydown', e => {
   if (state.transitioning && state.transitionPhase === 'hold') { state.transitionAdvance = true; return; }
-  // DEV: number keys 1-9 to jump to scenes (remove for release)
+  if (!debugMode) return;
+  // Debug: number keys 1-9 to jump to scenes
   if (e.key >= '1' && e.key <= '9') {
     const target = parseInt(e.key) - 1;
     if (target < scenes.length) { initAudio(); startAmbient(); loadScene(target); }
   }
-  // DEV: 0 to wipe memory and restart (remove for release)
+  // Debug: 0 to wipe memory and restart
   if (e.key === '0') {
     if (confirm('Wipe the little guy\'s memory and start over?')) {
       window.removeEventListener('beforeunload', saveGame);
@@ -1344,6 +1349,21 @@ canvas.addEventListener('mousemove', e => {
 });
 
 canvas.addEventListener('mousedown', e => {
+  // Debug toggle: triple-click top-left corner (20x20)
+  const r = canvas.getBoundingClientRect();
+  const cx = e.clientX - r.left, cy = e.clientY - r.top;
+  if (cx < 20 && cy < 20) {
+    const now = Date.now();
+    if (now - debugClickTimer < 500) { debugClicks++; } else { debugClicks = 1; }
+    debugClickTimer = now;
+    if (debugClicks >= 3) {
+      debugMode = !debugMode;
+      debugClicks = 0;
+      document.title = debugMode ? '[DEBUG] little guy' : 'little guy';
+      setTimeout(updateTabTitle, 2000);
+    }
+    return;
+  }
   if (state.transitioning && state.transitionPhase === 'hold') { state.transitionAdvance = true; return; }
   if (state.transitioning) return;
   if (state.endingDone || (state.postMonologue && state.postMonologuePhase >= 2)) return; // don't allow interaction during ending
