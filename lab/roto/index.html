@@ -1046,28 +1046,32 @@ el('file-images').addEventListener('change', e => {
   }
 });
 
-// ── GIF frame extraction using canvas + ImageBitmap trick ──
-// We use a tiny embedded GIF parser (LZW decoder) to extract all frames
+// ── GIF frame extraction using gifuct-js ──
 async function loadGif(file) {
-  el('frame-info').textContent = 'Parsing GIF...';
+  el('frame-info').textContent = 'Loading GIF parser...';
   frames = [];
 
+  // Dynamically import gifuct-js
+  const { parseGIF: gParse, decompressFrames } = await import('https://cdn.jsdelivr.net/npm/gifuct-js@2.1.2/+esm');
+
+  el('frame-info').textContent = 'Parsing GIF...';
   const buffer = await file.arrayBuffer();
-  const gifFrames = parseGIF(new Uint8Array(buffer));
+  const gif = gParse(buffer);
+  const gifFrames = decompressFrames(gif, true);
 
   if (!gifFrames.length) {
-    el('frame-info').textContent = 'Failed to parse GIF';
+    el('frame-info').textContent = 'No frames found in GIF';
     return;
   }
 
-  const gw = gifFrames[0].width;
-  const gh = gifFrames[0].height;
+  const gw = gif.lsd.width;
+  const gh = gif.lsd.height;
   let w = gw, h = gh;
   if (w > 640) { h = Math.round(h * 640 / w); w = 640; }
   if (h > 480) { w = Math.round(w * 480 / h); h = 480; }
   initBlank(w, h);
 
-  // Composite each frame (GIF frames can be partial patches)
+  // Composite canvas (full GIF size, handles partial frame patches)
   const compositeCvs = document.createElement('canvas');
   compositeCvs.width = gw; compositeCvs.height = gh;
   const compCtx = compositeCvs.getContext('2d');
@@ -1079,24 +1083,27 @@ async function loadGif(file) {
   for (let i = 0; i < gifFrames.length; i++) {
     const gf = gifFrames[i];
 
-    // Handle disposal
+    // Create patch ImageData
+    const patchData = new ImageData(
+      new Uint8ClampedArray(gf.patch),
+      gf.dims.width,
+      gf.dims.height
+    );
+
+    // Handle disposal from previous frame
     if (i > 0) {
       const prev = gifFrames[i - 1];
-      if (prev.disposalMethod === 2) {
-        // Restore to background
-        compCtx.clearRect(prev.left, prev.top, prev.frameWidth, prev.frameHeight);
+      if (prev.disposalType === 2) {
+        compCtx.clearRect(prev.dims.left, prev.dims.top, prev.dims.width, prev.dims.height);
       }
-      // disposalMethod 3 (restore to previous) is rare, skip
     }
 
-    // Draw frame patch
+    // Draw patch onto composite
     const patchCvs = document.createElement('canvas');
-    patchCvs.width = gf.frameWidth; patchCvs.height = gf.frameHeight;
-    const patchCtx = patchCvs.getContext('2d');
-    const patchData = patchCtx.createImageData(gf.frameWidth, gf.frameHeight);
-    patchData.data.set(gf.pixels);
-    patchCtx.putImageData(patchData, 0, 0);
-    compCtx.drawImage(patchCvs, gf.left, gf.top);
+    patchCvs.width = gf.dims.width;
+    patchCvs.height = gf.dims.height;
+    patchCvs.getContext('2d').putImageData(patchData, 0, 0);
+    compCtx.drawImage(patchCvs, gf.dims.left, gf.dims.top);
 
     // Scale to target size
     scaleCtx.clearRect(0, 0, w, h);
@@ -1109,241 +1116,6 @@ async function loadGif(file) {
 
   rebuildTimeline();
   goToFrame(0);
-}
-
-// ── Minimal GIF Parser ──
-// Parses GIF87a/89a, extracts frames with LZW decompression
-function parseGIF(data) {
-  let pos = 0;
-  const frames = [];
-
-  function readU8() { return data[pos++]; }
-  function readU16() { const v = data[pos] | (data[pos+1] << 8); pos += 2; return v; }
-  function readBytes(n) { const s = data.slice(pos, pos + n); pos += n; return s; }
-
-  // Header
-  const sig = String.fromCharCode(...readBytes(6));
-  if (sig !== 'GIF87a' && sig !== 'GIF89a') return [];
-
-  const screenW = readU16();
-  const screenH = readU16();
-  const packed = readU8();
-  const bgIndex = readU8();
-  readU8(); // pixel aspect
-
-  const gctFlag = (packed >> 7) & 1;
-  const gctSize = 1 << ((packed & 7) + 1);
-  let gct = null;
-
-  if (gctFlag) {
-    gct = [];
-    for (let i = 0; i < gctSize; i++) {
-      gct.push([readU8(), readU8(), readU8()]);
-    }
-  }
-
-  let transparentIndex = -1;
-  let disposalMethod = 0;
-
-  while (pos < data.length) {
-    const block = readU8();
-
-    if (block === 0x3B) break; // trailer
-
-    if (block === 0x21) {
-      // Extension
-      const label = readU8();
-
-      if (label === 0xF9) {
-        // Graphics Control Extension
-        readU8(); // block size (always 4)
-        const gcPacked = readU8();
-        disposalMethod = (gcPacked >> 2) & 7;
-        const transFlag = gcPacked & 1;
-        readU16(); // delay
-        transparentIndex = transFlag ? readU8() : (readU8(), -1);
-        readU8(); // terminator
-      } else {
-        // Skip other extensions
-        while (true) {
-          const sz = readU8();
-          if (sz === 0) break;
-          pos += sz;
-        }
-      }
-      continue;
-    }
-
-    if (block === 0x2C) {
-      // Image descriptor
-      const left = readU16();
-      const top = readU16();
-      const fw = readU16();
-      const fh = readU16();
-      const imgPacked = readU8();
-      const lctFlag = (imgPacked >> 7) & 1;
-      const interlace = (imgPacked >> 6) & 1;
-      const lctSize = 1 << ((imgPacked & 7) + 1);
-
-      let lct = null;
-      if (lctFlag) {
-        lct = [];
-        for (let i = 0; i < lctSize; i++) {
-          lct.push([readU8(), readU8(), readU8()]);
-        }
-      }
-
-      const ct = lct || gct;
-      const minCodeSize = readU8();
-
-      // Read sub-blocks
-      let lzwData = [];
-      while (true) {
-        const sz = readU8();
-        if (sz === 0) break;
-        for (let i = 0; i < sz; i++) lzwData.push(data[pos++]);
-      }
-
-      // LZW decode
-      const pixels = decodeLZW(lzwData, minCodeSize, fw * fh);
-
-      // Convert to RGBA
-      const rgba = new Uint8ClampedArray(fw * fh * 4);
-      const rows = new Array(fh);
-
-      // Handle interlace
-      if (interlace) {
-        let row = 0;
-        const passes = [[0, 8], [4, 8], [2, 4], [1, 2]];
-        let pixIdx = 0;
-        for (const [start, step] of passes) {
-          for (let y = start; y < fh; y += step) {
-            for (let x = 0; x < fw; x++) {
-              const ci = pixels[pixIdx++];
-              const oi = (y * fw + x) * 4;
-              if (ci === transparentIndex) {
-                rgba[oi + 3] = 0;
-              } else if (ct && ct[ci]) {
-                rgba[oi] = ct[ci][0];
-                rgba[oi + 1] = ct[ci][1];
-                rgba[oi + 2] = ct[ci][2];
-                rgba[oi + 3] = 255;
-              }
-            }
-          }
-        }
-      } else {
-        for (let i = 0; i < pixels.length && i < fw * fh; i++) {
-          const ci = pixels[i];
-          const oi = i * 4;
-          if (ci === transparentIndex) {
-            rgba[oi + 3] = 0;
-          } else if (ct && ct[ci]) {
-            rgba[oi] = ct[ci][0];
-            rgba[oi + 1] = ct[ci][1];
-            rgba[oi + 2] = ct[ci][2];
-            rgba[oi + 3] = 255;
-          }
-        }
-      }
-
-      frames.push({
-        left, top, frameWidth: fw, frameHeight: fh,
-        width: screenW, height: screenH,
-        pixels: rgba, disposalMethod
-      });
-
-      transparentIndex = -1;
-      disposalMethod = 0;
-      continue;
-    }
-
-    // Unknown block, skip
-    break;
-  }
-
-  return frames;
-}
-
-function decodeLZW(data, minCodeSize, pixelCount) {
-  const clearCode = 1 << minCodeSize;
-  const eoiCode = clearCode + 1;
-  let codeSize = minCodeSize + 1;
-  let nextCode = eoiCode + 1;
-  let maxCode = 1 << codeSize;
-
-  // Init table
-  let table = [];
-  for (let i = 0; i < clearCode; i++) table[i] = [i];
-  table[clearCode] = [];
-  table[eoiCode] = [];
-
-  const output = [];
-  let bitBuf = 0, bitCount = 0, dataPos = 0;
-
-  function readCode() {
-    while (bitCount < codeSize) {
-      if (dataPos >= data.length) return -1;
-      bitBuf |= data[dataPos++] << bitCount;
-      bitCount += 8;
-    }
-    const code = bitBuf & ((1 << codeSize) - 1);
-    bitBuf >>= codeSize;
-    bitCount -= codeSize;
-    return code;
-  }
-
-  let code = readCode(); // should be clear code
-  if (code !== clearCode) return output;
-
-  code = readCode();
-  if (code === -1 || code === eoiCode) return output;
-  let prev = table[code] ? table[code].slice() : [code];
-  for (const p of prev) output.push(p);
-
-  while (output.length < pixelCount) {
-    code = readCode();
-    if (code === -1 || code === eoiCode) break;
-
-    if (code === clearCode) {
-      codeSize = minCodeSize + 1;
-      nextCode = eoiCode + 1;
-      maxCode = 1 << codeSize;
-      table = [];
-      for (let i = 0; i < clearCode; i++) table[i] = [i];
-      table[clearCode] = [];
-      table[eoiCode] = [];
-
-      code = readCode();
-      if (code === -1 || code === eoiCode) break;
-      prev = table[code] ? table[code].slice() : [code];
-      for (const p of prev) output.push(p);
-      continue;
-    }
-
-    let entry;
-    if (table[code]) {
-      entry = table[code];
-    } else if (code === nextCode) {
-      entry = prev.concat(prev[0]);
-    } else {
-      break; // corrupt
-    }
-
-    for (const p of entry) output.push(p);
-
-    if (nextCode < 4096) {
-      table[nextCode++] = prev.concat(entry[0]);
-      if (nextCode >= maxCode && codeSize < 12) {
-        codeSize++;
-        maxCode = 1 << codeSize;
-      }
-    }
-
-    prev = entry.slice();
-  }
-
-  return output;
 }
 
 function loadImages(files) {
