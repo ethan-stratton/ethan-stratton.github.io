@@ -419,6 +419,12 @@
     <button class="btn" id="randomize">🎲 Randomize</button>
     <button class="btn" id="export">📷 Export PNG</button>
   </div>
+  <div class="btn-row">
+    <button class="btn" id="save">💾 Save</button>
+    <button class="btn" id="load">📂 Load</button>
+    <button class="btn" id="copyurl">🔗 Share URL</button>
+  </div>
+  <div id="saved-list" style="margin-top:12px;"></div>
 </div>
 
 <script>
@@ -802,6 +808,107 @@
     el('panel').classList.toggle('hidden');
     el('toggle-panel').style.right = el('panel').classList.contains('hidden') ? '16px' : '336px';
   });
+
+  // ── Save / Load / Share ──
+  function getCurrentState() {
+    const state = { custom1: customPalettes[1], custom2: customPalettes[2] };
+    const ids = ['palette1','distType1','amp1','freq1','speed1','scrollX1','scrollY1','palSpeed1','scale1',
+                 'palette2','distType2','amp2','freq2','speed2','scrollX2','scrollY2','palSpeed2','scale2','opacity2'];
+    ids.forEach(id => { state[id] = el(id).value; });
+    return state;
+  }
+
+  function applyState(state) {
+    if (state.custom1) customPalettes[1] = state.custom1;
+    if (state.custom2) customPalettes[2] = state.custom2;
+    const ids = ['palette1','distType1','amp1','freq1','speed1','scrollX1','scrollY1','palSpeed1','scale1',
+                 'palette2','distType2','amp2','freq2','speed2','scrollX2','scrollY2','palSpeed2','scale2','opacity2'];
+    ids.forEach(id => { if (state[id] !== undefined) el(id).value = state[id]; });
+    updateLabels();
+  }
+
+  // Save to localStorage
+  function getSaved() {
+    try { return JSON.parse(localStorage.getItem('eb_saves') || '[]'); } catch { return []; }
+  }
+
+  function renderSavedList() {
+    const saves = getSaved();
+    const container = el('saved-list');
+    if (saves.length === 0) { container.innerHTML = ''; return; }
+    container.innerHTML = '<label style="margin-top:0">Saved Presets</label>';
+    saves.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:4px;margin-top:4px;align-items:center;';
+      const btn = document.createElement('button');
+      btn.className = 'preset-btn';
+      btn.style.flex = '1';
+      btn.textContent = s.name || ('Save ' + (i + 1));
+      btn.addEventListener('click', () => applyState(s.state));
+      const del = document.createElement('button');
+      del.className = 'preset-btn';
+      del.style.cssText = 'width:28px;flex:none;color:#ff6060;';
+      del.textContent = '×';
+      del.addEventListener('click', () => {
+        const saves = getSaved();
+        saves.splice(i, 1);
+        localStorage.setItem('eb_saves', JSON.stringify(saves));
+        renderSavedList();
+      });
+      row.appendChild(btn);
+      row.appendChild(del);
+      container.appendChild(row);
+    });
+  }
+
+  el('save').addEventListener('click', () => {
+    const name = prompt('Name this preset:');
+    if (name === null) return;
+    const saves = getSaved();
+    saves.push({ name: name || ('Save ' + (saves.length + 1)), state: getCurrentState() });
+    localStorage.setItem('eb_saves', JSON.stringify(saves));
+    renderSavedList();
+  });
+
+  el('load').addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', () => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const state = JSON.parse(reader.result);
+          applyState(state);
+        } catch { alert('Invalid file'); }
+      };
+      reader.readAsText(input.files[0]);
+    });
+    input.click();
+  });
+
+  // Share URL — encode state in hash
+  el('copyurl').addEventListener('click', () => {
+    const state = getCurrentState();
+    const encoded = btoa(JSON.stringify(state));
+    const url = window.location.origin + window.location.pathname + '#' + encoded;
+    navigator.clipboard.writeText(url).then(() => {
+      el('copyurl').textContent = '✅ Copied!';
+      setTimeout(() => { el('copyurl').textContent = '🔗 Share URL'; }, 2000);
+    }).catch(() => {
+      prompt('Copy this URL:', url);
+    });
+  });
+
+  // Load from URL hash on startup
+  if (window.location.hash.length > 1) {
+    try {
+      const state = JSON.parse(atob(window.location.hash.slice(1)));
+      applyState(state);
+    } catch {}
+  }
+
+  renderSavedList();
 
   // ── Init ──
   updateLabels();
