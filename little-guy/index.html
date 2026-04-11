@@ -333,14 +333,24 @@ function extractRecognizedWords(writing) {
   return state.wordsLearned.filter(w => text.includes(w));
 }
 
+const writingFade = {}; // key → current alpha for smooth fading
 function getWritingAlpha(w) {
-  if (w.reveal === 'always') return 0.75;
-  if (w.reveal && w.reveal.startsWith('after:')) {
-    return hasFired(state.scene, w.reveal.slice(6)) ? 0.65 : 0;
+  let target = 0;
+  if (w.reveal === 'always') target = 0.75;
+  else if (w.reveal && w.reveal.startsWith('after:')) {
+    target = hasFired(state.scene, w.reveal.slice(6)) ? 0.65 : 0;
+  } else {
+    // proximity to guy
+    const dist = Math.abs(guy.x - w.x);
+    target = dist < 150 ? Math.max(0, 0.7 - dist / 300) : 0;
   }
-  // proximity to guy
-  const dist = Math.abs(guy.x - w.x);
-  return dist < 150 ? Math.max(0, 0.7 - dist / 300) : 0;
+  // Smooth fade
+  const key = w.x + '_' + w.y;
+  const cur = writingFade[key] || 0;
+  const rate = target > cur ? 0.008 : 0.02; // fade in slower than fade out
+  writingFade[key] = cur + (target - cur) * rate;
+  if (writingFade[key] < 0.005) writingFade[key] = 0;
+  return writingFade[key];
 }
 
 // Cursor proximity glow — makes writing brighter when mouse is near
