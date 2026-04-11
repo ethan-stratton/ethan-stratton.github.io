@@ -251,7 +251,7 @@
   @media (max-width: 768px) {
     .page { flex-direction: column-reverse; padding: 32px 16px 60px; gap: 40px; }
     .sidebar { width: 100%; }
-    .sidebar-grid { grid-template-columns: repeat(4, 1fr); }
+    .sidebar-grid { grid-template-columns: repeat(3, 1fr); }
     header h1 { font-size: 2rem; }
     header { padding: 48px 16px 32px; }
   }
@@ -283,8 +283,16 @@
         <div class="tile-label">EB Backgrounds</div>
       </a>
       <a href="/lab/easing/" class="sidebar-tile" title="Easing Functions">
-        <canvas class="tile-canvas" data-tile="sandbox"></canvas>
+        <canvas class="tile-canvas" data-tile="easing"></canvas>
         <div class="tile-label">Easing</div>
+      </a>
+      <a href="/lab/debanding/" class="sidebar-tile" title="IGN Debanding">
+        <canvas class="tile-canvas" data-tile="debanding"></canvas>
+        <div class="tile-label">Debanding</div>
+      </a>
+      <a href="/lab/dof/" class="sidebar-tile" title="Depth of Field">
+        <canvas class="tile-canvas" data-tile="dof"></canvas>
+        <div class="tile-label">Depth of Field</div>
       </a>
       <div class="sidebar-tile" title="Iron & Ether — In Development">
         <canvas class="tile-canvas" data-tile="ironether"></canvas>
@@ -378,6 +386,74 @@
           grad.addColorStop(1, 'transparent');
           ctx.fillStyle = grad; ctx.fillRect(0, 0, w, h);
         }
+      } else if (type === 'easing') {
+        // Mini easing curve
+        ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = 'rgba(184,156,255,0.15)'; ctx.lineWidth = 1;
+        ctx.setLineDash([2,2]);
+        ctx.beginPath(); ctx.moveTo(20,h-20); ctx.lineTo(w-20,20); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#b89cff'; ctx.lineWidth = 2; ctx.beginPath();
+        for (let i = 0; i <= 160; i++) {
+          const t = i/160;
+          const v = 1-Math.pow(1-t,3); // SmoothStop3
+          const px = 20+t*(w-40), py = (h-20)-v*(h-40);
+          i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+        }
+        ctx.stroke();
+        const bt = ((time*0.4)%1.5)/1.2;
+        if (bt>=0&&bt<=1) {
+          const bv = 1-Math.pow(1-bt,3);
+          ctx.beginPath(); ctx.arc(20+bt*(w-40),(h-20)-bv*(h-40),4,0,Math.PI*2);
+          ctx.fillStyle='#dcc8ff'; ctx.fill();
+        }
+      } else if (type === 'debanding') {
+        // Gradient with banding vs smooth
+        const imgData = ctx.createImageData(w, h);
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const dx=x-w/2,dy=y-h/2;
+          const d = Math.sqrt(dx*dx+dy*dy)/(w*0.6);
+          const v = Math.max(0,1-d);
+          const bits = 4, levels = (1<<bits)-1;
+          const useIGN = x >= w/2;
+          let q;
+          if (useIGN) {
+            const n = (52.9829189*((x*0.06711056+y*0.00583715)%1))%1;
+            q = Math.round((v+(n-0.5)/levels)*levels)/levels;
+          } else { q = Math.round(v*levels)/levels; }
+          q = Math.min(1,Math.max(0,q));
+          const i=(y*w+x)*4;
+          imgData.data[i]=q*80; imgData.data[i+1]=q*40; imgData.data[i+2]=q*160; imgData.data[i+3]=255;
+        }
+        ctx.putImageData(imgData,0,0);
+        ctx.strokeStyle='rgba(184,156,255,0.2)'; ctx.lineWidth=1;
+        ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(w/2,0); ctx.lineTo(w/2,h); ctx.stroke(); ctx.setLineDash([]);
+      } else if (type === 'dof') {
+        // Blurry corridor vibe
+        ctx.fillStyle = '#0a0a0f'; ctx.fillRect(0,0,w,h);
+        // Draw some "objects" at different depths with blur simulation
+        const depths = [{x:40,y:100,s:30,blur:true},{x:100,y:80,s:20,blur:false},{x:160,y:110,s:25,blur:true}];
+        for (const d of depths) {
+          const a = d.blur ? 0.15 : 0.6;
+          const spread = d.blur ? 3 : 0;
+          for (let r = d.s+spread*4; r >= d.s; r -= 2) {
+            ctx.beginPath(); ctx.arc(d.x,d.y,r,0,Math.PI*2);
+            ctx.fillStyle = `rgba(${d.blur?60:140},${d.blur?50:100},${d.blur?40:80},${a*0.1})`;
+            ctx.fill();
+          }
+          ctx.beginPath(); ctx.arc(d.x,d.y,d.s*0.5,0,Math.PI*2);
+          ctx.fillStyle = `rgba(180,140,100,${a})`;
+          ctx.fill();
+        }
+        // Fog overlay
+        const fogA = 0.15+0.05*Math.sin(time*0.5);
+        ctx.fillStyle = `rgba(60,55,50,${fogA})`;
+        ctx.fillRect(0,0,w,h);
+        // Vignette
+        const vg = ctx.createRadialGradient(w/2,h/2,20,w/2,h/2,w*0.7);
+        vg.addColorStop(0,'transparent');
+        vg.addColorStop(1,'rgba(0,0,0,0.6)');
+        ctx.fillStyle = vg; ctx.fillRect(0,0,w,h);
       } else if (type === 'ironether') {
         ctx.fillStyle = '#0a0810'; ctx.fillRect(0, 0, w, h);
         ctx.strokeStyle = `rgba(255,140,60,${0.3+0.15*Math.sin(time*1.5)})`;
