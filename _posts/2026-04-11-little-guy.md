@@ -1,14 +1,12 @@
 ---
 layout: post
-title: "Little Guy Is Out"
+title: "Little Guy game"
 date: 2026-04-11
 tags: [browser, narrative, experimental]
 ---
 
-I shipped my first game. It's small and weird and I love it.
+put a game on itch.io, was trying to make something existential. didn't really succeed i think but it's something. hopefully will make someone think a little harder once they finish it. 
 
-A little creature made of code discovers words, finds edges, and eventually asks *why*. There are four endings depending on how you treat him.
-
-Built it in vanilla JavaScript and HTML5 Canvas. One file. No engine, no framework.
+there are four endings, but you can only experience once based on how the little guy learns
 
 [Play it on itch.io →](https://e-man-games.itch.io/little-guy)
