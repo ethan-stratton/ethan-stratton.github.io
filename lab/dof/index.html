@@ -18,7 +18,13 @@
     height: 100vh;
   }
 
-  #scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
+  #scene {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    display: block;
+  }
 
   .controls {
     position: fixed;
@@ -151,7 +157,7 @@
 
   #toggle-panel {
     position: fixed;
-    top: 16px; right: 16px;
+    top: 16px; right: 316px;
     z-index: 20;
     width: 40px; height: 40px;
     border-radius: 50%;
@@ -164,6 +170,7 @@
     align-items: center;
     justify-content: center;
     backdrop-filter: blur(8px);
+    transition: right 0.3s;
   }
 
   .depth-indicator {
@@ -200,11 +207,24 @@
     font-style: italic;
     margin-top: 8px;
   }
+
+  #error-msg {
+    position: fixed;
+    bottom: 20px; left: 20px;
+    z-index: 100;
+    color: #ff6060;
+    font-size: 0.75rem;
+    background: rgba(0,0,0,0.8);
+    padding: 8px 14px;
+    border-radius: 4px;
+    display: none;
+  }
 </style>
 </head>
 <body>
 
-<canvas id="scene"></canvas>
+<div id="scene"></div>
+<div id="error-msg"></div>
 
 <button id="toggle-panel">⚙</button>
 
@@ -220,8 +240,8 @@
     <label>Aperture (blur strength) <span class="val" id="v-aperture">0.025</span></label>
     <input type="range" id="aperture" min="0" max="0.08" step="0.001" value="0.025">
 
-    <label>Focus Range <span class="val" id="v-frange">4.0</span></label>
-    <input type="range" id="frange" min="0.5" max="20" step="0.5" value="4">
+    <label>Max Blur <span class="val" id="v-maxblur">0.01</span></label>
+    <input type="range" id="maxblur" min="0" max="0.05" step="0.001" value="0.01">
 
     <div class="depth-indicator">
       <div class="range-mark" id="range-mark"></div>
@@ -299,17 +319,29 @@ import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const el = id => document.getElementById(id);
+const errEl = el('error-msg');
 
-// ── Scene setup ──
-const canvas = el('scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
+function showError(msg) {
+  errEl.textContent = msg;
+  errEl.style.display = 'block';
+  console.error(msg);
+}
+
+try {
+
+const W = window.innerWidth;
+const H = window.innerHeight;
+
+// ── Renderer ──
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W, H);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.8;
+el('scene').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 100);
+const camera = new THREE.PerspectiveCamera(55, W / H, 0.5, 100);
 camera.position.set(0, 3, 0);
 camera.lookAt(0, 2.5, -20);
 
@@ -328,114 +360,108 @@ scene.background = fogColors.sh.clone();
 const ambientLight = new THREE.AmbientLight(0x887766, 0.15);
 scene.add(ambientLight);
 
-// Flickering point lights along corridor
 const lights = [];
 for (let i = 0; i < 8; i++) {
   const z = -5 - i * 7;
   const light = new THREE.PointLight(0xffaa66, 1.5, 15, 2);
   light.position.set(Math.sin(i * 1.3) * 1.5, 4, z);
   scene.add(light);
-  lights.push({ light, baseIntensity: 1.0 + Math.random() * 1.0, flickerSpeed: 2 + Math.random() * 4, z });
+  lights.push({ light, baseIntensity: 1.0 + Math.random(), flickerSpeed: 2 + Math.random() * 4 });
 
-  // Light fixture (small emissive sphere)
-  const bulbGeo = new THREE.SphereGeometry(0.12, 8, 8);
-  const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffcc88 });
-  const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+  // Bulb
+  const bulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.12, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffcc88 })
+  );
   bulb.position.copy(light.position);
   scene.add(bulb);
 }
 
-// ── Corridor geometry ──
-const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a3530, roughness: 0.85, metalness: 0.1 });
-const floorMat = new THREE.MeshStandardMaterial({ color: 0x252220, roughness: 0.9, metalness: 0.05 });
+// ── Corridor ──
+const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a3530, roughness: 0.85 });
+const floorMat = new THREE.MeshStandardMaterial({ color: 0x252220, roughness: 0.9 });
 const ceilMat = new THREE.MeshStandardMaterial({ color: 0x2a2825, roughness: 0.95 });
-
-const corridorLen = 70;
-const corridorW = 4;
-const corridorH = 5;
+const cLen = 70, cW = 4, cH = 5;
 
 // Floor
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(corridorW, corridorLen), floorMat);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(cW, cLen), floorMat);
 floor.rotation.x = -Math.PI / 2;
-floor.position.set(0, 0, -corridorLen / 2);
+floor.position.set(0, 0, -cLen / 2);
 scene.add(floor);
 
 // Ceiling
-const ceil = new THREE.Mesh(new THREE.PlaneGeometry(corridorW, corridorLen), ceilMat);
+const ceil = new THREE.Mesh(new THREE.PlaneGeometry(cW, cLen), ceilMat);
 ceil.rotation.x = Math.PI / 2;
-ceil.position.set(0, corridorH, -corridorLen / 2);
+ceil.position.set(0, cH, -cLen / 2);
 scene.add(ceil);
 
 // Walls
-const wallGeo = new THREE.PlaneGeometry(corridorLen, corridorH);
+const wallGeo = new THREE.PlaneGeometry(cLen, cH);
 const wallL = new THREE.Mesh(wallGeo, wallMat);
 wallL.rotation.y = Math.PI / 2;
-wallL.position.set(-corridorW / 2, corridorH / 2, -corridorLen / 2);
+wallL.position.set(-cW / 2, cH / 2, -cLen / 2);
 scene.add(wallL);
 
 const wallR = new THREE.Mesh(wallGeo, wallMat);
 wallR.rotation.y = -Math.PI / 2;
-wallR.position.set(corridorW / 2, corridorH / 2, -corridorLen / 2);
+wallR.position.set(cW / 2, cH / 2, -cLen / 2);
 scene.add(wallR);
 
 // Back wall
-const backWall = new THREE.Mesh(new THREE.PlaneGeometry(corridorW, corridorH), wallMat);
-backWall.position.set(0, corridorH / 2, -corridorLen);
-scene.add(backWall);
+const back = new THREE.Mesh(new THREE.PlaneGeometry(cW, cH), wallMat);
+back.position.set(0, cH / 2, -cLen);
+scene.add(back);
 
-// ── Objects scattered along corridor ──
-const objMat1 = new THREE.MeshStandardMaterial({ color: 0x554840, roughness: 0.7 });
-const objMat2 = new THREE.MeshStandardMaterial({ color: 0x664444, roughness: 0.6 });
-const objMat3 = new THREE.MeshStandardMaterial({ color: 0x445566, roughness: 0.5, metalness: 0.3 });
+// ── Objects at various depths ──
+const mats = [
+  new THREE.MeshStandardMaterial({ color: 0x554840, roughness: 0.7 }),
+  new THREE.MeshStandardMaterial({ color: 0x664444, roughness: 0.6 }),
+  new THREE.MeshStandardMaterial({ color: 0x445566, roughness: 0.5, metalness: 0.3 }),
+  new THREE.MeshStandardMaterial({ color: 0x888880, roughness: 0.4, metalness: 0.5 }),
+];
 
-// Wheelchair
-function addBox(x, y, z, w, h, d, mat) {
+function box(x, y, z, w, h, d, mat) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
   m.position.set(x, y, z);
-  m.castShadow = true;
   scene.add(m);
-  return m;
 }
 
-// Debris / objects at various depths
-addBox(-1.2, 0.4, -6, 0.8, 0.8, 0.8, objMat1);
-addBox(1.0, 0.3, -12, 0.6, 0.6, 1.2, objMat2);
-addBox(-0.8, 0.75, -20, 0.5, 1.5, 0.5, objMat3); // tall pillar
-addBox(0.5, 0.5, -28, 1.0, 1.0, 0.6, objMat1);
-addBox(-1.0, 0.3, -35, 0.7, 0.6, 0.7, objMat2);
-addBox(1.2, 1.0, -42, 0.4, 2.0, 0.4, objMat3); // tall
-addBox(0, 0.25, -50, 1.5, 0.5, 1.5, objMat1); // low wide
+box(-1.2, 0.4, -6,  0.8, 0.8, 0.8, mats[0]);
+box( 1.0, 0.3, -12, 0.6, 0.6, 1.2, mats[1]);
+box(-0.8, 0.75,-20, 0.5, 1.5, 0.5, mats[2]);
+box( 0.5, 0.5, -28, 1.0, 1.0, 0.6, mats[0]);
+box(-1.0, 0.3, -35, 0.7, 0.6, 0.7, mats[1]);
+box( 1.2, 1.0, -42, 0.4, 2.0, 0.4, mats[2]);
+box( 0.0, 0.25,-50, 1.5, 0.5, 1.5, mats[0]);
+// Gurney
+box( 1.3, 0.5, -18, 0.7, 0.1, 2.0, mats[1]);
+box( 1.3, 0.8, -18, 0.5, 0.05, 1.8, mats[3]);
 
-// Gurneys (stretched boxes)
-addBox(1.3, 0.5, -18, 0.7, 0.1, 2.0, objMat2);
-addBox(1.3, 0.8, -18, 0.5, 0.05, 1.8, new THREE.MeshStandardMaterial({ color: 0x888880, roughness: 0.4, metalness: 0.5 }));
-
-// Pipes on ceiling
-for (let i = 0; i < 12; i++) {
+// Pipes
+for (let i = 0; i < 8; i++) {
   const pipe = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.06, 0.06, corridorLen, 6),
+    new THREE.CylinderGeometry(0.06, 0.06, cLen, 6),
     new THREE.MeshStandardMaterial({ color: 0x555550, metalness: 0.6, roughness: 0.3 })
   );
   pipe.rotation.x = Math.PI / 2;
-  pipe.position.set(-1.5 + (i % 4) * 1.0, corridorH - 0.15, -corridorLen / 2);
-  if (i >= 4 && i < 8) pipe.position.y = corridorH - 0.35;
-  if (i >= 8) { pipe.position.y = corridorH - 0.55; pipe.position.x = -1.0 + (i % 4) * 0.7; }
+  pipe.position.set(-1.5 + (i % 4) * 1.0, cH - 0.15 - Math.floor(i / 4) * 0.2, -cLen / 2);
   scene.add(pipe);
 }
 
 // ── Post Processing ──
 const composer = new EffectComposer(renderer);
-const renderPass = new RenderPass(scene, camera);
-composer.addPass(renderPass);
+composer.addPass(new RenderPass(scene, camera));
 
 const bokehPass = new BokehPass(scene, camera, {
-  focus: 15,
+  focus: 15.0,
   aperture: 0.025,
-  maxblur: 0.02
+  maxblur: 0.01,
+  width: W,
+  height: H
 });
 composer.addPass(bokehPass);
 
-// Film grain + vignette shader
+// Film grain + vignette
 const grainShader = {
   uniforms: {
     tDiffuse: { value: null },
@@ -453,26 +479,16 @@ const grainShader = {
     uniform float grain;
     uniform float vignette;
     varying vec2 vUv;
-
     float rand(vec2 co) { return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453); }
-
     void main() {
       vec4 color = texture2D(tDiffuse, vUv);
-
-      // Film grain
-      float g = (rand(vUv + fract(time)) - 0.5) * grain;
-      color.rgb += g;
-
-      // Vignette
+      color.rgb += (rand(vUv + fract(time)) - 0.5) * grain;
       vec2 vc = vUv - 0.5;
-      float v = 1.0 - dot(vc, vc) * vignette * 2.5;
-      color.rgb *= v;
-
+      color.rgb *= 1.0 - dot(vc, vc) * vignette * 2.5;
       gl_FragColor = color;
     }
   `
 };
-
 const grainPass = new ShaderPass(grainShader);
 composer.addPass(grainPass);
 
@@ -480,27 +496,26 @@ composer.addPass(grainPass);
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-canvas.addEventListener('click', (e) => {
-  const rect = canvas.getBoundingClientRect();
+renderer.domElement.addEventListener('click', (e) => {
+  const rect = renderer.domElement.getBoundingClientRect();
   mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const hits = raycaster.intersectObjects(scene.children, true);
   if (hits.length > 0) {
-    const dist = hits[0].distance;
-    el('focal').value = dist;
+    el('focal').value = Math.min(50, hits[0].distance);
     updateControls();
   }
 });
 
 // ── Presets ──
 const presets = {
-  'foggy-street': { focal: 15, aperture: 0.025, frange: 4, fog: 0.06, fogcol: 'sh', ambient: 0.12, grain: 0.08, vignette: 0.5, angle: 'corridor', sway: 0.4 },
-  'otherworld':   { focal: 10, aperture: 0.035, frange: 3, fog: 0.08, fogcol: 'blood', ambient: 0.08, grain: 0.12, vignette: 0.7, angle: 'low', sway: 0.6 },
-  'hospital':     { focal: 20, aperture: 0.02,  frange: 5, fog: 0.03, fogcol: 'cold', ambient: 0.2, grain: 0.04, vignette: 0.3, angle: 'corridor', sway: 0.2 },
-  'shallow':      { focal: 8,  aperture: 0.06,  frange: 1.5, fog: 0.02, fogcol: 'sh', ambient: 0.2, grain: 0.03, vignette: 0.2, angle: 'corridor', sway: 0.1 },
-  'deep':         { focal: 25, aperture: 0.005, frange: 20, fog: 0.01, fogcol: 'void', ambient: 0.3, grain: 0.02, vignette: 0.15, angle: 'corridor', sway: 0.1 },
-  'noir':         { focal: 12, aperture: 0.03,  frange: 3, fog: 0.05, fogcol: 'void', ambient: 0.06, grain: 0.1, vignette: 0.8, angle: 'dutch', sway: 0.3 },
+  'foggy-street': { focal: 15, aperture: 0.025, maxblur: 0.01, fog: 0.06, fogcol: 'sh', ambient: 0.12, grain: 0.08, vignette: 0.5, angle: 'corridor', sway: 0.4 },
+  'otherworld':   { focal: 10, aperture: 0.035, maxblur: 0.02, fog: 0.08, fogcol: 'blood', ambient: 0.08, grain: 0.12, vignette: 0.7, angle: 'low', sway: 0.6 },
+  'hospital':     { focal: 20, aperture: 0.02,  maxblur: 0.008, fog: 0.03, fogcol: 'cold', ambient: 0.2, grain: 0.04, vignette: 0.3, angle: 'corridor', sway: 0.2 },
+  'shallow':      { focal: 8,  aperture: 0.06,  maxblur: 0.04, fog: 0.02, fogcol: 'sh', ambient: 0.2, grain: 0.03, vignette: 0.2, angle: 'corridor', sway: 0.1 },
+  'deep':         { focal: 25, aperture: 0.003, maxblur: 0.002, fog: 0.01, fogcol: 'void', ambient: 0.3, grain: 0.02, vignette: 0.15, angle: 'corridor', sway: 0.1 },
+  'noir':         { focal: 12, aperture: 0.03,  maxblur: 0.015, fog: 0.05, fogcol: 'void', ambient: 0.06, grain: 0.1, vignette: 0.8, angle: 'dutch', sway: 0.3 },
 };
 
 document.querySelectorAll('.preset-btn').forEach(btn => {
@@ -509,7 +524,7 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
     if (!p) return;
     el('focal').value = p.focal;
     el('aperture').value = p.aperture;
-    el('frange').value = p.frange;
+    el('maxblur').value = p.maxblur;
     el('fog').value = p.fog;
     el('fog-color').value = p.fogcol;
     el('ambient').value = p.ambient;
@@ -525,16 +540,16 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
 function updateControls() {
   const focal = parseFloat(el('focal').value);
   const aperture = parseFloat(el('aperture').value);
-  const frange = parseFloat(el('frange').value);
+  const maxblur = parseFloat(el('maxblur').value);
   const fogDensity = parseFloat(el('fog').value);
   const fogCol = el('fog-color').value;
   const ambient = parseFloat(el('ambient').value);
   const grainAmt = parseFloat(el('grain').value);
   const vignetteAmt = parseFloat(el('vignette').value);
 
-  bokehPass.uniforms.focus.value = focal;
-  bokehPass.uniforms.aperture.value = aperture;
-  bokehPass.uniforms.maxblur.value = Math.min(0.05, aperture * 1.5);
+  bokehPass.uniforms['focus'].value = focal;
+  bokehPass.uniforms['aperture'].value = aperture;
+  bokehPass.uniforms['maxblur'].value = maxblur;
 
   scene.fog.density = fogDensity;
   const fc = fogColors[fogCol] || fogColors.sh;
@@ -548,7 +563,7 @@ function updateControls() {
   // Labels
   el('v-focal').textContent = focal.toFixed(1);
   el('v-aperture').textContent = aperture.toFixed(3);
-  el('v-frange').textContent = frange.toFixed(1);
+  el('v-maxblur').textContent = maxblur.toFixed(3);
   el('v-fog').textContent = fogDensity.toFixed(3);
   el('v-fogcol').textContent = el('fog-color').options[el('fog-color').selectedIndex].text.toLowerCase();
   el('v-ambient').textContent = ambient.toFixed(2);
@@ -560,10 +575,10 @@ function updateControls() {
   // Depth indicator
   const maxDist = 50;
   const focalPct = (focal / maxDist) * 100;
-  const rangePct = (frange / maxDist) * 100;
   el('focal-mark').style.left = focalPct + '%';
-  el('range-mark').style.left = Math.max(0, focalPct - rangePct) + '%';
-  el('range-mark').style.width = Math.min(100, rangePct * 2) + '%';
+  const rPct = 10; // approx visual range
+  el('range-mark').style.left = Math.max(0, focalPct - rPct) + '%';
+  el('range-mark').style.width = (rPct * 2) + '%';
 }
 
 document.querySelectorAll('.controls input, .controls select').forEach(e => {
@@ -571,88 +586,70 @@ document.querySelectorAll('.controls input, .controls select').forEach(e => {
 });
 
 // ── Camera angles ──
-function getCameraState(angle, time, sway) {
+function getCameraState(angle, t, sway) {
   const s = sway * 0.3;
-  const sx = Math.sin(time * 0.15) * s;
-  const sy = Math.sin(time * 0.1) * s * 0.3;
+  const sx = Math.sin(t * 0.15) * s;
+  const sy = Math.sin(t * 0.1) * s * 0.3;
 
   switch (angle) {
-    case 'corridor':
-      return {
-        pos: [sx, 3 + sy, 0],
-        look: [sx * 0.5, 2.5, -20]
-      };
-    case 'low':
-      return {
-        pos: [sx, 1.0 + sy * 0.5, 0],
-        look: [sx * 0.3, 1.5, -20]
-      };
-    case 'overhead':
-      return {
-        pos: [sx, 4.5 + sy, -5],
-        look: [0, 0, -25]
-      };
-    case 'dutch':
-      return {
-        pos: [1.5 + sx, 2.5 + sy, 0],
-        look: [-0.5, 2, -20],
-        roll: 0.12 + Math.sin(time * 0.08) * 0.03
-      };
-    case 'orbit':
-      const a = time * 0.05;
-      const r = 3;
-      return {
-        pos: [Math.sin(a) * r, 3 + sy, Math.cos(a) * r - 15],
-        look: [0, 2.5, -20]
-      };
-    default:
-      return { pos: [0, 3, 0], look: [0, 2.5, -20] };
+    case 'corridor': return { pos: [sx, 3+sy, 0], look: [sx*0.5, 2.5, -20] };
+    case 'low':      return { pos: [sx, 1.0+sy*0.5, 0], look: [sx*0.3, 1.5, -20] };
+    case 'overhead':  return { pos: [sx, 4.5+sy, -5], look: [0, 0, -25] };
+    case 'dutch':    return { pos: [1.5+sx, 2.5+sy, 0], look: [-0.5, 2, -20], roll: 0.12+Math.sin(t*0.08)*0.03 };
+    case 'orbit': {
+      const a = t * 0.05, r = 3;
+      return { pos: [Math.sin(a)*r, 3+sy, Math.cos(a)*r-15], look: [0, 2.5, -20] };
+    }
+    default: return { pos: [0, 3, 0], look: [0, 2.5, -20] };
   }
 }
 
 // ── Toggle panel ──
 el('toggle-panel').addEventListener('click', () => {
-  el('panel').classList.toggle('hidden');
-  el('toggle-panel').style.right = el('panel').classList.contains('hidden') ? '16px' : '316px';
+  const hidden = el('panel').classList.toggle('hidden');
+  el('toggle-panel').style.right = hidden ? '16px' : '316px';
 });
 
 // ── Resize ──
 window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  composer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  bokehPass.uniforms['aspect'].value = w / h;
 });
 
 // ── Render loop ──
 let time = 0;
 
 function animate() {
-  time += 0.016;
   requestAnimationFrame(animate);
+  time += 0.016;
 
-  // Flickering lights
+  // Flicker
   for (const l of lights) {
-    const flicker = l.baseIntensity + Math.sin(time * l.flickerSpeed) * 0.3 + Math.sin(time * l.flickerSpeed * 2.7) * 0.15;
-    l.light.intensity = Math.max(0, flicker);
+    l.light.intensity = Math.max(0, l.baseIntensity + Math.sin(time * l.flickerSpeed) * 0.3 + Math.sin(time * l.flickerSpeed * 2.7) * 0.15);
   }
 
   // Camera
-  const angle = el('cam-angle').value;
-  const sway = parseFloat(el('sway').value);
-  const cam = getCameraState(angle, time, sway);
+  const cam = getCameraState(el('cam-angle').value, time, parseFloat(el('sway').value));
   camera.position.set(...cam.pos);
   camera.lookAt(new THREE.Vector3(...cam.look));
   if (cam.roll) camera.rotation.z = cam.roll;
+  else camera.rotation.z = 0;
 
-  // Grain time
   grainPass.uniforms.time.value = time;
-
   composer.render();
 }
 
 updateControls();
 animate();
+
+} catch(e) {
+  showError('Error: ' + e.message);
+  console.error(e);
+}
 
 </script>
 
