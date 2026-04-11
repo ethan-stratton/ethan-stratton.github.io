@@ -1,12 +1,12 @@
 ---
 layout: post
-title: "Hello, World"
+title: "hello world"
 date: 2026-04-11
 tags: []
 ---
 
-This site is new. I'm building it by hand — no templates, no CMS. Just HTML, CSS, and JavaScript.
+been wanting a site for a while, looks like github pages is the way to go
 
-Games go here. Experiments go here. When I have something worth writing, that goes here too. No schedule, no content treadmill. Finished things on a shelf.
+will add games, experiments, fun stuff. things worth putting on here at least
 
-More soon.
+more soon.
