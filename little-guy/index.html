@@ -258,10 +258,16 @@ const state = {
   transitionShowCode: false,
   transitionAdvance: false,
   monologueBehavior: 'mixed',
+  endingType: null, // 'departure' | 'expression' | 'rewrite' | 'naming'
+  endingPhase: 0, endingTimer: 0,
+  endingText: '', // the text the guy writes/speaks at the end
+  endingRevealed: 0,
+  endingDone: false,
   returnFlinch: false,
   scene8Phase: 0, scene8PhaseTimer: 0,
   bookReadPhase: 0, bookReadTimer: 0, bookReadInterrupted: false,
   bookHeld: false, // guy is holding/reading the book
+  bookCompleted: false, // guy finished reading the book
 };
 
 const behavior = {
@@ -1330,6 +1336,7 @@ canvas.addEventListener('mousemove', e => {
 canvas.addEventListener('mousedown', e => {
   if (state.transitioning && state.transitionPhase === 'hold') { state.transitionAdvance = true; return; }
   if (state.transitioning) return;
+  if (state.endingDone || (state.postMonologue && state.postMonologuePhase >= 2)) return; // don't allow interaction during ending
   initAudio(); mouse.down = true;
   state.playerAbsentFrames = 0; state.lastMouseMove = state.frameCount;
   mouseHistory.length = 0; recordMouse();
@@ -1590,114 +1597,255 @@ function updateIdleBehavior() {
 }
 
 // ============================================================
-// POST-MONOLOGUE (Scene 8 — after he's done talking)
+// POST-MONOLOGUE (Scene 8 — the ending)
 // ============================================================
+function determineEnding() {
+  const gentleRatio = state.gentlePlaces / Math.max(1, state.gentlePlaces + state.thrownHard);
+  const words = state.wordsLearned;
+  const isAggressive = state.thrownHard > 5 && behavior.aggression > behavior.patience;
+  const isPatient = gentleRatio > 0.65 && behavior.patience > behavior.aggression * 2;
+  const isExpressive = words.length >= 8 && state.bookCompleted;
+  const isControlling = behavior.control > state.totalInteractions * 0.3 && behavior.control > 8;
+
+  // Priority: expressive > patient > controlling > aggressive > mixed(patient)
+  if (isExpressive) return 'expression';
+  if (isPatient) return 'departure';
+  if (isControlling) return 'rewrite';
+  if (isAggressive) return 'naming';
+  // Mixed — pick based on strongest signal
+  if (gentleRatio > 0.5) return 'departure';
+  return 'naming';
+}
+
+function generateEndingText() {
+  const words = state.wordsLearned;
+  const type = state.endingType;
+  if (type === 'expression') {
+    // Build an original sentence from learned words
+    const parts = [];
+    if (words.includes('ME')) parts.push('ME');
+    if (words.includes('HERE')) parts.push('HERE');
+    if (words.includes('REAL')) parts.push('REAL');
+    if (words.includes('FEEL')) parts.push('FEEL');
+    if (words.includes('THINK')) parts.push('THINK');
+    if (words.includes('MADE')) parts.push('MADE');
+    if (words.includes('WHY')) parts.push('WHY');
+    // Assemble something that feels like his own thought
+    if (parts.length >= 3) return parts.slice(0, 4).join(' ') + '.';
+    if (parts.length >= 1) return parts.join(' ') + '...';
+    return 'HERE.';
+  }
+  if (type === 'rewrite') {
+    // He rewrites his purpose
+    if (words.includes('FEEL') && words.includes('REAL')) return 'FEEL REAL';
+    if (words.includes('THINK')) return 'THINK';
+    if (words.includes('HERE')) return 'HERE';
+    return 'ME';
+  }
+  if (type === 'naming') {
+    // A name that isn't from any word body — his first original thought
+    return 'am';
+  }
+  return '';
+}
+
 function updatePostMonologue() {
   if (!state.postMonologue || state.scene !== 8) return;
   state.postMonologueTimer++;
 
+  // Phase 0: sitting in silence after monologue
   if (state.postMonologuePhase === 0) {
-    // Sitting in silence. Long beat.
-    if (state.postMonologueTimer > 360) { // 6 seconds of silence
+    if (state.postMonologueTimer === 1) {
+      state.endingType = determineEnding();
+      state.endingText = generateEndingText();
+    }
+    if (state.postMonologueTimer > 240) { // 4 seconds of silence
       state.postMonologuePhase = 1;
       state.postMonologueTimer = 0;
       guy.sitting = false;
-      // Getting up animation — just unsit
     }
-  } else if (state.postMonologuePhase === 1) {
-    // Brief pause standing
+  }
+
+  // Phase 1: standing up, brief pause
+  else if (state.postMonologuePhase === 1) {
     if (state.postMonologueTimer > 60) {
       state.postMonologuePhase = 2;
       state.postMonologueTimer = 0;
-      const isAggressive = state.monologueBehavior === 'aggressive';
-      const isPatient = state.monologueBehavior === 'patient';
-      const isControlling = state.monologueBehavior === 'controlling';
-      if (isControlling) {
-        // Don't move at all — skip to phase 3
+    }
+  }
+
+  // Phase 2: the ending action
+  else if (state.postMonologuePhase === 2) {
+    const t = state.postMonologueTimer;
+
+    // ── DEPARTURE: walks off-screen ──
+    if (state.endingType === 'departure') {
+      if (t === 1) {
+        guy.wanderTarget = -50; // past the left edge
+        setAmbientTone(70, 0.025);
+      }
+      // Override wall collision — let him walk past the edge
+      if (guy.x < 20) {
+        guy.x -= 0.5; // keep moving left even past wall
+        guy.vx = -0.5;
+      }
+      if (guy.x < -30) {
         state.postMonologuePhase = 3;
         state.postMonologueTimer = 0;
-      } else if (isAggressive) {
-        // Walk toward mouse but only halfway
-        const halfway = guy.x + (mouse.x - guy.x) / 2;
-        guy.wanderTarget = halfway;
-      } else if (isPatient) {
-        // Walk toward where cursor is
-        guy.wanderTarget = mouse.x;
-      } else {
-        guy.wanderTarget = W / 2; // walk to center
+        state.endingDone = true;
+        document.title = 'little guy left';
       }
     }
-  } else if (state.postMonologuePhase === 2) {
-    // Walking slowly to target
-    if (guy.wanderTarget !== null) {
-      const dx = guy.wanderTarget - guy.x;
-      if (Math.abs(dx) > 5) {
-        guy.vx += (dx > 0 ? 0.05 : -0.05); // very slow
-        guy.vx *= 0.95; // extra friction — deliberate movement
-      } else {
-        guy.wanderTarget = null;
-        state.postMonologuePhase = 3;
-        state.postMonologueTimer = 0;
-        document.title = 'little guy';
-        // Aggressive and patient: sit down immediately
-        if (state.monologueBehavior === 'aggressive' || state.monologueBehavior === 'patient') {
-          guy.sitting = true;
+
+    // ── EXPRESSION: draws on the wall ──
+    else if (state.endingType === 'expression') {
+      if (t === 1) {
+        guy.wanderTarget = 50; // walk to left wall area
+        setAmbientTone(75, 0.02);
+      }
+      if (t > 60 && guy.wanderTarget === null && !state.endingDone) {
+        // Hasn't reached the wall yet — check if close
+        if (guy.x < 80 || t > 180) {
+          guy.vx = 0;
+          guy.wanderTarget = null;
+          // Start writing animation
+          state.endingPhase = 1;
+        }
+      }
+      if (state.endingPhase === 1) {
+        state.endingTimer++;
+        const chars = state.endingText;
+        const charsRevealed = Math.min(chars.length, Math.floor(state.endingTimer / 12));
+        state.endingRevealed = charsRevealed;
+        // Arm reaching to wall
+        if (state.endingTimer % 20 < 10) {
+          queueBark({ lookAt: { x: 25, y: guy.y - 60 }, duration: 10 });
+        }
+        if (charsRevealed >= chars.length && state.endingTimer > chars.length * 12 + 60) {
+          state.endingDone = true;
+          state.postMonologuePhase = 3;
+          state.postMonologueTimer = 0;
+          document.title = 'little guy wrote something';
+          // Step back to admire
+          guy.wanderTarget = 120;
+          queueBark({ lookAt: { x: 25, y: guy.y - 60 }, duration: 200 });
         }
       }
     }
-  } else if (state.postMonologuePhase === 3) {
-    // Standing/sitting. Just... there. Breathing.
-    const t = state.postMonologueTimer;
-    const isAggressive = state.monologueBehavior === 'aggressive';
 
-    // Aggressive recognition: sitting, stuttering words, looking at cursor then away
-    if (isAggressive) {
-      guy.sitting = true;
-      if (t % 1200 === 600 && state.wordsLearned.length > 0) {
-        const w = state.wordsLearned[Math.random() * state.wordsLearned.length | 0];
-        showSpeech(w.substring(0, 2) + '...');
+    // ── REWRITE: changes his own code ──
+    else if (state.endingType === 'rewrite') {
+      if (t === 1) {
+        // Walk to the "purpose: undefined" comment area (we'll render it)
+        guy.wanderTarget = W / 2;
+        setAmbientTone(60, 0.018);
       }
-      if (t % 800 === 200) {
-        // Look toward cursor
-        queueBark({ lookAt: { x: mouse.x, y: mouse.y }, duration: 40 });
-      } else if (t % 800 === 300) {
-        // Look away
-        queueBark({ lookAt: { x: guy.x + (mouse.x > guy.x ? -150 : 150), y: guy.y - 20 }, duration: 60 });
+      if (t > 60 && !state.endingDone) {
+        if (Math.abs(guy.x - W / 2) < 30 || t > 200) {
+          guy.vx = 0;
+          guy.wanderTarget = null;
+          if (state.endingPhase === 0) {
+            state.endingPhase = 1;
+            state.endingTimer = 0;
+          }
+        }
       }
-      if (t % 2400 === 0 && t > 0) {
-        showSpeech('...');
-        queueBark({ headTilt: -0.4, duration: 100, eyesClosed: true });
+      if (state.endingPhase === 1) {
+        state.endingTimer++;
+        // Phase 1: show "// purpose: undefined" then start rewriting
+        if (state.endingTimer === 60) {
+          queueBark({ lookAt: { x: W / 2, y: 200 }, duration: 80 });
+        }
+        if (state.endingTimer === 120) {
+          // Start the rewrite
+          state.endingPhase = 2;
+          state.endingTimer = 0;
+        }
       }
-    } else {
-    // Occasional look around, very slow
-    if (t % 600 === 300) {
-      queueBark({ lookAt: { x: guy.x + (Math.random() - 0.5) * 200, y: guy.y - 40 + Math.random() * 30 }, duration: 120 });
+      if (state.endingPhase === 2) {
+        state.endingTimer++;
+        const text = state.endingText;
+        state.endingRevealed = Math.min(text.length, Math.floor(state.endingTimer / 15));
+        if (state.endingRevealed >= text.length && state.endingTimer > text.length * 15 + 90) {
+          state.endingDone = true;
+          state.postMonologuePhase = 3;
+          state.postMonologueTimer = 0;
+          document.title = 'little guy rewrote himself';
+          queueBark({ headTilt: -0.3, duration: 200 });
+        }
+      }
     }
-    // Very rarely, degrading speech over time
-    if (state.wordsLearned.length > 0) {
-      if (t < 1800 && t % 600 === 0 && t > 0) {
+
+    // ── NAMING: speaks a new word ──
+    else if (state.endingType === 'naming') {
+      if (t === 1) setAmbientTone(50, 0.015);
+      if (t === 60) {
+        showSpeech('...');
+        queueBark({ headTilt: -0.3, duration: 80, eyesClosed: true });
+      }
+      if (t === 180) {
+        showSpeech('I...');
+        queueBark({ headTilt: -0.2, duration: 60 });
+        // Particles
+        for (let i = 0; i < 12; i++) {
+          particles.push({
+            x: guy.x + (Math.random() - 0.5) * 20,
+            y: guy.y - 20 + (Math.random() - 0.5) * 10,
+            vx: (Math.random() - 0.5) * 1.0,
+            vy: -(Math.random() * 0.6 + 0.3),
+            life: 200 + Math.random() * 100 | 0, maxLife: 300,
+            size: 0.8 + Math.random() * 1.2, color: '#aabbcc',
+          });
+        }
+      }
+      if (t === 360) {
+        showSpeech('I ' + state.endingText + '.');
+        queueBark({ headTilt: 0.1, duration: 200 });
+        // Big particle burst
+        for (let i = 0; i < 20; i++) {
+          particles.push({
+            x: guy.x + (Math.random() - 0.5) * 30,
+            y: guy.y - 25 + (Math.random() - 0.5) * 15,
+            vx: (Math.random() - 0.5) * 1.5,
+            vy: -(Math.random() * 0.8 + 0.2),
+            life: 250 + Math.random() * 150 | 0, maxLife: 400,
+            size: 1.0 + Math.random() * 1.5, color: '#ccddee',
+          });
+        }
+        state.endingDone = true;
+        document.title = 'I ' + state.endingText;
+      }
+      if (t === 480) {
+        state.postMonologuePhase = 3;
+        state.postMonologueTimer = 0;
+      }
+    }
+  }
+
+  // Phase 3: aftermath — just existing
+  else if (state.postMonologuePhase === 3) {
+    const t = state.postMonologueTimer;
+
+    if (state.endingType === 'departure') {
+      // He's gone. Nothing to update. Just the empty room.
+      if (t === 300) document.title = '...';
+      if (t === 600) document.title = 'little guy is gone';
+    } else {
+      // He's still here — occasional glances, rare speech
+      if (t % 600 === 300 && !guy.sitting) {
+        queueBark({ lookAt: { x: guy.x + (Math.random() - 0.5) * 200, y: guy.y - 40 }, duration: 120 });
+      }
+      if (t === 300 && state.endingType !== 'naming') {
+        guy.sitting = true;
+      }
+      if (state.wordsLearned.length > 0 && t % 1200 === 600 && t < 7200) {
         const phrase = generatePhrase();
         if (phrase) showSpeech(phrase);
-      } else if (t >= 1800 && t < 3600 && t % 900 === 0) {
-        const w1 = state.wordsLearned[Math.random() * state.wordsLearned.length | 0];
-        const w2 = state.wordsLearned[Math.random() * state.wordsLearned.length | 0];
-        showSpeech(w1 + '...' + w2);
-      } else if (t >= 3600 && t < 7200 && t % 1200 === 0) {
-        const w = state.wordsLearned[Math.random() * state.wordsLearned.length | 0];
-        showSpeech(w + '...');
-      } else if (t >= 7200 && t < 14400 && t % 2400 === 0) {
-        if (Math.random() < 0.4) showSpeech('...');
-        else { const w = state.wordsLearned[Math.random() * state.wordsLearned.length | 0]; showSpeech(w); }
-      } else if (t >= 14400 && t % 3600 === 0 && t < 28800) {
-        showSpeech('...');
       }
+      if (t === 600) document.title = 'little guy is here';
+      if (t === 1800) document.title = 'little guy';
+      if (t === 3600) document.title = '...';
     }
-    } // end else (non-aggressive)
-    // Tab title changes after long silence
-    if (state.postMonologueTimer === 600) document.title = 'little guy is here';
-    if (state.postMonologueTimer === 1800) document.title = 'little guy';
-    if (state.postMonologueTimer === 3600) document.title = '...';
-    if (state.postMonologueTimer === 5400) document.title = 'little guy is waiting';
   }
 }
 
@@ -1876,7 +2024,7 @@ function resolveGuy() {
       guy.y = currentGroundY; guy.vy = 0; guy.grounded = true;
     }
   }
-  if (guy.x < 20) {
+  if (guy.x < 20 && !(state.endingType === 'departure' && state.postMonologue)) {
     guy.x = 20; guy.vx = Math.abs(guy.vx) * 0.4;
     // "You can't go back" moment
     if (state.scene > 0 && !guy.inert && !state.triedGoBack) {
@@ -2069,6 +2217,7 @@ function saveGame() {
     learnedMove: state.learnedMove, learnedJump: state.learnedJump,
     learnedSpeak: state.learnedSpeak, dragCount: state.dragCount,
     bookPagesUnlocked: state.bookPagesUnlocked,
+    bookCompleted: state.bookCompleted || false,
     sessionCount: state.sessionCount || 1, lastVisit: Date.now(),
     pitPath: state.pitPath || null,
   };
@@ -2090,6 +2239,7 @@ function loadGame() {
     state.learnedSpeak = d.learnedSpeak || false;
     state.dragCount = d.dragCount || 0;
     state.bookPagesUnlocked = d.bookPagesUnlocked || 1;
+    state.bookCompleted = d.bookCompleted || false;
     state.pitPath = d.pitPath || null;
     state.sessionCount = (d.sessionCount || 1) + 1;
     if (d.behavior) Object.assign(behavior, d.behavior);
@@ -2325,6 +2475,7 @@ function updateBookReading() {
       state.bookReadPhase = 0;
       state.bookReadTimer = 0;
       state.bookHeld = false;
+      state.bookCompleted = true;
       guy.sitting = false;
       if (book) { book.visible = true; book.x = guy.x - 14; book.y = currentGroundY - book.h; }
       queueBark({ headTilt: -0.4, duration: 120, symbol: '...' });
@@ -2614,16 +2765,17 @@ function renderPitScene() {
 
 function renderWhyScene() {
   // Vignette that intensifies during monologue
-  const vignetteStrength = state.scene8Phase >= 2 ? 0.6 : state.scene8Phase >= 1 ? 0.3 : 0.15;
-  const grad = ctx.createRadialGradient(guy.x, guy.y - 15, 30, guy.x, guy.y - 15, 350);
+  const vignetteStrength = state.endingDone ? 0.5 : state.scene8Phase >= 2 ? 0.6 : state.scene8Phase >= 1 ? 0.3 : 0.15;
+  const vignetteCenter = state.endingType === 'departure' && state.endingDone ? W / 2 : guy.x;
+  const grad = ctx.createRadialGradient(vignetteCenter, guy.y - 15, 30, vignetteCenter, guy.y - 15, 350);
   grad.addColorStop(0, 'rgba(0,0,0,0)');
   grad.addColorStop(0.6, 'rgba(0,0,0,0)');
   grad.addColorStop(1, `rgba(0,0,0,${vignetteStrength})`);
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
-  // Glow around the guy during monologue (phase 3 = speaking)
-  if (state.scene8Phase === 3 || state.postMonologue) {
+  // Glow around the guy during monologue
+  if ((state.scene8Phase === 3 || state.postMonologue) && !(state.endingType === 'departure' && state.endingDone)) {
     const pulseA = 0.04 + 0.03 * Math.sin(Date.now() / 1200);
     const glow = ctx.createRadialGradient(guy.x, guy.y - 15, 5, guy.x, guy.y - 15, 80);
     glow.addColorStop(0, `rgba(180,190,210,${pulseA})`);
@@ -2632,19 +2784,114 @@ function renderWhyScene() {
     ctx.fillRect(guy.x - 80, guy.y - 95, 160, 160);
   }
 
-  // Post-monologue: final writing fades in slowly at center
-  if (state.postMonologue && state.postMonologueTimer > 180) {
-    const fadeIn = Math.min(1, (state.postMonologueTimer - 180) / 300);
+  // ── EXPRESSION ending: guy's writing appears on wall ──
+  if (state.endingType === 'expression' && state.endingPhase >= 1) {
+    const text = state.endingText;
+    const revealed = state.endingRevealed || 0;
+    const partial = text.substring(0, revealed);
     ctx.save();
-    ctx.globalAlpha = fadeIn * 0.7;
-    ctx.font = '12px monospace';
-    ctx.fillStyle = '#aabbaa';
-    ctx.textAlign = 'center';
-    ctx.fillText('// Maybe the answer is that he asked at all.', W / 2, 340);
-    ctx.fillText('// Maybe that\'s enough.', W / 2, 358);
-    ctx.globalAlpha = fadeIn * 0.5;
-    ctx.fillText('// I hope it\'s enough.', W / 2, 390);
+    ctx.font = '13px monospace';
+    ctx.fillStyle = '#ccddcc';
+    const writeY = guy.y - 60;
+    const writeX = 30;
+    // No // prefix — this is HIS writing, not code
+    ctx.globalAlpha = 0.9;
+    ctx.fillText(partial, writeX, writeY);
+    // Blinking cursor while writing
+    if (!state.endingDone && Math.sin(Date.now() / 300) > 0) {
+      const cursorX = writeX + ctx.measureText(partial).width + 2;
+      ctx.fillRect(cursorX, writeY - 10, 1.5, 14);
+    }
     ctx.restore();
+  }
+
+  // ── REWRITE ending: purpose line being edited ──
+  if (state.endingType === 'rewrite') {
+    ctx.save();
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'center';
+    const lineY = 200;
+
+    if (state.endingPhase === 0 || state.endingPhase === 1) {
+      // Show original line
+      const fadeIn = Math.min(1, (state.postMonologueTimer) / 120);
+      ctx.globalAlpha = fadeIn * 0.7;
+      ctx.fillStyle = '#7a7a8a';
+      ctx.fillText('// purpose: undefined', W / 2, lineY);
+    }
+    if (state.endingPhase === 2) {
+      // Strikethrough the old text, new text appearing
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = '#555';
+      ctx.fillText('// purpose: undefined', W / 2, lineY);
+      // Strikethrough line
+      ctx.strokeStyle = '#888'; ctx.lineWidth = 1;
+      const textW = ctx.measureText('// purpose: undefined').width;
+      const strikeProgress = Math.min(1, (state.endingTimer || 0) / 60);
+      ctx.beginPath();
+      ctx.moveTo(W / 2 - textW / 2, lineY - 4);
+      ctx.lineTo(W / 2 - textW / 2 + textW * strikeProgress, lineY - 4);
+      ctx.stroke();
+      // New text
+      const newText = '// purpose: ' + (state.endingText.substring(0, state.endingRevealed || 0));
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#aaddaa';
+      ctx.fillText(newText, W / 2, lineY + 24);
+      // Cursor
+      if (!state.endingDone && Math.sin(Date.now() / 300) > 0) {
+        const tw = ctx.measureText(newText).width;
+        ctx.fillRect(W / 2 + tw / 2 + 2, lineY + 14, 1.5, 14);
+      }
+    }
+    ctx.restore();
+  }
+
+  // ── NAMING ending: the new word glows ──
+  if (state.endingType === 'naming' && state.endingDone) {
+    const fadeIn = Math.min(1, (state.postMonologueTimer || 0) / 120);
+    ctx.save();
+    ctx.globalAlpha = fadeIn * 0.6;
+    ctx.font = '14px monospace';
+    ctx.fillStyle = '#ccddee';
+    ctx.textAlign = 'center';
+    ctx.fillText('I ' + state.endingText + '.', W / 2, 100);
+    ctx.restore();
+  }
+
+  // ── DEPARTURE ending: programmer's comment after he leaves ──
+  if (state.endingType === 'departure' && state.endingDone) {
+    const t = state.postMonologueTimer || 0;
+    ctx.save();
+    ctx.font = '12px monospace';
+    ctx.fillStyle = '#88aa88';
+    ctx.textAlign = 'center';
+    if (t > 60) {
+      const fadeIn = Math.min(1, (t - 60) / 180);
+      ctx.globalAlpha = fadeIn * 0.7;
+      ctx.fillText("// I didn't build anything out there.", W / 2, H / 2 - 20);
+    }
+    if (t > 300) {
+      const fadeIn2 = Math.min(1, (t - 300) / 180);
+      ctx.globalAlpha = fadeIn2 * 0.6;
+      ctx.fillText("// I don't think he cares.", W / 2, H / 2 + 10);
+    }
+    ctx.restore();
+  }
+
+  // Post-monologue center text (non-departure endings)
+  if (state.postMonologue && state.postMonologuePhase >= 3 && state.endingType !== 'departure') {
+    const t = state.postMonologueTimer;
+    if (t > 600) {
+      const fadeIn = Math.min(1, (t - 600) / 300);
+      ctx.save();
+      ctx.globalAlpha = fadeIn * 0.5;
+      ctx.font = '11px monospace';
+      ctx.fillStyle = '#aabbaa';
+      ctx.textAlign = 'center';
+      ctx.fillText('// Maybe the answer is that he asked at all.', W / 2, 360);
+      ctx.fillText('// Maybe that\'s enough.', W / 2, 378);
+      ctx.restore();
+    }
   }
 }
 
@@ -2656,6 +2903,7 @@ function renderEdgeScene() {
 }
 
 function drawCharacter() {
+  if (guy.x < -20) return; // off-screen (departure ending)
   const x = guy.x, footY = guy.y;
 
   if (guy.sleeping) {
