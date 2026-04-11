@@ -294,6 +294,10 @@
         <canvas class="tile-canvas" data-tile="dof"></canvas>
         <div class="tile-label">Depth of Field</div>
       </a>
+      <a href="/lab/roto/" class="sidebar-tile" title="Rotoscope → Spritesheet">
+        <canvas class="tile-canvas" data-tile="roto"></canvas>
+        <div class="tile-label">Rotoscope</div>
+      </a>
       <div class="sidebar-tile" title="Iron & Ether — In Development">
         <canvas class="tile-canvas" data-tile="ironether"></canvas>
         <div class="tile-label">Iron & Ether</div>
@@ -454,6 +458,38 @@
         vg.addColorStop(0,'transparent');
         vg.addColorStop(1,'rgba(0,0,0,0.6)');
         ctx.fillStyle = vg; ctx.fillRect(0,0,w,h);
+      } else if (type === 'roto') {
+        // Rotoscope: stick figure animation
+        ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, w, h);
+        // Ghost frame (onion skin)
+        const phase = (time * 0.5) % (Math.PI * 2);
+        const prevPhase = phase - 0.4;
+        ctx.strokeStyle = 'rgba(184,156,255,0.15)'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        const hx = w/2, hy = h*0.3;
+        // prev pose
+        ctx.moveTo(hx, hy+10);
+        ctx.lineTo(hx, hy+35);
+        ctx.moveTo(hx-12+Math.sin(prevPhase)*8, hy+55);
+        ctx.lineTo(hx, hy+35);
+        ctx.lineTo(hx+12-Math.sin(prevPhase)*8, hy+55);
+        ctx.moveTo(hx-10+Math.cos(prevPhase)*6, hy+22);
+        ctx.lineTo(hx, hy+15);
+        ctx.lineTo(hx+10-Math.cos(prevPhase)*6, hy+22);
+        ctx.stroke();
+        // Current pose
+        ctx.strokeStyle = '#b89cff'; ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(hx, hy, 6, 0, Math.PI*2); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(hx, hy+6); ctx.lineTo(hx, hy+30);
+        ctx.moveTo(hx-12+Math.sin(phase)*8, hy+50);
+        ctx.lineTo(hx, hy+30);
+        ctx.lineTo(hx+12-Math.sin(phase)*8, hy+50);
+        ctx.moveTo(hx-10+Math.cos(phase)*6, hy+18);
+        ctx.lineTo(hx, hy+10);
+        ctx.lineTo(hx+10-Math.cos(phase)*6, hy+18);
+        ctx.stroke();
       } else if (type === 'ironether') {
         ctx.fillStyle = '#0a0810'; ctx.fillRect(0, 0, w, h);
         ctx.strokeStyle = `rgba(255,140,60,${0.3+0.15*Math.sin(time*1.5)})`;
