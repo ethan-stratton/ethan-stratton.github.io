@@ -350,8 +350,8 @@ function renderWallWritings() {
   for (let i = 0; i < writings.length; i++) {
     const w = writings[i];
     let alpha = getWritingAlpha(w);
-    // Add cursor glow
-    alpha = Math.min(0.95, alpha + getWritingCursorGlow(w));
+    // Add cursor glow — but only if the writing is already visible
+    if (alpha > 0) alpha = Math.min(0.95, alpha + getWritingCursorGlow(w));
     // Scene 0 pulse for first writing at game start
     if (state.scene === 0 && i === 0 && state.frameCount < 180) {
       alpha = Math.max(alpha, 0.4 + 0.3 * Math.sin(state.frameCount * 0.08));
@@ -925,7 +925,7 @@ const scenes = [
       { x: 300, y: 50, lines: [
         '// This is the last room.',
       ], color: '#88aa88', reveal: 'always' },
-      { x: 100, y: 400, lines: [
+      { x: 100, y: 430, lines: [
         '// Just wait.',
       ], color: '#88aa88', reveal: 'always' },
       { x: 30, y: 180, lines: [
@@ -938,7 +938,7 @@ const scenes = [
         '// I just wanted to see what would happen.',
       ], color: '#7a7a8a', reveal: 'after:scene8_speak' },
       {
-        x: 250, y: 280,
+        x: 550, y: 250,
         lines: [
           '// I think I made this because I was lonely.',
           '// Is that a good enough reason?',
