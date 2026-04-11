@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IGN Debanding — strattao</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400&family=JetBrains+Mono:wght@300;400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    color: #c8c0b8;
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+  }
+
+  canvas#starfield {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 60px 24px 80px;
+  }
+
+  header { margin-bottom: 48px; }
+
+  header h1 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 2rem;
+    color: #e8e0d8;
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 30px rgba(180, 140, 255, 0.3);
+  }
+
+  header .sub {
+    font-size: 0.8rem;
+    color: #585050;
+    margin-top: 8px;
+  }
+
+  header .sub a {
+    color: #b89cff;
+    text-decoration: none;
+  }
+  header .sub a:hover {
+    text-shadow: 0 0 8px rgba(184, 156, 255, 0.5);
+  }
+
+  .intro {
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: #908880;
+    margin-bottom: 40px;
+    max-width: 640px;
+  }
+
+  .intro strong { color: #c8c0b8; font-weight: 400; }
+  .intro code {
+    background: rgba(184, 156, 255, 0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+  }
+
+  /* ── Demo area ── */
+  .demo-section {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(184, 156, 255, 0.1);
+    border-radius: 8px;
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+
+  .demo-section h2 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 1.1rem;
+    color: #a898c8;
+    margin-bottom: 16px;
+    letter-spacing: 0.04em;
+  }
+
+  .split-view {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 16px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(184, 156, 255, 0.08);
+  }
+
+  .split-view canvas {
+    flex: 1;
+    display: block;
+  }
+
+  .split-label-row {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 16px;
+  }
+
+  .split-label {
+    font-size: 0.7rem;
+    color: #706860;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .split-label.active { color: #b89cff; }
+
+  /* Single canvas mode */
+  .full-canvas {
+    width: 100%;
+    border-radius: 6px;
+    border: 1px solid rgba(184, 156, 255, 0.08);
+    display: block;
+    margin-bottom: 16px;
+  }
+
+  label {
+    display: block;
+    font-size: 0.7rem;
+    color: #706860;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    margin-top: 12px;
+  }
+
+  label:first-child { margin-top: 0; }
+
+  .val {
+    float: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: #b89cff;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: rgba(184, 156, 255, 0.12);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #b89cff;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(184, 156, 255, 0.4);
+  }
+
+  select {
+    width: 100%;
+    padding: 6px 8px;
+    background: rgba(184, 156, 255, 0.06);
+    border: 1px solid rgba(184, 156, 255, 0.15);
+    border-radius: 4px;
+    color: #c8c0b8;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    outline: none;
+  }
+
+  .controls-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .controls-row > div { flex: 1; min-width: 200px; }
+
+  .code-block {
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(184, 156, 255, 0.1);
+    border-radius: 6px;
+    padding: 16px;
+    margin-top: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: #a8a098;
+    overflow-x: auto;
+  }
+
+  .code-block .keyword { color: #b89cff; }
+  .code-block .func { color: #60d0ff; }
+  .code-block .num { color: #ff9060; }
+  .code-block .comment { color: #505050; }
+
+  .toggle-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .toggle-btn {
+    padding: 8px 16px;
+    background: rgba(184, 156, 255, 0.06);
+    border: 1px solid rgba(184, 156, 255, 0.15);
+    border-radius: 4px;
+    color: #908880;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .toggle-btn:hover {
+    background: rgba(184, 156, 255, 0.12);
+    color: #dcc8ff;
+  }
+
+  .toggle-btn.active {
+    background: rgba(184, 156, 255, 0.15);
+    color: #dcc8ff;
+    border-color: rgba(184, 156, 255, 0.4);
+    box-shadow: 0 0 10px rgba(184, 156, 255, 0.1);
+  }
+
+  .zoom-hint {
+    font-size: 0.68rem;
+    color: #504848;
+    font-style: italic;
+    margin-top: 8px;
+  }
+
+  footer {
+    text-align: center;
+    color: #403838;
+    font-size: 0.75rem;
+    padding: 60px 0 40px;
+    letter-spacing: 0.04em;
+  }
+
+  footer a { color: #b89cff; text-decoration: none; }
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<div class="content">
+
+  <header>
+    <h1>IGN Debanding</h1>
+    <p class="sub"><a href="/">← strattao</a> · lab</p>
+  </header>
+
+  <div class="intro">
+    <p><strong>Color banding</strong> is the ugly staircase pattern you see in gradients, glows, fog, and dark scenes — anywhere colors transition slowly across few bits of precision.</p>
+    <p style="margin-top:10px;"><strong>Interleaved Gradient Noise</strong> is one line of shader code that kills it. It adds a tiny imperceptible noise pattern that breaks up the bands. Unlike random noise (which looks grainy), IGN is spatially coherent — neighboring pixels get similar-but-different offsets, so the result looks smooth to your eye.</p>
+    <p style="margin-top:10px;">From <strong>Acerola's video</strong>: must be applied at draw time, not as post-processing. The holy grail for debanding glows and fog in 2D games.</p>
+  </div>
+
+  <!-- ── Demo 1: Side by side gradient ── -->
+  <div class="demo-section">
+    <h2>Gradient Comparison</h2>
+    <div class="split-view">
+      <canvas id="grad-banded" width="440" height="300"></canvas>
+      <canvas id="grad-ign" width="440" height="300"></canvas>
+    </div>
+    <div class="split-label-row">
+      <span class="split-label">← No debanding (banded)</span>
+      <span class="split-label active">IGN debanding →</span>
+    </div>
+
+    <div class="controls-row">
+      <div>
+        <label>Gradient Type <span class="val" id="v-gtype">radial glow</span></label>
+        <select id="grad-type">
+          <option value="radial">Radial Glow</option>
+          <option value="linear">Linear Gradient</option>
+          <option value="vignette">Vignette</option>
+          <option value="fog">Fog Layer</option>
+        </select>
+
+        <label>Color <span class="val" id="v-gcolor">purple</span></label>
+        <select id="grad-color">
+          <option value="purple">Purple</option>
+          <option value="blue">Blue</option>
+          <option value="red">Red/Orange</option>
+          <option value="green">Green</option>
+          <option value="white">White</option>
+        </select>
+      </div>
+      <div>
+        <label>Bit Depth (simulated) <span class="val" id="v-bits">5</span></label>
+        <input type="range" id="bits" min="2" max="8" step="1" value="5">
+
+        <label>Noise Strength <span class="val" id="v-strength">1.0</span></label>
+        <input type="range" id="strength" min="0" max="3" step="0.1" value="1">
+
+        <label>Zoom (see the pixels) <span class="val" id="v-zoom">1x</span></label>
+        <input type="range" id="zoom" min="1" max="8" step="1" value="1">
+      </div>
+    </div>
+    <p class="zoom-hint">Crank zoom to 4x+ to really see the banding vs the noise pattern</p>
+  </div>
+
+  <!-- ── Demo 2: Animated glow ── -->
+  <div class="demo-section">
+    <h2>Animated Glow</h2>
+    <p style="font-size:0.82rem;color:#706860;margin-bottom:16px;">A pulsing glow — the kind you'd see around a spell, a lamp, or a firefly in a 2D game. Toggle debanding on/off.</p>
+    <div class="toggle-row">
+      <button class="toggle-btn active" id="glow-off-btn">Banded</button>
+      <button class="toggle-btn" id="glow-on-btn">IGN Debanded</button>
+      <button class="toggle-btn" id="glow-split-btn">Split</button>
+    </div>
+    <canvas id="glow-canvas" class="full-canvas" width="880" height="300"></canvas>
+
+    <label>Glow Intensity <span class="val" id="v-glow-int">0.6</span></label>
+    <input type="range" id="glow-intensity" min="0.1" max="1" step="0.05" value="0.6">
+
+    <label>Glow Radius <span class="val" id="v-glow-rad">120</span></label>
+    <input type="range" id="glow-radius" min="30" max="250" step="5" value="120">
+  </div>
+
+  <!-- ── The Code ── -->
+  <div class="demo-section">
+    <h2>The Code</h2>
+    <p style="font-size:0.82rem;color:#706860;margin-bottom:16px;">This is literally the entire thing. One function.</p>
+    <div class="code-block">
+      <span class="comment">// Interleaved Gradient Noise — Jorge Jimenez, 2014</span><br>
+      <span class="keyword">float</span> <span class="func">IGN</span>(<span class="keyword">vec2</span> screenPos) {<br>
+      &nbsp;&nbsp;<span class="keyword">return</span> <span class="func">fract</span>(<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;<span class="num">52.9829189</span> * <span class="func">fract</span>(<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="func">dot</span>(screenPos, <span class="keyword">vec2</span>(<span class="num">0.06711056</span>, <span class="num">0.00583715</span>))<br>
+      &nbsp;&nbsp;&nbsp;&nbsp;)<br>
+      &nbsp;&nbsp;);<br>
+      }<br><br>
+      <span class="comment">// Usage: add to color before quantization</span><br>
+      color += (<span class="func">IGN</span>(gl_FragCoord.xy) - <span class="num">0.5</span>) / levels;
+    </div>
+  </div>
+
+</div>
+
+<footer><a href="/">strattao</a> · built by hand</footer>
+
+<script>
+(function() {
+
+  // ── Starfield ──
+  const sf = document.getElementById('starfield');
+  const sfCtx = sf.getContext('2d');
+  let sw, sh, sfStars;
+  function sfResize() { sw = sf.width = window.innerWidth; sh = sf.height = window.innerHeight; }
+  function sfCreate() {
+    sfStars = [];
+    for (let i = 0; i < 140; i++) {
+      sfStars.push({
+        x: Math.random()*sw, y: Math.random()*sh,
+        size: 0.3+Math.random()*1.5, speed: 0.1+Math.random()*0.4,
+        alpha: 0.2+Math.random()*0.4, ts: 0.005+Math.random()*0.015,
+        to: Math.random()*Math.PI*2, hue: 240+Math.random()*40, sat: Math.random()*25
+      });
+    }
+  }
+  let sfT = 0;
+  function sfDraw() {
+    sfCtx.clearRect(0,0,sw,sh); sfT++;
+    for (const s of sfStars) {
+      s.y -= s.speed;
+      if (s.y < -2) { s.y = sh+2; s.x = Math.random()*sw; }
+      const a = s.alpha*(0.5+0.5*Math.sin(sfT*s.ts+s.to));
+      sfCtx.beginPath(); sfCtx.arc(s.x,s.y,s.size,0,Math.PI*2);
+      sfCtx.fillStyle = `hsla(${s.hue},${s.sat}%,85%,${a})`; sfCtx.fill();
+    }
+    requestAnimationFrame(sfDraw);
+  }
+  window.addEventListener('resize', () => { sfResize(); sfCreate(); });
+  sfResize(); sfCreate(); sfDraw();
+
+  // ── Helpers ──
+  const el = id => document.getElementById(id);
+
+  // IGN function (same math as the shader)
+  function ign(x, y) {
+    return fract(52.9829189 * fract(x * 0.06711056 + y * 0.00583715));
+  }
+
+  function fract(x) { return x - Math.floor(x); }
+
+  // Quantize to simulate low bit depth
+  function quantize(v, bits) {
+    const levels = (1 << bits) - 1;
+    return Math.round(v * levels) / levels;
+  }
+
+  function quantizeWithIGN(v, bits, x, y, strength) {
+    const levels = (1 << bits) - 1;
+    const noise = (ign(x, y) - 0.5) * strength / levels;
+    return Math.round((v + noise) * levels) / levels;
+  }
+
+  // Color bases
+  const colors = {
+    purple: [80, 40, 160],
+    blue: [20, 60, 180],
+    red: [180, 50, 20],
+    green: [20, 140, 60],
+    white: [160, 160, 160],
+  };
+
+  // ── Demo 1: Gradient comparison ──
+  const cBanded = el('grad-banded');
+  const cIgn = el('grad-ign');
+  const ctxB = cBanded.getContext('2d');
+  const ctxI = cIgn.getContext('2d');
+
+  function gradientValue(type, x, y, w, h) {
+    if (type === 'radial') {
+      const dx = x - w/2, dy = y - h/2;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      const maxD = Math.sqrt(w*w/4 + h*h/4);
+      return Math.max(0, 1 - d / maxD);
+    } else if (type === 'linear') {
+      return 1 - y / h;
+    } else if (type === 'vignette') {
+      const dx = (x - w/2) / (w/2);
+      const dy = (y - h/2) / (h/2);
+      const d = Math.sqrt(dx*dx + dy*dy);
+      return Math.max(0, 1 - d * 0.8);
+    } else { // fog
+      const wave = Math.sin(x / w * Math.PI * 2) * 0.15;
+      return Math.max(0, Math.min(1, (1 - y/h) * 0.7 + wave));
+    }
+  }
+
+  function drawGradDemo() {
+    const type = el('grad-type').value;
+    const col = colors[el('grad-color').value];
+    const bits = parseInt(el('bits').value);
+    const strength = parseFloat(el('strength').value);
+    const zoom = parseInt(el('zoom').value);
+
+    const rw = Math.ceil(cBanded.width / zoom);
+    const rh = Math.ceil(cBanded.height / zoom);
+
+    const imgB = ctxB.createImageData(cBanded.width, cBanded.height);
+    const imgI = ctxI.createImageData(cIgn.width, cIgn.height);
+
+    for (let py = 0; py < cBanded.height; py++) {
+      for (let px = 0; px < cBanded.width; px++) {
+        // Sample at zoomed coordinates
+        const sx = Math.floor(px / zoom);
+        const sy = Math.floor(py / zoom);
+
+        const v = gradientValue(type, sx, sy, rw, rh);
+        const vB = quantize(v, bits);
+        const vI = quantizeWithIGN(v, bits, sx, sy, strength);
+
+        const idx = (py * cBanded.width + px) * 4;
+
+        // Banded
+        imgB.data[idx]     = col[0] * vB;
+        imgB.data[idx + 1] = col[1] * vB;
+        imgB.data[idx + 2] = col[2] * vB;
+        imgB.data[idx + 3] = 255;
+
+        // IGN
+        imgI.data[idx]     = Math.min(255, col[0] * vI);
+        imgI.data[idx + 1] = Math.min(255, col[1] * vI);
+        imgI.data[idx + 2] = Math.min(255, col[2] * vI);
+        imgI.data[idx + 3] = 255;
+      }
+    }
+
+    ctxB.putImageData(imgB, 0, 0);
+    ctxI.putImageData(imgI, 0, 0);
+
+    // Labels
+    ctxB.fillStyle = 'rgba(200,190,180,0.4)';
+    ctxB.font = '11px Inter';
+    ctxB.fillText('BANDED', 12, 22);
+
+    ctxI.fillStyle = 'rgba(184,156,255,0.5)';
+    ctxI.font = '11px Inter';
+    ctxI.fillText('IGN', 12, 22);
+  }
+
+  // ── Demo 2: Animated glow ──
+  const glowC = el('glow-canvas');
+  const glowCtx = glowC.getContext('2d');
+  let glowMode = 'banded'; // 'banded', 'ign', 'split'
+  let glowTime = 0;
+
+  el('glow-off-btn').addEventListener('click', () => { glowMode = 'banded'; updateGlowBtns(); });
+  el('glow-on-btn').addEventListener('click', () => { glowMode = 'ign'; updateGlowBtns(); });
+  el('glow-split-btn').addEventListener('click', () => { glowMode = 'split'; updateGlowBtns(); });
+
+  function updateGlowBtns() {
+    el('glow-off-btn').classList.toggle('active', glowMode === 'banded');
+    el('glow-on-btn').classList.toggle('active', glowMode === 'ign');
+    el('glow-split-btn').classList.toggle('active', glowMode === 'split');
+  }
+
+  function drawGlow() {
+    glowTime += 0.03;
+    const w = glowC.width, h = glowC.height;
+    const intensity = parseFloat(el('glow-intensity').value);
+    const baseRadius = parseFloat(el('glow-radius').value);
+    const pulse = 1 + 0.2 * Math.sin(glowTime * 2);
+    const radius = baseRadius * pulse;
+    const cx = w / 2, cy = h / 2;
+    const bits = 5; // fixed low bit depth to show the effect
+
+    const img = glowCtx.createImageData(w, h);
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const dx = x - cx, dy = y - cy;
+        const d = Math.sqrt(dx*dx + dy*dy);
+        const v = Math.max(0, (1 - d / radius)) * intensity;
+
+        const idx = (y * w + x) * 4;
+
+        let useIGN;
+        if (glowMode === 'split') {
+          useIGN = x >= w / 2;
+        } else {
+          useIGN = glowMode === 'ign';
+        }
+
+        const q = useIGN ? quantizeWithIGN(v, bits, x, y, 1.0) : quantize(v, bits);
+        const qc = Math.min(1, q);
+
+        // Purple glow on dark bg
+        img.data[idx]     = qc * 140;
+        img.data[idx + 1] = qc * 80;
+        img.data[idx + 2] = qc * 255;
+        img.data[idx + 3] = 255;
+      }
+    }
+
+    glowCtx.putImageData(img, 0, 0);
+
+    // Split line
+    if (glowMode === 'split') {
+      glowCtx.strokeStyle = 'rgba(184,156,255,0.3)';
+      glowCtx.lineWidth = 1;
+      glowCtx.setLineDash([4, 4]);
+      glowCtx.beginPath();
+      glowCtx.moveTo(w/2, 0);
+      glowCtx.lineTo(w/2, h);
+      glowCtx.stroke();
+      glowCtx.setLineDash([]);
+
+      glowCtx.fillStyle = 'rgba(200,190,180,0.35)';
+      glowCtx.font = '10px Inter';
+      glowCtx.fillText('BANDED', 12, 18);
+      glowCtx.fillStyle = 'rgba(184,156,255,0.45)';
+      glowCtx.fillText('IGN', w/2 + 12, 18);
+    }
+
+    requestAnimationFrame(drawGlow);
+  }
+
+  // ── Controls ──
+  function updateLabels() {
+    el('v-gtype').textContent = el('grad-type').options[el('grad-type').selectedIndex].text.toLowerCase();
+    el('v-gcolor').textContent = el('grad-color').value;
+    el('v-bits').textContent = el('bits').value;
+    el('v-strength').textContent = parseFloat(el('strength').value).toFixed(1);
+    el('v-zoom').textContent = el('zoom').value + 'x';
+    el('v-glow-int').textContent = parseFloat(el('glow-intensity').value).toFixed(2);
+    el('v-glow-rad').textContent = el('glow-radius').value;
+    drawGradDemo();
+  }
+
+  document.querySelectorAll('.demo-section input, .demo-section select').forEach(e => {
+    e.addEventListener('input', updateLabels);
+  });
+
+  // Init
+  updateLabels();
+  drawGlow();
+
+})();
+</script>
+
+</body>
+</html>
