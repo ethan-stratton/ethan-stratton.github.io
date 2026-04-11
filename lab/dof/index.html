@@ -739,8 +739,8 @@ function animate() {
   let moving = false;
   if (keys['KeyW'] || keys['ArrowUp'])    { player.x += forward.x*speed*dt; player.z += forward.z*speed*dt; moving = true; }
   if (keys['KeyS'] || keys['ArrowDown'])   { player.x -= forward.x*speed*dt; player.z -= forward.z*speed*dt; moving = true; }
-  if (keys['KeyA'] || keys['ArrowLeft'])    { player.x -= right.x*speed*dt; player.z -= right.z*speed*dt; moving = true; }
-  if (keys['KeyD'] || keys['ArrowRight'])   { player.x += right.x*speed*dt; player.z += right.z*speed*dt; moving = true; }
+  if (keys['KeyA'] || keys['ArrowLeft'])    { player.x += right.x*speed*dt; player.z += right.z*speed*dt; moving = true; }
+  if (keys['KeyD'] || keys['ArrowRight'])   { player.x -= right.x*speed*dt; player.z -= right.z*speed*dt; moving = true; }
 
   // Vertical
   const eyeBase = keys['KeyC'] ? 1.0 : 1.7;
