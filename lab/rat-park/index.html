@@ -5,644 +5,688 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Rat Park</title>
 <style>
+  @font-face {
+    font-family: 'pixel';
+    src: url('https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2') format('woff2');
+  }
   * { margin: 0; padding: 0; }
   body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-  canvas { image-rendering: pixelated; cursor: none; }
+  canvas { image-rendering: pixelated; }
+  /* Preload the font */
+  .font-preload { font-family: 'Press Start 2P', monospace; position: absolute; left: -9999px; }
 </style>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
+<span class="font-preload">.</span>
 <canvas id="c"></canvas>
 <script>
-// ── CONFIG ──
+// Wait for font to load
+document.fonts.ready.then(() => { init(); });
+
+function init() {
+
 const SCALE = 3;
-const W = 256, H = 224; // SNES res
+const W = 320, H = 240;
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 canvas.width = W * SCALE;
 canvas.height = H * SCALE;
 ctx.imageSmoothingEnabled = false;
 
-// Offscreen buffer at native res
 const buf = document.createElement('canvas');
 buf.width = W; buf.height = H;
 const bx = buf.getContext('2d');
 
-// ── COLORS — mood-dependent ──
-const MOOD = {
-  connected: {
-    bg: '#2a1a3a',
-    cage: '#5a4a6a',
-    floor: '#3a2a4a',
-    accent: '#b89cff',
-    sky: '#1a0a2a'
-  },
-  neutral: {
-    bg: '#1a1a22',
-    cage: '#3a3a44',
-    floor: '#2a2a32',
-    accent: '#7a7a88',
-    sky: '#0e0e14'
-  },
-  isolated: {
-    bg: '#111114',
-    cage: '#222228',
-    floor: '#1a1a1e',
-    accent: '#444450',
-    sky: '#08080c'
+// ── PIXEL ART SPRITE SYSTEM ──
+// Sprites are defined as arrays of [x, y, color] relative to top-left
+// We cache them as ImageData for fast drawing
+
+const spriteCache = {};
+
+function defineSprite(name, w, h, pixels) {
+  const cvs = document.createElement('canvas');
+  cvs.width = w; cvs.height = h;
+  const c = cvs.getContext('2d');
+  for (const [x, y, col] of pixels) {
+    c.fillStyle = col;
+    c.fillRect(x, y, 1, 1);
   }
+  spriteCache[name] = cvs;
+}
+
+function drawSprite(name, x, y, flipX) {
+  const spr = spriteCache[name];
+  if (!spr) return;
+  if (flipX) {
+    bx.save();
+    bx.translate(Math.floor(x + spr.width), Math.floor(y));
+    bx.scale(-1, 1);
+    bx.drawImage(spr, 0, 0);
+    bx.restore();
+  } else {
+    bx.drawImage(spr, Math.floor(x), Math.floor(y));
+  }
+}
+
+// ── DEFINE RAT SPRITES ──
+// 16x16 rat - idle, facing right
+// Color tokens: B=body, E=ear, I=inner ear, Y=eye, N=nose, T=tail, W=whisker, P=paw
+
+function makeRatSprite(name, bodyCol, earCol, innerEarCol, belly, hasBow) {
+  const px = [];
+  const B = bodyCol, E = earCol, IE = innerEarCol, BL = belly;
+
+  // Ears (row 2-3)
+  px.push([9, 1, E], [10, 1, E]);
+  px.push([12, 1, E], [13, 1, E]);
+  px.push([9, 2, IE], [10, 2, E]);
+  px.push([12, 2, IE], [13, 2, E]);
+
+  // Head (row 3-7)
+  px.push([8, 3, B], [9, 3, B], [10, 3, B], [11, 3, B], [12, 3, B], [13, 3, B]);
+  px.push([7, 4, B], [8, 4, B], [9, 4, B], [10, 4, '#111'], [11, 4, B], [12, 4, B], [13, 4, B], [14, 4, B]);
+  px.push([7, 5, B], [8, 5, B], [9, 5, B], [10, 5, B], [11, 5, B], [12, 5, B], [13, 5, B], [14, 5, B]);
+  px.push([8, 6, B], [9, 6, B], [10, 6, B], [11, 6, B], [12, 6, B], [13, 6, B], [14, 6, '#222']); // nose
+  px.push([9, 7, B], [10, 7, B], [11, 7, B], [12, 7, B]);
+
+  // Whiskers
+  px.push([15, 5, '#aaa8'], [14, 4, '#aaa6']);
+
+  // Body (row 7-11)
+  px.push([5, 7, B], [6, 7, B], [7, 7, B], [8, 7, B], [9, 7, B], [10, 7, B], [11, 7, B]);
+  px.push([4, 8, B], [5, 8, B], [6, 8, BL], [7, 8, BL], [8, 8, BL], [9, 8, B], [10, 8, B], [11, 8, B]);
+  px.push([4, 9, B], [5, 9, B], [6, 9, BL], [7, 9, BL], [8, 9, BL], [9, 9, B], [10, 9, B], [11, 9, B]);
+  px.push([4, 10, B], [5, 10, B], [6, 10, B], [7, 10, B], [8, 10, B], [9, 10, B], [10, 10, B]);
+  px.push([5, 11, B], [6, 11, B], [7, 11, B], [8, 11, B], [9, 11, B]);
+
+  // Paws (row 12-13)
+  px.push([4, 11, '#e8c8b0'], [5, 12, '#e8c8b0'], [9, 11, '#e8c8b0'], [10, 12, '#e8c8b0']);
+
+  // Tail (row 9-10, going left)
+  px.push([3, 9, '#d8a8a0'], [2, 8, '#d8a8a0'], [1, 7, '#d8a8a0'], [0, 7, '#d8a8a0']);
+
+  // Bow (girl rat)
+  if (hasBow) {
+    px.push([10, 0, '#ff5080'], [11, 0, '#ff5080'], [12, 0, '#ff5080']);
+    px.push([11, 1, '#ff3060']);
+    px.push([10, 2, '#ff5080'], [12, 2, '#ff5080']);
+  }
+
+  defineSprite(name, 16, 14, px);
+}
+
+function makeRatWalkSprite(name, bodyCol, earCol, innerEarCol, belly, hasBow) {
+  const px = [];
+  const B = bodyCol, E = earCol, IE = innerEarCol, BL = belly;
+
+  // Same head
+  px.push([9, 1, E], [10, 1, E], [12, 1, E], [13, 1, E]);
+  px.push([9, 2, IE], [10, 2, E], [12, 2, IE], [13, 2, E]);
+  px.push([8, 3, B], [9, 3, B], [10, 3, B], [11, 3, B], [12, 3, B], [13, 3, B]);
+  px.push([7, 4, B], [8, 4, B], [9, 4, B], [10, 4, '#111'], [11, 4, B], [12, 4, B], [13, 4, B], [14, 4, B]);
+  px.push([7, 5, B], [8, 5, B], [9, 5, B], [10, 5, B], [11, 5, B], [12, 5, B], [13, 5, B], [14, 5, B]);
+  px.push([8, 6, B], [9, 6, B], [10, 6, B], [11, 6, B], [12, 6, B], [13, 6, B], [14, 6, '#222']);
+  px.push([9, 7, B], [10, 7, B], [11, 7, B], [12, 7, B]);
+  px.push([15, 5, '#aaa8'], [14, 4, '#aaa6']);
+
+  // Body
+  px.push([5, 7, B], [6, 7, B], [7, 7, B], [8, 7, B], [9, 7, B], [10, 7, B], [11, 7, B]);
+  px.push([4, 8, B], [5, 8, B], [6, 8, BL], [7, 8, BL], [8, 8, BL], [9, 8, B], [10, 8, B], [11, 8, B]);
+  px.push([4, 9, B], [5, 9, B], [6, 9, BL], [7, 9, BL], [8, 9, BL], [9, 9, B], [10, 9, B], [11, 9, B]);
+  px.push([4, 10, B], [5, 10, B], [6, 10, B], [7, 10, B], [8, 10, B], [9, 10, B], [10, 10, B]);
+  px.push([5, 11, B], [6, 11, B], [7, 11, B], [8, 11, B], [9, 11, B]);
+
+  // Legs offset (walking)
+  px.push([3, 11, '#e8c8b0'], [6, 12, '#e8c8b0'], [8, 11, '#e8c8b0'], [11, 12, '#e8c8b0']);
+
+  // Tail (slightly different curve)
+  px.push([3, 9, '#d8a8a0'], [2, 9, '#d8a8a0'], [1, 8, '#d8a8a0'], [0, 8, '#d8a8a0']);
+
+  if (hasBow) {
+    px.push([10, 0, '#ff5080'], [11, 0, '#ff5080'], [12, 0, '#ff5080']);
+    px.push([11, 1, '#ff3060']);
+    px.push([10, 2, '#ff5080'], [12, 2, '#ff5080']);
+  }
+
+  defineSprite(name, 16, 14, px);
+}
+
+// Player rat (grey)
+makeRatSprite('player_idle', '#b0a090', '#c0a898', '#e8b8b0', '#c8b8a8', false);
+makeRatWalkSprite('player_walk', '#b0a090', '#c0a898', '#e8b8b0', '#c8b8a8', false);
+
+// Hazel (pink-ish, bow)
+makeRatSprite('hazel_idle', '#c89898', '#d8a8a0', '#f0c0c0', '#d8b0b0', true);
+
+// Bruno (dark brown, big)
+makeRatSprite('bruno_idle', '#705840', '#806850', '#a08070', '#907860', false);
+
+// Pip (cream/yellow, small — we'll just scale)
+makeRatSprite('pip_idle', '#c8b880', '#d0c090', '#e0d0a0', '#d8c898', false);
+
+// ── ENVIRONMENT SPRITES ──
+// Running wheel (20x20)
+function drawWheel(x, y, time) {
+  const cx = x + 10, cy = y + 10;
+  // Outer ring
+  bx.strokeStyle = '#8878a0';
+  bx.lineWidth = 2;
+  bx.beginPath();
+  bx.arc(cx, cy, 9, 0, Math.PI * 2);
+  bx.stroke();
+  // Inner ring
+  bx.strokeStyle = '#685870';
+  bx.lineWidth = 1;
+  bx.beginPath();
+  bx.arc(cx, cy, 5, 0, Math.PI * 2);
+  bx.stroke();
+  // Spokes (rotating)
+  bx.strokeStyle = '#786890';
+  bx.lineWidth = 1;
+  for (let i = 0; i < 6; i++) {
+    const a = i * Math.PI / 3 + time * 0.8;
+    bx.beginPath();
+    bx.moveTo(cx + Math.cos(a) * 5, cy + Math.sin(a) * 5);
+    bx.lineTo(cx + Math.cos(a) * 9, cy + Math.sin(a) * 9);
+    bx.stroke();
+  }
+  // Stand
+  bx.strokeStyle = '#585060';
+  bx.lineWidth = 1.5;
+  bx.beginPath();
+  bx.moveTo(cx, cy + 9);
+  bx.lineTo(cx - 4, cy + 14);
+  bx.moveTo(cx, cy + 9);
+  bx.lineTo(cx + 4, cy + 14);
+  bx.stroke();
+}
+
+// Water bottle
+function drawBottle(x, y, isClean) {
+  // Tube
+  bx.fillStyle = isClean ? 'rgba(100, 160, 255, 0.5)' : 'rgba(100, 255, 130, 0.5)';
+  bx.fillRect(x + 3, y, 6, 18);
+  // Cap
+  bx.fillStyle = '#888';
+  bx.fillRect(x + 2, y - 2, 8, 3);
+  // Water level
+  bx.fillStyle = isClean ? 'rgba(80, 130, 255, 0.6)' : 'rgba(80, 255, 110, 0.6)';
+  bx.fillRect(x + 4, y + 4, 4, 12);
+  // Nozzle
+  bx.fillStyle = '#aaa';
+  bx.fillRect(x + 5, y + 18, 2, 3);
+}
+
+// Nest
+function drawNest(x, y) {
+  // Shredded paper / bedding
+  bx.fillStyle = '#a09070';
+  bx.beginPath();
+  bx.ellipse(x + 16, y + 6, 16, 6, 0, 0, Math.PI * 2);
+  bx.fill();
+  bx.fillStyle = '#b8a080';
+  bx.beginPath();
+  bx.ellipse(x + 16, y + 4, 13, 4, 0, 0, Math.PI * 2);
+  bx.fill();
+  // Stray bits
+  bx.fillStyle = '#c8b890';
+  bx.fillRect(x + 4, y + 2, 3, 1);
+  bx.fillRect(x + 22, y + 3, 2, 1);
+  bx.fillRect(x + 12, y + 1, 4, 1);
+}
+
+// Tunnel
+function drawTunnel(x, y) {
+  // Cardboard tube
+  bx.fillStyle = '#8a7050';
+  bx.fillRect(x, y, 36, 18);
+  // Darker edge lines
+  bx.fillStyle = '#6a5030';
+  bx.fillRect(x, y, 36, 1);
+  bx.fillRect(x, y + 17, 36, 1);
+  // Openings
+  bx.fillStyle = '#1a1218';
+  bx.beginPath();
+  bx.ellipse(x + 2, y + 9, 3, 7, 0, 0, Math.PI * 2);
+  bx.fill();
+  bx.beginPath();
+  bx.ellipse(x + 34, y + 9, 3, 7, 0, 0, Math.PI * 2);
+  bx.fill();
+  // Corrugation lines
+  bx.strokeStyle = '#7a6040';
+  bx.lineWidth = 0.5;
+  for (let i = 4; i < 34; i += 3) {
+    bx.beginPath();
+    bx.moveTo(x + i, y + 1);
+    bx.lineTo(x + i, y + 17);
+    bx.stroke();
+  }
+}
+
+// ── MOOD COLORS ──
+const MOOD = {
+  connected: { bg: '#2a1a3a', cage: '#6a5a7a', floor: '#3a2a4a', floorLight: '#4a3a5a', bars: '#7a6a8a' },
+  neutral:   { bg: '#1a1a22', cage: '#3a3a44', floor: '#2a2a32', floorLight: '#323238', bars: '#4a4a54' },
+  isolated:  { bg: '#111114', cage: '#222228', floor: '#1a1a1e', floorLight: '#202024', bars: '#2a2a30' }
 };
 
+function lerpColor(a, b, t) {
+  const parse = c => { const h = parseInt(c.slice(1), 16); return [h>>16, (h>>8)&0xff, h&0xff]; };
+  const [ar,ag,ab] = parse(a), [br,bg,bb] = parse(b);
+  const r = Math.round(ar+(br-ar)*t), g = Math.round(ag+(bg-ag)*t), b2 = Math.round(ab+(bb-ab)*t);
+  return `rgb(${r},${g},${b2})`;
+}
+
+function getMood() {
+  const s = state.social;
+  const blend = (key) => {
+    if (s > 0.6) return lerpColor(MOOD.neutral[key], MOOD.connected[key], (s-0.6)/0.4);
+    return lerpColor(MOOD.isolated[key], MOOD.neutral[key], s/0.6);
+  };
+  return { bg: blend('bg'), cage: blend('cage'), floor: blend('floor'), floorLight: blend('floorLight'), bars: blend('bars') };
+}
+
 // ── GAME STATE ──
+const WORLD_W = 640;
+const FLOOR_Y = 185;
+const CAGE_TOP = 30;
+
 const state = {
-  social: 0.3,        // 0 = isolated, 1 = deeply connected
-  drugPull: 0,         // how much the drug is calling (computed)
+  social: 0.3,
   time: 0,
   camera: { x: 0 },
   dialogActive: false,
   dialogText: '',
   dialogQueue: [],
   dialogCallback: null,
-  interactPrompt: null  // {text, x, y}
+  dialogSpeaker: '',
+  dialogCharIdx: 0,      // typewriter effect
+  dialogFullText: '',
+  dialogTimer: 0
 };
 
-// ── WORLD ──
-const WORLD_W = 600;   // total cage width in pixels
-const FLOOR_Y = 170;
-const CAGE_TOP = 40;
-
-// ── PLAYER (the new rat) ──
 const player = {
-  x: 80, y: FLOOR_Y - 16,
-  w: 14, h: 16,
-  vx: 0,
-  facing: 1,     // 1 = right, -1 = left
-  frame: 0,
-  frameTimer: 0,
-  speed: 1.2,
-  talking: false
+  x: 80, y: FLOOR_Y,
+  w: 16, h: 14,
+  vx: 0, facing: 1,
+  frame: 0, frameTimer: 0,
+  speed: 1.5
 };
 
-// ── NPCs ──
 const npcs = [
   {
-    name: 'Hazel',
-    x: 180, y: FLOOR_Y - 16,
-    w: 14, h: 16,
-    facing: -1,
-    color: '#e8a0b0',   // pinkish
-    bow: true,
+    name: 'Hazel', sprite: 'hazel_idle',
+    x: 200, y: FLOOR_Y, facing: -1,
     dialog: [
       "Oh! You're new here.",
-      "It's not so bad once you get used to it.",
-      "The wheel is actually kind of fun. Try it!",
+      "It's not so bad once\nyou get used to it.",
+      "The wheel is actually\nkind of fun. Try it!",
       "...I'm glad you came over."
     ],
-    talked: false,
-    socialBonus: 0.15
+    talked: false, socialBonus: 0.15
   },
   {
-    name: 'Bruno',
-    x: 350, y: FLOOR_Y - 16,
-    w: 16, h: 16,
-    facing: 1,
-    color: '#8a7060',   // brown
-    bow: false,
+    name: 'Bruno', sprite: 'bruno_idle',
+    x: 380, y: FLOOR_Y, facing: 1,
     dialog: [
       "...",
       "You smell new.",
-      "See that water bottle on the far end?",
-      "Don't drink from it. Trust me.",
-      "...it makes everything quiet. But then you need more."
+      "See that bottle on\nthe far end?",
+      "Don't drink from it.\nTrust me.",
+      "It makes everything quiet.\nBut then you need more."
     ],
-    talked: false,
-    socialBonus: 0.15
+    talked: false, socialBonus: 0.15
   },
   {
-    name: 'Pip',
-    x: 480, y: FLOOR_Y - 16,
-    w: 12, h: 14,
-    facing: -1,
-    color: '#c8c0a0',   // cream/yellow
-    bow: false,
+    name: 'Pip', sprite: 'pip_idle',
+    x: 510, y: FLOOR_Y, facing: -1,
     dialog: [
       "hihihihi!",
-      "wanna race? I'm fast!",
-      "this place is okay. there's food and stuff.",
-      "sometimes the big ones watch us. it's weird.",
-      "but we got each other right??"
+      "wanna race?? i'm fast!",
+      "this place is okay.\nthere's food and stuff.",
+      "sometimes the big ones\nwatch us. it's weird.",
+      "but we got each other\nright??"
     ],
-    talked: false,
-    socialBonus: 0.1
+    talked: false, socialBonus: 0.1
   }
 ];
 
-// ── OBJECTS ──
 const objects = [
-  { type: 'wheel',   x: 230, y: FLOOR_Y - 28, w: 24, h: 28 },
-  { type: 'bottle',  x: 120, y: FLOOR_Y - 22, w: 10, h: 22, label: 'water' },
-  { type: 'nest',    x: 40,  y: FLOOR_Y - 10, w: 30, h: 10 },
-  { type: 'tunnel',  x: 400, y: FLOOR_Y - 20, w: 32, h: 20 },
-  // The drugged water — always at the far end
-  { type: 'drug',    x: 555, y: FLOOR_Y - 24, w: 14, h: 24, glow: 0 }
+  { type: 'wheel',  x: 260, y: FLOOR_Y - 24 },
+  { type: 'bottle', x: 135, y: FLOOR_Y - 21 },
+  { type: 'nest',   x: 40,  y: FLOOR_Y - 10 },
+  { type: 'tunnel', x: 430, y: FLOOR_Y - 16 },
+  { type: 'drug',   x: 590, y: FLOOR_Y - 24 }
 ];
 
 // ── INPUT ──
 const keys = {};
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
-  if (e.code === 'Space' || e.code === 'KeyE' || e.code === 'Enter') {
+  if (['Space','KeyE','Enter'].includes(e.code)) {
     e.preventDefault();
     handleInteract();
   }
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; });
 
-// ── INTERACT ──
+// ── DIALOG ──
+function setDialogText(text) {
+  state.dialogFullText = text;
+  state.dialogCharIdx = 0;
+  state.dialogText = '';
+  state.dialogTimer = 0;
+}
+
 function handleInteract() {
   if (state.dialogActive) {
-    advanceDialog();
+    // If still typing, show full text
+    if (state.dialogCharIdx < state.dialogFullText.length) {
+      state.dialogCharIdx = state.dialogFullText.length;
+      state.dialogText = state.dialogFullText;
+      return;
+    }
+    // Advance
+    if (state.dialogQueue.length > 0) {
+      setDialogText(state.dialogQueue.shift());
+    } else {
+      state.dialogActive = false;
+      if (state.dialogCallback) { state.dialogCallback(); state.dialogCallback = null; }
+    }
     return;
   }
 
-  // Check NPC proximity
+  // NPCs
   for (const npc of npcs) {
-    if (Math.abs(player.x - npc.x) < 28 && Math.abs(player.y - npc.y) < 20) {
-      startDialog(npc);
-      return;
-    }
-  }
-
-  // Check object proximity
-  for (const obj of objects) {
-    if (Math.abs(player.x - obj.x) < 24 && Math.abs(player.y - obj.y) < 20) {
-      interactObject(obj);
-      return;
-    }
-  }
-}
-
-function startDialog(npc) {
-  state.dialogActive = true;
-  state.dialogQueue = [...npc.dialog];
-  state.dialogText = state.dialogQueue.shift();
-  state.dialogSpeaker = npc.name;
-  player.talking = true;
-
-  state.dialogCallback = () => {
-    if (!npc.talked) {
-      npc.talked = true;
-      state.social = Math.min(1, state.social + npc.socialBonus);
-    }
-    player.talking = false;
-  };
-}
-
-function advanceDialog() {
-  if (state.dialogQueue.length > 0) {
-    state.dialogText = state.dialogQueue.shift();
-  } else {
-    state.dialogActive = false;
-    state.dialogText = '';
-    if (state.dialogCallback) {
-      state.dialogCallback();
-      state.dialogCallback = null;
-    }
-  }
-}
-
-function interactObject(obj) {
-  if (obj.type === 'wheel') {
-    state.dialogActive = true;
-    state.dialogQueue = [];
-    state.dialogText = "*squeak squeak squeak* ...that was actually kind of fun.";
-    state.dialogSpeaker = '';
-    state.dialogCallback = () => { state.social = Math.min(1, state.social + 0.03); };
-  } else if (obj.type === 'drug') {
-    state.dialogActive = true;
-    state.dialogSpeaker = '';
-    if (state.social > 0.5) {
-      state.dialogQueue = [];
-      state.dialogText = "The water glows faintly. You think about your friends. ...you walk away.";
-      state.dialogCallback = null;
-    } else {
-      state.dialogQueue = [
-        "It smells sweet. Warm. It promises quiet.",
-        "Everything else is so loud and hard...",
-        "...maybe just a sip."
-      ];
-      state.dialogText = state.dialogQueue.shift();
+    if (Math.abs(player.x - npc.x) < 26) {
+      state.dialogActive = true;
+      state.dialogSpeaker = npc.name;
+      state.dialogQueue = [...npc.dialog];
+      setDialogText(state.dialogQueue.shift());
       state.dialogCallback = () => {
-        state.social = Math.max(0, state.social - 0.2);
-        // The world gets greyer
+        if (!npc.talked) { npc.talked = true; state.social = Math.min(1, state.social + npc.socialBonus); }
       };
-    }
-  } else if (obj.type === 'bottle') {
-    state.dialogActive = true;
-    state.dialogQueue = [];
-    state.dialogText = "Clean water. Refreshing.";
-    state.dialogSpeaker = '';
-    state.dialogCallback = null;
-  } else if (obj.type === 'nest') {
-    state.dialogActive = true;
-    state.dialogQueue = [];
-    state.dialogText = "Soft bedding. Smells like home... or it could.";
-    state.dialogSpeaker = '';
-    state.dialogCallback = null;
-  } else if (obj.type === 'tunnel') {
-    state.dialogActive = true;
-    state.dialogQueue = [];
-    state.dialogText = "A cardboard tunnel. You scurry through it. Safe in here.";
-    state.dialogSpeaker = '';
-    state.dialogCallback = () => { state.social = Math.min(1, state.social + 0.02); };
-  }
-}
-
-// ── DRAWING HELPERS ──
-function lerpColor(a, b, t) {
-  const ah = parseInt(a.slice(1), 16);
-  const bh = parseInt(b.slice(1), 16);
-  const ar = ah >> 16, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
-  const br = bh >> 16, bg = (bh >> 8) & 0xff, bb = bh & 0xff;
-  const r = Math.round(ar + (br - ar) * t);
-  const g = Math.round(ag + (bg - ag) * t);
-  const b2 = Math.round(ab + (bb - ab) * t);
-  return `rgb(${r},${g},${b2})`;
-}
-
-function getMoodColors() {
-  const s = state.social;
-  if (s > 0.6) {
-    const t = (s - 0.6) / 0.4;
-    return {
-      bg: lerpColor(MOOD.neutral.bg, MOOD.connected.bg, t),
-      cage: lerpColor(MOOD.neutral.cage, MOOD.connected.cage, t),
-      floor: lerpColor(MOOD.neutral.floor, MOOD.connected.floor, t),
-      accent: lerpColor(MOOD.neutral.accent, MOOD.connected.accent, t),
-      sky: lerpColor(MOOD.neutral.sky, MOOD.connected.sky, t)
-    };
-  } else {
-    const t = s / 0.6;
-    return {
-      bg: lerpColor(MOOD.isolated.bg, MOOD.neutral.bg, t),
-      cage: lerpColor(MOOD.isolated.cage, MOOD.neutral.cage, t),
-      floor: lerpColor(MOOD.isolated.floor, MOOD.neutral.floor, t),
-      accent: lerpColor(MOOD.isolated.accent, MOOD.neutral.accent, t),
-      sky: lerpColor(MOOD.isolated.sky, MOOD.neutral.sky, t)
-    };
-  }
-}
-
-// ── DRAW RAT ──
-function drawRat(x, y, w, h, color, facing, frame, bow) {
-  const cx = x - state.camera.x;
-  // Body
-  bx.fillStyle = color;
-  bx.fillRect(cx - w/2, y - h, w, h);
-
-  // Head (slightly forward)
-  const headX = cx - w/2 + (facing > 0 ? w - 2 : -4);
-  bx.fillRect(headX, y - h - 2, 6, 7);
-
-  // Eyes
-  bx.fillStyle = '#000';
-  const eyeX = headX + (facing > 0 ? 4 : 1);
-  bx.fillRect(eyeX, y - h - 1, 1, 1);
-
-  // Ear
-  bx.fillStyle = color;
-  const earX = headX + (facing > 0 ? 3 : 2);
-  bx.fillRect(earX, y - h - 4, 2, 2);
-
-  // Inner ear (lighter)
-  bx.fillStyle = '#ffccdd';
-  bx.fillRect(earX, y - h - 3, 1, 1);
-
-  // Tail
-  bx.strokeStyle = color;
-  bx.lineWidth = 1;
-  bx.beginPath();
-  const tailX = cx - w/2 + (facing > 0 ? 0 : w);
-  bx.moveTo(tailX, y - 3);
-  bx.lineTo(tailX + (-facing * 8), y - 6 + Math.sin(state.time * 3) * 2);
-  bx.stroke();
-
-  // Legs (simple, animated)
-  bx.fillStyle = color;
-  const legOffset = Math.sin(frame * 0.5) * 2;
-  // Front legs
-  bx.fillRect(cx - w/2 + (facing > 0 ? w - 4 : 1) + legOffset, y - 2, 2, 3);
-  // Back legs
-  bx.fillRect(cx - w/2 + (facing > 0 ? 2 : w - 5) - legOffset, y - 2, 2, 3);
-
-  // Bow for girl rat
-  if (bow) {
-    bx.fillStyle = '#ff6090';
-    const bowX = earX + (facing > 0 ? -1 : 2);
-    bx.fillRect(bowX, y - h - 5, 3, 2);
-    bx.fillRect(bowX + 1, y - h - 6, 1, 1);
-  }
-
-  // Whiskers
-  bx.strokeStyle = 'rgba(200,200,200,0.3)';
-  bx.lineWidth = 0.5;
-  const whiskerBaseX = headX + (facing > 0 ? 5 : 0);
-  const whiskerBaseY = y - h + 2;
-  for (let i = -1; i <= 1; i += 2) {
-    bx.beginPath();
-    bx.moveTo(whiskerBaseX, whiskerBaseY);
-    bx.lineTo(whiskerBaseX + facing * 6, whiskerBaseY + i * 2);
-    bx.stroke();
-  }
-}
-
-// ── DRAW WORLD ──
-function drawWorld() {
-  const c = getMoodColors();
-  const cam = state.camera.x;
-
-  // Sky / background
-  bx.fillStyle = c.sky;
-  bx.fillRect(0, 0, W, H);
-
-  // Cage bars (background)
-  bx.strokeStyle = c.cage;
-  bx.lineWidth = 2;
-  for (let x = 20; x < WORLD_W; x += 30) {
-    const sx = x - cam;
-    if (sx > -5 && sx < W + 5) {
-      bx.beginPath();
-      bx.moveTo(sx, CAGE_TOP);
-      bx.lineTo(sx, FLOOR_Y + 10);
-      bx.stroke();
-    }
-  }
-
-  // Top bar
-  bx.fillStyle = c.cage;
-  bx.fillRect(0, CAGE_TOP - 2, W, 4);
-
-  // Floor
-  bx.fillStyle = c.floor;
-  bx.fillRect(0, FLOOR_Y, W, H - FLOOR_Y);
-
-  // Floor texture (wood shavings)
-  bx.fillStyle = 'rgba(255,255,200,0.03)';
-  for (let i = 0; i < 40; i++) {
-    const fx = ((i * 37 + 13) % WORLD_W) - cam;
-    if (fx > -10 && fx < W + 10) {
-      const fy = FLOOR_Y + 5 + (i * 7) % 20;
-      bx.fillRect(fx, fy, 3 + (i % 3), 1);
+      return;
     }
   }
 
   // Objects
   for (const obj of objects) {
-    const ox = obj.x - cam;
-    if (ox < -40 || ox > W + 40) continue;
+    const dist = Math.abs(player.x - (obj.x + 10));
+    if (dist < 24) {
+      state.dialogActive = true;
+      state.dialogSpeaker = '';
 
-    if (obj.type === 'wheel') {
-      bx.strokeStyle = c.accent;
-      bx.lineWidth = 1.5;
-      bx.beginPath();
-      bx.arc(ox + obj.w/2, obj.y + obj.h/2, 11, 0, Math.PI * 2);
-      bx.stroke();
-      // Spokes
-      for (let a = 0; a < 4; a++) {
-        const angle = a * Math.PI / 2 + state.time * 0.5;
-        bx.beginPath();
-        bx.moveTo(ox + obj.w/2, obj.y + obj.h/2);
-        bx.lineTo(ox + obj.w/2 + Math.cos(angle) * 10, obj.y + obj.h/2 + Math.sin(angle) * 10);
-        bx.stroke();
+      if (obj.type === 'wheel') {
+        setDialogText("*squeak squeak squeak*\n...that was kind of fun.");
+        state.dialogQueue = [];
+        state.dialogCallback = () => { state.social = Math.min(1, state.social + 0.03); };
+      } else if (obj.type === 'bottle') {
+        setDialogText("Clean water. Refreshing.");
+        state.dialogQueue = [];
+        state.dialogCallback = null;
+      } else if (obj.type === 'nest') {
+        setDialogText("Soft bedding. Smells like\nhome... or it could.");
+        state.dialogQueue = [];
+        state.dialogCallback = null;
+      } else if (obj.type === 'tunnel') {
+        setDialogText("You scurry through the\ntube. Safe in here.");
+        state.dialogQueue = [];
+        state.dialogCallback = () => { state.social = Math.min(1, state.social + 0.02); };
+      } else if (obj.type === 'drug') {
+        if (state.social > 0.5) {
+          setDialogText("The water glows faintly.\nYou think about your\nfriends. ...you walk away.");
+          state.dialogQueue = [];
+          state.dialogCallback = null;
+        } else {
+          setDialogText("It smells sweet. Warm.\nIt promises quiet.");
+          state.dialogQueue = [
+            "Everything else is so\nloud and hard...",
+            "...maybe just a sip."
+          ];
+          state.dialogCallback = () => { state.social = Math.max(0, state.social - 0.2); };
+        }
       }
-    } else if (obj.type === 'bottle') {
-      bx.fillStyle = 'rgba(100, 140, 255, 0.3)';
-      bx.fillRect(ox, obj.y, obj.w, obj.h);
-      bx.strokeStyle = 'rgba(150, 180, 255, 0.5)';
-      bx.lineWidth = 1;
-      bx.strokeRect(ox, obj.y, obj.w, obj.h);
-    } else if (obj.type === 'nest') {
-      bx.fillStyle = 'rgba(180, 150, 100, 0.3)';
-      bx.beginPath();
-      bx.ellipse(ox + obj.w/2, obj.y + obj.h/2, obj.w/2, obj.h/2, 0, 0, Math.PI * 2);
-      bx.fill();
-    } else if (obj.type === 'tunnel') {
-      bx.fillStyle = 'rgba(120, 90, 60, 0.4)';
-      bx.fillRect(ox, obj.y, obj.w, obj.h);
-      bx.fillStyle = '#0a0a0e';
-      bx.beginPath();
-      bx.arc(ox + (obj.w * 0.2), obj.y + obj.h/2, 6, 0, Math.PI * 2);
-      bx.fill();
-      bx.beginPath();
-      bx.arc(ox + (obj.w * 0.8), obj.y + obj.h/2, 6, 0, Math.PI * 2);
-      bx.fill();
-    } else if (obj.type === 'drug') {
-      // Drugged water — glows based on isolation
-      const pull = 1 - state.social;
-      const glow = 0.2 + pull * 0.6 + Math.sin(state.time * 2) * 0.1 * pull;
-      obj.glow = glow;
-
-      // Glow aura
-      const grad = bx.createRadialGradient(ox + obj.w/2, obj.y + obj.h/2, 2, ox + obj.w/2, obj.y + obj.h/2, 20 + pull * 15);
-      grad.addColorStop(0, `rgba(120, 255, 120, ${glow * 0.4})`);
-      grad.addColorStop(1, 'rgba(120, 255, 120, 0)');
-      bx.fillStyle = grad;
-      bx.fillRect(ox - 20, obj.y - 20, obj.w + 40, obj.h + 40);
-
-      // Bottle
-      bx.fillStyle = `rgba(120, 255, 120, ${0.3 + glow * 0.3})`;
-      bx.fillRect(ox, obj.y, obj.w, obj.h);
-      bx.strokeStyle = `rgba(120, 255, 120, ${0.5 + glow * 0.3})`;
-      bx.lineWidth = 1;
-      bx.strokeRect(ox, obj.y, obj.w, obj.h);
+      return;
     }
   }
-}
-
-// ── DRAW DIALOG ──
-function drawDialog() {
-  if (!state.dialogActive) return;
-
-  // Box
-  bx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-  bx.fillRect(10, H - 58, W - 20, 48);
-  bx.strokeStyle = getMoodColors().accent;
-  bx.lineWidth = 1;
-  bx.strokeRect(10, H - 58, W - 20, 48);
-
-  // Speaker name
-  if (state.dialogSpeaker) {
-    bx.fillStyle = getMoodColors().accent;
-    bx.font = '7px monospace';
-    bx.fillText(state.dialogSpeaker, 16, H - 48);
-  }
-
-  // Text
-  bx.fillStyle = '#c8c0b8';
-  bx.font = '6px monospace';
-  const words = state.dialogText.split(' ');
-  let line = '';
-  let lineY = state.dialogSpeaker ? H - 38 : H - 44;
-  for (const word of words) {
-    const test = line + word + ' ';
-    if (bx.measureText(test).width > W - 40) {
-      bx.fillText(line, 16, lineY);
-      line = word + ' ';
-      lineY += 9;
-    } else {
-      line = test;
-    }
-  }
-  bx.fillText(line, 16, lineY);
-
-  // Continue prompt
-  const blink = Math.sin(state.time * 5) > 0;
-  if (blink) {
-    bx.fillStyle = getMoodColors().accent;
-    bx.fillText('▼', W - 26, H - 14);
-  }
-}
-
-// ── DRAW INTERACT PROMPT ──
-function drawInteractPrompt() {
-  if (state.dialogActive) return;
-
-  let prompt = null;
-
-  // Check NPCs
-  for (const npc of npcs) {
-    if (Math.abs(player.x - npc.x) < 28 && Math.abs(player.y - npc.y) < 20) {
-      prompt = { text: `[E] Talk to ${npc.name}`, x: npc.x - state.camera.x, y: npc.y - npc.h - 10 };
-      break;
-    }
-  }
-
-  // Check objects
-  if (!prompt) {
-    for (const obj of objects) {
-      if (Math.abs(player.x - obj.x) < 24 && Math.abs(player.y - obj.y) < 20) {
-        const labels = {
-          wheel: '[E] Use wheel',
-          bottle: '[E] Drink',
-          nest: '[E] Rest',
-          tunnel: '[E] Explore',
-          drug: '[E] Drink...'
-        };
-        prompt = { text: labels[obj.type] || '[E]', x: obj.x - state.camera.x + obj.w/2, y: obj.y - 10 };
-        break;
-      }
-    }
-  }
-
-  if (prompt) {
-    bx.fillStyle = 'rgba(0,0,0,0.6)';
-    const tw = bx.measureText(prompt.text).width;
-    bx.fillRect(prompt.x - tw/2 - 3, prompt.y - 6, tw + 6, 10);
-    bx.fillStyle = getMoodColors().accent;
-    bx.font = '5px monospace';
-    bx.fillText(prompt.text, prompt.x - tw/2, prompt.y);
-  }
-}
-
-// ── DRAW HUD ──
-function drawHUD() {
-  // Social meter (small, top-left)
-  const mw = 40, mh = 4;
-  const mx = 8, my = 8;
-
-  bx.fillStyle = 'rgba(0,0,0,0.4)';
-  bx.fillRect(mx - 1, my - 1, mw + 2, mh + 2);
-
-  // Bar
-  const fill = state.social * mw;
-  const barColor = state.social > 0.6 ? '#b89cff' : state.social > 0.3 ? '#7a7a88' : '#444450';
-  bx.fillStyle = barColor;
-  bx.fillRect(mx, my, fill, mh);
-
-  // Label
-  bx.fillStyle = 'rgba(200,200,200,0.3)';
-  bx.font = '4px monospace';
-  bx.fillText('connection', mx, my - 2);
 }
 
 // ── UPDATE ──
 function update(dt) {
   state.time += dt;
 
+  // Typewriter
+  if (state.dialogActive && state.dialogCharIdx < state.dialogFullText.length) {
+    state.dialogTimer += dt;
+    while (state.dialogTimer > 0.03 && state.dialogCharIdx < state.dialogFullText.length) {
+      state.dialogTimer -= 0.03;
+      state.dialogCharIdx++;
+      state.dialogText = state.dialogFullText.slice(0, state.dialogCharIdx);
+    }
+  }
+
   if (!state.dialogActive) {
-    // Movement
     let move = 0;
     if (keys['ArrowLeft'] || keys['KeyA']) move = -1;
     if (keys['ArrowRight'] || keys['KeyD']) move = 1;
 
-    // Sluggish controls when isolated
     const speedMult = 0.6 + state.social * 0.4;
     player.vx = move * player.speed * speedMult;
     player.x += player.vx;
-    player.x = Math.max(20, Math.min(WORLD_W - 20, player.x));
+    player.x = Math.max(16, Math.min(WORLD_W - 16, player.x));
 
     if (move !== 0) {
       player.facing = move;
       player.frameTimer += dt;
-      if (player.frameTimer > 0.12) {
-        player.frame++;
-        player.frameTimer = 0;
-      }
+      if (player.frameTimer > 0.15) { player.frame = 1 - player.frame; player.frameTimer = 0; }
     } else {
       player.frame = 0;
-      player.frameTimer = 0;
     }
 
-    // Drug drift — when isolated, controls drift toward the drug
-    if (state.social < 0.3) {
-      const drugX = 555;
-      const drift = (1 - state.social / 0.3) * 0.15;
-      const dir = Math.sign(drugX - player.x);
-      if (move === 0) {
-        player.x += dir * drift;
-      }
+    // Drug drift
+    if (state.social < 0.25 && move === 0) {
+      const dir = Math.sign(590 - player.x);
+      player.x += dir * (1 - state.social / 0.25) * 0.2;
     }
   }
 
-  // Camera follow
-  const targetCamX = player.x - W / 2;
-  state.camera.x += (targetCamX - state.camera.x) * 0.08;
+  // Camera
+  const target = player.x - W / 2;
+  state.camera.x += (target - state.camera.x) * 0.06;
   state.camera.x = Math.max(0, Math.min(WORLD_W - W, state.camera.x));
 }
 
-// ── MAIN LOOP ──
-let lastTime = 0;
+// ── DRAW ──
+function draw() {
+  const m = getMood();
+  const cam = state.camera.x;
 
-function gameLoop(timestamp) {
-  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
-  lastTime = timestamp;
+  // Background
+  bx.fillStyle = m.bg;
+  bx.fillRect(0, 0, W, H);
 
-  update(dt);
-
-  // Draw to buffer
-  bx.clearRect(0, 0, W, H);
-  drawWorld();
-
-  // Draw NPCs
-  for (const npc of npcs) {
-    drawRat(npc.x, npc.y + npc.h, npc.w, npc.h, npc.color, npc.facing, 0, npc.bow);
+  // Cage bars (behind everything)
+  bx.strokeStyle = m.bars;
+  bx.lineWidth = 3;
+  for (let x = 15; x < WORLD_W; x += 25) {
+    const sx = Math.floor(x - cam);
+    if (sx > -4 && sx < W + 4) {
+      bx.beginPath();
+      bx.moveTo(sx, CAGE_TOP);
+      bx.lineTo(sx, FLOOR_Y + 4);
+      bx.stroke();
+    }
   }
 
-  // Draw player
-  drawRat(player.x, player.y + player.h, player.w, player.h, '#c8b8a8', player.facing, player.frame, false);
+  // Top bar
+  bx.fillStyle = m.cage;
+  bx.fillRect(0, CAGE_TOP - 3, W, 6);
 
-  drawInteractPrompt();
-  drawDialog();
-  drawHUD();
+  // Floor
+  bx.fillStyle = m.floor;
+  bx.fillRect(0, FLOOR_Y, W, H - FLOOR_Y);
 
-  // Scale up to display canvas
+  // Bedding texture
+  bx.fillStyle = m.floorLight;
+  for (let i = 0; i < 80; i++) {
+    const fx = Math.floor(((i * 43 + 17) % WORLD_W) - cam);
+    if (fx > -4 && fx < W + 4) {
+      const fy = FLOOR_Y + 3 + (i * 11) % 30;
+      bx.fillRect(fx, fy, 2 + (i % 4), 1);
+    }
+  }
+
+  // ── Objects ──
+  for (const obj of objects) {
+    const ox = Math.floor(obj.x - cam);
+    if (ox < -40 || ox > W + 40) continue;
+
+    if (obj.type === 'wheel') {
+      drawWheel(ox, obj.y, state.time);
+    } else if (obj.type === 'bottle') {
+      drawBottle(ox, obj.y, true);
+    } else if (obj.type === 'nest') {
+      drawNest(ox, obj.y);
+    } else if (obj.type === 'tunnel') {
+      drawTunnel(ox, obj.y);
+    } else if (obj.type === 'drug') {
+      // Glow
+      const pull = 1 - state.social;
+      const glow = 0.15 + pull * 0.5 + Math.sin(state.time * 2.5) * pull * 0.1;
+      const grad = bx.createRadialGradient(ox + 6, obj.y + 10, 2, ox + 6, obj.y + 10, 25 + pull * 20);
+      grad.addColorStop(0, `rgba(100, 255, 120, ${glow * 0.5})`);
+      grad.addColorStop(1, 'rgba(100, 255, 120, 0)');
+      bx.fillStyle = grad;
+      bx.fillRect(ox - 30, obj.y - 30, 72, 72);
+
+      drawBottle(ox, obj.y, false);
+    }
+  }
+
+  // ── NPCs ──
+  for (const npc of npcs) {
+    const nx = Math.floor(npc.x - cam);
+    if (nx < -20 || nx > W + 20) continue;
+    const flip = npc.facing < 0;
+    drawSprite(npc.sprite, nx - 8, npc.y - 14, flip);
+
+    // Name above head
+    bx.fillStyle = 'rgba(200,200,200,0.4)';
+    bx.font = '7px "Press Start 2P"';
+    const tw = bx.measureText(npc.name).width;
+    bx.fillText(npc.name, nx - tw/2 + 4, npc.y - 18);
+  }
+
+  // ── Player ──
+  const px = Math.floor(player.x - cam);
+  const sprName = player.frame === 0 ? 'player_idle' : 'player_walk';
+  const flip = player.facing < 0;
+  drawSprite(sprName, px - 8, player.y - 14, flip);
+
+  // ── Interact prompt ──
+  if (!state.dialogActive) {
+    let prompt = null;
+
+    for (const npc of npcs) {
+      if (Math.abs(player.x - npc.x) < 26) {
+        prompt = { text: '[E] Talk', x: Math.floor(npc.x - cam), y: npc.y - 28 };
+        break;
+      }
+    }
+    if (!prompt) {
+      const labels = { wheel: '[E] Use', bottle: '[E] Drink', nest: '[E] Rest', tunnel: '[E] Enter', drug: '[E] ...' };
+      for (const obj of objects) {
+        if (Math.abs(player.x - (obj.x + 10)) < 24) {
+          prompt = { text: labels[obj.type], x: Math.floor(obj.x + 10 - cam), y: FLOOR_Y - 34 };
+          break;
+        }
+      }
+    }
+
+    if (prompt) {
+      bx.font = '7px "Press Start 2P"';
+      const tw = bx.measureText(prompt.text).width;
+      bx.fillStyle = 'rgba(0,0,0,0.7)';
+      bx.fillRect(prompt.x - tw/2 - 4, prompt.y - 8, tw + 8, 12);
+      bx.fillStyle = '#e0d0f0';
+      bx.fillText(prompt.text, prompt.x - tw/2, prompt.y);
+    }
+  }
+
+  // ── Dialog box ──
+  if (state.dialogActive) {
+    const bxH = 52;
+    const bxY = H - bxH - 8;
+    const bxX = 12;
+    const bxW = W - 24;
+
+    // Box
+    bx.fillStyle = 'rgba(8, 6, 16, 0.92)';
+    bx.fillRect(bxX, bxY, bxW, bxH);
+    bx.strokeStyle = m.bars;
+    bx.lineWidth = 2;
+    bx.strokeRect(bxX, bxY, bxW, bxH);
+
+    // Speaker
+    if (state.dialogSpeaker) {
+      bx.fillStyle = '#b89cff';
+      bx.font = '8px "Press Start 2P"';
+      bx.fillText(state.dialogSpeaker, bxX + 8, bxY + 12);
+    }
+
+    // Text (with manual line breaks)
+    bx.fillStyle = '#d8d0c8';
+    bx.font = '8px "Press Start 2P"';
+    const startY = state.dialogSpeaker ? bxY + 26 : bxY + 16;
+    const lines = state.dialogText.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      bx.fillText(lines[i], bxX + 8, startY + i * 12);
+    }
+
+    // Continue indicator
+    if (state.dialogCharIdx >= state.dialogFullText.length) {
+      const blink = Math.sin(state.time * 5) > 0;
+      if (blink) {
+        bx.fillStyle = '#b89cff';
+        bx.fillText('▼', bxX + bxW - 18, bxY + bxH - 8);
+      }
+    }
+  }
+
+  // ── HUD — connection meter ──
+  const hudX = 8, hudY = 10;
+  bx.fillStyle = 'rgba(0,0,0,0.5)';
+  bx.fillRect(hudX - 1, hudY - 1, 52, 10);
+  bx.font = '6px "Press Start 2P"';
+  bx.fillStyle = 'rgba(200,200,200,0.35)';
+  bx.fillText('♥', hudX + 1, hudY + 7);
+  const barW = 40;
+  bx.fillStyle = '#222';
+  bx.fillRect(hudX + 10, hudY + 1, barW, 6);
+  const fill = state.social * barW;
+  const barCol = state.social > 0.6 ? '#b89cff' : state.social > 0.3 ? '#6a6a78' : '#3a3a48';
+  bx.fillStyle = barCol;
+  bx.fillRect(hudX + 10, hudY + 1, fill, 6);
+
+  // ── Scale to screen ──
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(buf, 0, 0, W, H, 0, 0, canvas.width, canvas.height);
-
-  requestAnimationFrame(gameLoop);
 }
 
-requestAnimationFrame(gameLoop);
+// ── LOOP ──
+let last = 0;
+function loop(ts) {
+  const dt = Math.min((ts - last) / 1000, 0.05);
+  last = ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
 
+} // end init
 </script>
 </body>
 </html>
