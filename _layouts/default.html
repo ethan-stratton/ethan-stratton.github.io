@@ -294,6 +294,10 @@
         <canvas class="tile-canvas" data-tile="dof"></canvas>
         <div class="tile-label">Depth of Field</div>
       </a>
+      <a href="/lab/rat-park/" class="sidebar-tile" title="Rat Park">
+        <canvas class="tile-canvas" data-tile="ratpark"></canvas>
+        <div class="tile-label">Rat Park</div>
+      </a>
       <div class="sidebar-tile" title="Iron & Ether — In Development">
         <canvas class="tile-canvas" data-tile="ironether"></canvas>
         <div class="tile-label">Iron & Ether</div>
@@ -454,6 +458,31 @@
         vg.addColorStop(0,'transparent');
         vg.addColorStop(1,'rgba(0,0,0,0.6)');
         ctx.fillStyle = vg; ctx.fillRect(0,0,w,h);
+      } else if (type === 'ratpark') {
+        // Rat silhouette + green glow
+        ctx.fillStyle = '#0e0e14'; ctx.fillRect(0, 0, w, h);
+        const glow = 0.3 + Math.sin(time * 2) * 0.15;
+        const grd = ctx.createRadialGradient(w*0.8, h*0.6, 2, w*0.8, h*0.6, 24);
+        grd.addColorStop(0, `rgba(100,255,120,${glow})`);
+        grd.addColorStop(1, 'rgba(100,255,120,0)');
+        ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+        // Floor
+        ctx.fillStyle = '#1a1a22'; ctx.fillRect(0, h*0.72, w, h*0.28);
+        // Rat body
+        const rx = w*0.35, ry = h*0.65;
+        ctx.fillStyle = '#b0a090';
+        ctx.fillRect(rx, ry, 10, 6);
+        ctx.fillRect(rx+8, ry-3, 5, 5); // head
+        ctx.fillRect(rx+10, ry-5, 2, 2); // ear
+        ctx.fillStyle = '#111'; ctx.fillRect(rx+11, ry-2, 1, 1); // eye
+        ctx.fillStyle = '#d8a8a0';
+        ctx.fillRect(rx-3, ry+2, 3, 1); // tail
+        ctx.fillRect(rx-5, ry+1, 2, 1);
+        // Cage bars
+        ctx.strokeStyle = 'rgba(100,100,120,0.2)'; ctx.lineWidth = 2;
+        for (let bx = 8; bx < w; bx += 14) {
+          ctx.beginPath(); ctx.moveTo(bx, 0); ctx.lineTo(bx, h*0.75); ctx.stroke();
+        }
       } else if (type === 'ironether') {
         ctx.fillStyle = '#0a0810'; ctx.fillRect(0, 0, w, h);
         ctx.strokeStyle = `rgba(255,140,60,${0.3+0.15*Math.sin(time*1.5)})`;
