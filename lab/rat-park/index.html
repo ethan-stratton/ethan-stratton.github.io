@@ -494,6 +494,10 @@ function handleInteract(){
 }
 
 function talkToNpc(npc){
+  // Face each other
+  player.facing = npc.x > player.x ? 1 : -1;
+  npc.facing = player.x > npc.x ? 1 : -1;
+
   // Check if drug-tainted dialog
   if(state.drinkCount>0 && state.trust<0.7){
     const drugTier=Math.min(state.drinkCount-1, npc.drugDialogs.length-1);
@@ -751,6 +755,8 @@ function applyMeterChange(changes){
 }
 
 function startEating(npc){
+  player.facing = npc.x > player.x ? 1 : -1;
+  npc.facing = player.x > npc.x ? 1 : -1;
   state.carrying=null;state.activity_type='eating';state.activityTimer=0;
   state.activityData={npc,phase:0};player.sprOverride='player_eat';
 }
@@ -773,6 +779,8 @@ function updateEating(dt){
 }
 
 function startWrestling(npc){
+  player.facing = npc.x > player.x ? 1 : -1;
+  npc.facing = player.x > npc.x ? 1 : -1;
   state.activity_type='wrestling';state.activityTimer=0;
   state.activityData={npc,bar:50,playerPush:0,pipStrength:3+npc.friendship*0.5,done:false,result:null};
 }
@@ -800,7 +808,11 @@ function drawWrestling(){
   bx.fillRect(bX+pos-2,bY-3,4,bH+6);
 }
 
-function startSitting(npc){state.activity_type='sitting';state.activityTimer=0;state.activityData={npc,phase:0};}
+function startSitting(npc){
+  player.facing = npc.x > player.x ? 1 : -1;
+  npc.facing = player.x > npc.x ? 1 : -1;
+  state.activity_type='sitting';state.activityTimer=0;state.activityData={npc,phase:0};
+}
 function updateSitting(dt){
   const d=state.activityData;state.activityTimer+=dt;
   if(d.phase===0&&state.activityTimer>4){
@@ -1429,9 +1441,9 @@ function draw(){
   const isNightHud = dayPhaseHud > 0.7 || dayPhaseHud < 0.1;
   bx.font='6px "Press Start 2P"';
   bx.fillStyle='rgba(200,200,200,0.7)';
-  bx.fillText('Day '+state.day+'/'+state.maxDays, W-70, hudY+6);
+  bx.fillText('Day '+state.day+'/'+state.maxDays, W-62, hudY+6);
   // Sun/moon icon + progress bar
-  const clockX=W-70, clockY=hudY+12, clockW=50;
+  const clockX=W-62, clockY=hudY+12, clockW=44;
   bx.fillStyle='rgba(0,0,0,0.5)';bx.fillRect(clockX-2,clockY-1,clockW+4,8);
   // Day portion (0.1 to 0.7 = daytime)
   bx.fillStyle='#2a2a3a';bx.fillRect(clockX,clockY,clockW,6);
@@ -1449,7 +1461,7 @@ function draw(){
   bx.font='5px "Press Start 2P"';
   bx.fillStyle=isNightHud?'#6060a0':'#c0a040';
   const timeLabel = dayPhaseHud < 0.1 ? 'NIGHT' : dayPhaseHud < 0.25 ? 'MORN' : dayPhaseHud < 0.5 ? 'DAY' : dayPhaseHud < 0.7 ? 'EVE' : 'NIGHT';
-  bx.fillText(timeLabel,clockX+clockW+4,clockY+5);
+  bx.fillText(timeLabel,W-28,hudY+6);
   // "Dusk approaches" warning
   if(dayPhaseHud > 0.6 && dayPhaseHud < 0.7) {
     const warnA = Math.sin(state.time*4)*0.3+0.5;
