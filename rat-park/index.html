@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rat Park</title>
+<style>
+  @font-face { font-family: 'pixel'; src: url('https://fonts.gstatic.com/s/pressstart2p/v15/e3t4euO8T-267oIAQAu6jDQyK3nVivM.woff2') format('woff2'); }
+  * { margin: 0; padding: 0; }
+  body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+  canvas { image-rendering: pixelated; cursor: none; }
+  .font-preload { font-family: 'Press Start 2P', monospace; position: absolute; left: -9999px; }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+<span class="font-preload">.</span>
+<canvas id="c"></canvas>
+<script>
+document.fonts.ready.then(() => { init(); });
+
+function init() {
+
+const SCALE = 3, W = 320, H = 240;
+const canvas = document.getElementById('c');
+const ctxMain = canvas.getContext('2d');
+canvas.width = W * SCALE; canvas.height = H * SCALE;
+ctxMain.imageSmoothingEnabled = false;
+const buf = document.createElement('canvas'); buf.width = W; buf.height = H;
+const bx = buf.getContext('2d');
+
+// ═══════════════════════════════════════
+//  AUDIO ENGINE
+// ═══════════════════════════════════════
+let audioCtx = null, audioStarted = false;
+const aud = { master:null, ambNoise:null, ambGain:null, musicOscs:[], musicGains:[], bassOsc:null, bassGain:null, drugOsc:null, drugGain:null, drugOsc2:null, lastStep:0 };
+
+function initAudio() {
+  if (audioStarted) return; audioStarted = true;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  aud.master = audioCtx.createGain(); aud.master.gain.value = 0.5; aud.master.connect(audioCtx.destination);
+
+  const nLen = audioCtx.sampleRate*2, nBuf = audioCtx.createBuffer(1,nLen,audioCtx.sampleRate), nD = nBuf.getChannelData(0);
+  let ln=0; for(let i=0;i<nLen;i++){ln=(ln+0.02*(Math.random()*2-1))/1.02;nD[i]=ln*3.5;}
+  aud.ambNoise=audioCtx.createBufferSource();aud.ambNoise.buffer=nBuf;aud.ambNoise.loop=true;
+  aud.ambGain=audioCtx.createGain();aud.ambGain.gain.value=0.08;
+  const nLPF=audioCtx.createBiquadFilter();nLPF.type='lowpass';nLPF.frequency.value=300;
+  aud.ambNoise.connect(nLPF);nLPF.connect(aud.ambGain);aud.ambGain.connect(aud.master);aud.ambNoise.start();
+
+  aud.bassOsc=audioCtx.createOscillator();aud.bassOsc.type='sine';aud.bassOsc.frequency.value=65.41;
+  aud.bassGain=audioCtx.createGain();aud.bassGain.gain.value=0;
+  const bF=audioCtx.createBiquadFilter();bF.type='lowpass';bF.frequency.value=200;
+  aud.bassOsc.connect(bF);bF.connect(aud.bassGain);aud.bassGain.connect(aud.master);aud.bassOsc.start();
+
+  const types=['triangle','sine','triangle'];
+  for(let i=0;i<3;i++){const o=audioCtx.createOscillator();o.type=types[i];o.frequency.value=130;const g=audioCtx.createGain();g.gain.value=0;const f=audioCtx.createBiquadFilter();f.type='lowpass';f.frequency.value=800+i*400;o.connect(f);f.connect(g);g.connect(aud.master);o.start();aud.musicOscs.push(o);aud.musicGains.push(g);}
+
+  aud.drugOsc=audioCtx.createOscillator();aud.drugOsc.type='sawtooth';aud.drugOsc.frequency.value=55;
+  aud.drugOsc2=audioCtx.createOscillator();aud.drugOsc2.type='sawtooth';aud.drugOsc2.frequency.value=55.8;
+  aud.drugGain=audioCtx.createGain();aud.drugGain.gain.value=0;
+  const dF=audioCtx.createBiquadFilter();dF.type='lowpass';dF.frequency.value=180;
+  aud.drugOsc.connect(dF);aud.drugOsc2.connect(dF);dF.connect(aud.drugGain);aud.drugGain.connect(aud.master);
+  aud.drugOsc.start();aud.drugOsc2.start();
+}
+
+function sfx(type, speaker) {
+  if(!audioCtx)return; const t=audioCtx.currentTime;
+  if(type==='step'){
+    if(t-aud.lastStep<0.18)return;aud.lastStep=t;
+    const len=Math.floor(audioCtx.sampleRate*0.04),b=audioCtx.createBuffer(1,len,audioCtx.sampleRate),d=b.getChannelData(0);
+    for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*(1-i/len)**2*0.3;
+    const s=audioCtx.createBufferSource();s.buffer=b;const hp=audioCtx.createBiquadFilter();hp.type='highpass';hp.frequency.value=2000+Math.random()*2000;
+    const g=audioCtx.createGain();g.gain.value=0.15;s.connect(hp);hp.connect(g);g.connect(aud.master);s.start();
+  } else if(type==='blip'){
+    const pMap={Hazel:420,Bruno:180,Pip:550};const freq=(pMap[speaker]||300)+(Math.random()-0.5)*40;
+    const o=audioCtx.createOscillator();o.type='square';o.frequency.value=freq;const g=audioCtx.createGain();g.gain.value=0.06;g.gain.setTargetAtTime(0,t+0.04,0.02);o.connect(g);g.connect(aud.master);o.start();o.stop(t+0.08);
+  } else if(type==='socialUp'){
+    [261.63,329.63,392].forEach((f,i)=>{const o=audioCtx.createOscillator();o.type='triangle';o.frequency.value=f;const g=audioCtx.createGain();g.gain.value=0;g.gain.setValueAtTime(0.08,t+i*0.1);g.gain.setTargetAtTime(0,t+i*0.1+0.12,0.06);o.connect(g);g.connect(aud.master);o.start(t+i*0.1);o.stop(t+i*0.1+0.3);});
+  } else if(type==='socialDown'){
+    [293.66,233.08,174.61].forEach((f,i)=>{const o=audioCtx.createOscillator();o.type='triangle';o.frequency.value=f;const g=audioCtx.createGain();g.gain.value=0;g.gain.setValueAtTime(0.07,t+i*0.15);g.gain.setTargetAtTime(0,t+i*0.15+0.15,0.08);o.connect(g);g.connect(aud.master);o.start(t+i*0.15);o.stop(t+i*0.15+0.4);});
+  } else if(type==='drugDrink'){
+    const o1=audioCtx.createOscillator(),o2=audioCtx.createOscillator();o1.type=o2.type='sine';o1.frequency.value=440;o2.frequency.value=443;
+    o1.frequency.setTargetAtTime(220,t+0.5,0.3);o2.frequency.setTargetAtTime(218,t+0.5,0.3);
+    const g=audioCtx.createGain();g.gain.value=0.12;g.gain.setTargetAtTime(0,t+0.8,0.2);o1.connect(g);o2.connect(g);g.connect(aud.master);o1.start();o2.start();o1.stop(t+1.2);o2.stop(t+1.2);
+  } else if(type==='eat'){
+    for(let i=0;i<3;i++){const len=Math.floor(audioCtx.sampleRate*0.03),b=audioCtx.createBuffer(1,len,audioCtx.sampleRate),d=b.getChannelData(0);for(let j=0;j<len;j++)d[j]=(Math.random()*2-1)*(1-j/len)*0.2;const s=audioCtx.createBufferSource();s.buffer=b;const g=audioCtx.createGain();g.gain.value=0.12;const bp=audioCtx.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1200+Math.random()*800;s.connect(bp);bp.connect(g);g.connect(aud.master);s.start(t+i*0.12);}
+  } else if(type==='wrestleHit'){
+    const o=audioCtx.createOscillator();o.type='square';o.frequency.value=200+Math.random()*100;o.frequency.setTargetAtTime(100,t+0.03,0.02);const g=audioCtx.createGain();g.gain.value=0.1;g.gain.setTargetAtTime(0,t+0.05,0.02);o.connect(g);g.connect(aud.master);o.start();o.stop(t+0.1);
+  } else if(type==='wrestleWin'){
+    [392,523.25,659.25].forEach((f,i)=>{const o=audioCtx.createOscillator();o.type='triangle';o.frequency.value=f;const g=audioCtx.createGain();g.gain.value=0;g.gain.setValueAtTime(0.1,t+i*0.08);g.gain.setTargetAtTime(0,t+i*0.08+0.15,0.05);o.connect(g);g.connect(aud.master);o.start(t+i*0.08);o.stop(t+i*0.08+0.3);});
+  } else if(type==='build'){
+    const o=audioCtx.createOscillator();o.type='triangle';o.frequency.value=300+Math.random()*200;const g=audioCtx.createGain();g.gain.value=0.06;g.gain.setTargetAtTime(0,t+0.1,0.04);o.connect(g);g.connect(aud.master);o.start();o.stop(t+0.2);
+  } else if(type==='drip'){
+    const o=audioCtx.createOscillator();o.type='sine';o.frequency.value=1800;o.frequency.exponentialRampToValueAtTime(600,t+0.06);const g=audioCtx.createGain();g.gain.value=0.07;g.gain.setTargetAtTime(0,t+0.04,0.02);o.connect(g);g.connect(aud.master);o.start();o.stop(t+0.12);
+  } else if(type==='squeak'){
+    const o=audioCtx.createOscillator();o.type='sine';o.frequency.value=800+Math.random()*400;o.frequency.setTargetAtTime(1200+Math.random()*300,t+0.05,0.03);const g=audioCtx.createGain();g.gain.value=0.04;g.gain.setTargetAtTime(0,t+0.08,0.03);o.connect(g);g.connect(aud.master);o.start();o.stop(t+0.15);
+  } else if(type==='collapse'){
+    // Dark rumble
+    const len=audioCtx.sampleRate*1;const b=audioCtx.createBuffer(1,len,audioCtx.sampleRate);const d=b.getChannelData(0);
+    let n=0;for(let i=0;i<len;i++){n=(n+0.04*(Math.random()*2-1))/1.04;d[i]=n*5*(1-i/len);}
+    const s=audioCtx.createBufferSource();s.buffer=b;const lp=audioCtx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=150;
+    const g=audioCtx.createGain();g.gain.value=0.3;s.connect(lp);lp.connect(g);g.connect(aud.master);s.start();
+  } else if(type==='highWarm'){
+    // Brief warm euphoria sound
+    [330,415,494,660].forEach((f,i)=>{const o=audioCtx.createOscillator();o.type='sine';o.frequency.value=f;const g=audioCtx.createGain();g.gain.value=0;g.gain.setValueAtTime(0.06,t+i*0.05);g.gain.setTargetAtTime(0,t+0.4,0.3);o.connect(g);g.connect(aud.master);o.start(t+i*0.05);o.stop(t+1);});
+  } else if(type==='shake'){
+    const o=audioCtx.createOscillator();o.type='sawtooth';o.frequency.value=40;const g=audioCtx.createGain();g.gain.value=0.15;g.gain.setTargetAtTime(0,t+0.15,0.05);o.connect(g);g.connect(aud.master);o.start();o.stop(t+0.3);
+  }
+}
+
+function updateAudio(social, drugDist) {
+  if(!audioCtx)return;const t=audioCtx.currentTime;
+  aud.ambGain.gain.setTargetAtTime(0.05+(1-social)*0.06,t,0.5);
+  aud.bassGain.gain.setTargetAtTime(0.03+social*0.06,t,0.5);
+  const notes=[130.81,155.56,174.61,196,233.08,261.63];const thr=[0.3,0.5,0.7];
+  for(let i=0;i<3;i++){aud.musicGains[i].gain.setTargetAtTime(Math.max(0,Math.min(0.06,(social-thr[i])/0.2*0.06)),t,0.8);aud.musicOscs[i].frequency.setTargetAtTime(notes[Math.floor((state.time*0.15+i*1.7)%notes.length)],t,2);}
+  const dp=Math.max(0,1-drugDist/200);
+  aud.drugGain.gain.setTargetAtTime(dp*(1-social)*0.08+state.addiction*0.04,t,0.3);
+}
+
+// ═══════════════════════════════════════
+//  SPRITES (4-frame walk, eat, idle anim)
+// ═══════════════════════════════════════
+const spriteCache={};
+function defineSprite(name,w,h,pixels){const c=document.createElement('canvas');c.width=w;c.height=h;const cx=c.getContext('2d');for(const[x,y,col]of pixels){cx.fillStyle=col;cx.fillRect(x,y,1,1);}spriteCache[name]=c;}
+function drawSprite(name,x,y,flipX){const s=spriteCache[name];if(!s)return;if(flipX){bx.save();bx.translate(Math.floor(x+s.width),Math.floor(y));bx.scale(-1,1);bx.drawImage(s,0,0);bx.restore();}else bx.drawImage(s,Math.floor(x),Math.floor(y));}
+
+function ratPixels(B,E,IE,BL,bow,variant){
+  const px=[];
+  // Ears
+  px.push([9,1,E],[10,1,E],[12,1,E],[13,1,E]);
+  px.push([9,2,IE],[10,2,E],[12,2,IE],[13,2,E]);
+  // Head
+  px.push([8,3,B],[9,3,B],[10,3,B],[11,3,B],[12,3,B],[13,3,B]);
+  px.push([7,4,B],[8,4,B],[9,4,B],[10,4,'#111'],[11,4,B],[12,4,B],[13,4,B],[14,4,B]);
+  px.push([7,5,B],[8,5,B],[9,5,B],[10,5,B],[11,5,B],[12,5,B],[13,5,B],[14,5,B]);
+  // Nose area
+  if(variant==='eat'){
+    px.push([9,6,B],[10,6,B],[11,6,B],[12,6,B],[13,6,B]);
+    px.push([10,7,B],[11,7,B],[12,7,B],[13,7,'#222']);
+    px.push([14,6,'#aaa6']);
+  } else {
+    px.push([8,6,B],[9,6,B],[10,6,B],[11,6,B],[12,6,B],[13,6,B],[14,6,'#222']);
+    px.push([9,7,B],[10,7,B],[11,7,B],[12,7,B]);
+    px.push([15,5,'#aaa8'],[14,4,'#aaa6']);
+  }
+  // Body
+  px.push([5,7,B],[6,7,B],[7,7,B],[8,7,B],[9,7,B],[10,7,B],[11,7,B]);
+  px.push([4,8,B],[5,8,B],[6,8,BL],[7,8,BL],[8,8,BL],[9,8,B],[10,8,B],[11,8,B]);
+  px.push([4,9,B],[5,9,B],[6,9,BL],[7,9,BL],[8,9,BL],[9,9,B],[10,9,B],[11,9,B]);
+  px.push([4,10,B],[5,10,B],[6,10,B],[7,10,B],[8,10,B],[9,10,B],[10,10,B]);
+  px.push([5,11,B],[6,11,B],[7,11,B],[8,11,B],[9,11,B]);
+  // Tail
+  px.push([3,9,'#d8a8a0'],[2,8,'#d8a8a0'],[1,7,'#d8a8a0'],[0,7,'#d8a8a0']);
+  // Legs - 4 walk frames
+  if(variant==='walk1'){
+    px.push([4,11,'#e8c8b0'],[5,12,'#e8c8b0'],[9,11,'#e8c8b0'],[10,12,'#e8c8b0']);
+  } else if(variant==='walk2'){
+    px.push([3,11,'#e8c8b0'],[6,12,'#e8c8b0'],[8,11,'#e8c8b0'],[11,12,'#e8c8b0']);
+  } else if(variant==='walk3'){
+    px.push([5,12,'#e8c8b0'],[4,11,'#e8c8b0'],[10,12,'#e8c8b0'],[9,11,'#e8c8b0']);
+  } else if(variant==='walk4'){
+    px.push([6,12,'#e8c8b0'],[3,11,'#e8c8b0'],[11,12,'#e8c8b0'],[8,11,'#e8c8b0']);
+  } else {
+    px.push([4,11,'#e8c8b0'],[5,12,'#e8c8b0'],[9,11,'#e8c8b0'],[10,12,'#e8c8b0']);
+  }
+  if(bow){px.push([10,0,'#ff5080'],[11,0,'#ff5080'],[12,0,'#ff5080'],[11,1,'#ff3060'],[10,2,'#ff5080'],[12,2,'#ff5080']);}
+  return px;
+}
+
+function makeAllSprites(prefix,B,E,IE,BL,bow){
+  defineSprite(prefix+'_idle',16,14,ratPixels(B,E,IE,BL,bow,'idle'));
+  defineSprite(prefix+'_w1',16,14,ratPixels(B,E,IE,BL,bow,'walk1'));
+  defineSprite(prefix+'_w2',16,14,ratPixels(B,E,IE,BL,bow,'walk2'));
+  defineSprite(prefix+'_w3',16,14,ratPixels(B,E,IE,BL,bow,'walk3'));
+  defineSprite(prefix+'_w4',16,14,ratPixels(B,E,IE,BL,bow,'walk4'));
+  defineSprite(prefix+'_eat',16,14,ratPixels(B,E,IE,BL,bow,'eat'));
+}
+
+makeAllSprites('player','#b0a090','#c0a898','#e8b8b0','#c8b8a8',false);
+makeAllSprites('hazel','#c89898','#d8a8a0','#f0c0c0','#d8b0b0',true);
+makeAllSprites('bruno','#705840','#806850','#a08070','#907860',false);
+makeAllSprites('pip','#c8b880','#d0c090','#e0d0a0','#d8c898',false);
+
+// ═══════════════════════════════════════
+//  PARTICLES
+// ═══════════════════════════════════════
+const particles = [];
+function spawnDust(x, y, count) {
+  for(let i=0;i<count;i++) particles.push({
+    x, y: y-Math.random()*2, vx:(Math.random()-0.5)*8, vy:-Math.random()*12-4,
+    life:0.4+Math.random()*0.4, maxLife:0.4+Math.random()*0.4,
+    size:1+Math.random(), color:'rgba(160,140,120,'
+  });
+}
+function spawnEmote(x, y, text, color) {
+  particles.push({ x, y, vx:0, vy:-15, life:1.2, maxLife:1.2, text, color, size:0 });
+}
+function updateParticles(dt) {
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i]; p.life-=dt; if(p.life<=0){particles.splice(i,1);continue;}
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=30*dt; // gravity on dust
+  }
+}
+function drawParticles(cam) {
+  for(const p of particles){
+    const a=p.life/p.maxLife;
+    if(p.text){
+      bx.font='6px "Press Start 2P"';bx.fillStyle=p.color;bx.globalAlpha=a;
+      bx.fillText(p.text,p.x-cam,p.y);bx.globalAlpha=1;
+    } else {
+      bx.fillStyle=p.color+a.toFixed(2)+')';
+      bx.fillRect(Math.floor(p.x-cam),Math.floor(p.y),p.size,p.size);
+    }
+  }
+}
+
+// ═══════════════════════════════════════
+//  SCREEN EFFECTS
+// ═══════════════════════════════════════
+let screenShake = 0;
+let warmOverlay = 0;   // drug euphoria flash
+let crashOverlay = 0;  // post-drug crash
+let fadeToBlack = 0;   // collapse fade
+
+function addShake(amount) { screenShake = Math.min(screenShake + amount, 8); sfx('shake'); }
+
+// ═══════════════════════════════════════
+//  ENVIRONMENT
+// ═══════════════════════════════════════
+function drawWheel(x,y,time){const cx=x+10,cy=y+10;bx.strokeStyle='#8878a0';bx.lineWidth=2;bx.beginPath();bx.arc(cx,cy,9,0,Math.PI*2);bx.stroke();bx.strokeStyle='#685870';bx.lineWidth=1;bx.beginPath();bx.arc(cx,cy,5,0,Math.PI*2);bx.stroke();bx.strokeStyle='#786890';bx.lineWidth=1;for(let i=0;i<6;i++){const a=i*Math.PI/3+time*0.8;bx.beginPath();bx.moveTo(cx+Math.cos(a)*5,cy+Math.sin(a)*5);bx.lineTo(cx+Math.cos(a)*9,cy+Math.sin(a)*9);bx.stroke();}bx.strokeStyle='#585060';bx.lineWidth=1.5;bx.beginPath();bx.moveTo(cx,cy+9);bx.lineTo(cx-4,cy+14);bx.moveTo(cx,cy+9);bx.lineTo(cx+4,cy+14);bx.stroke();}
+function drawBottle(x,y,isClean){bx.fillStyle=isClean?'rgba(100,160,255,0.5)':'rgba(100,255,130,0.5)';bx.fillRect(x+3,y,6,18);bx.fillStyle='#888';bx.fillRect(x+2,y-2,8,3);bx.fillStyle=isClean?'rgba(80,130,255,0.6)':'rgba(80,255,110,0.6)';bx.fillRect(x+4,y+4,4,12);bx.fillStyle='#aaa';bx.fillRect(x+5,y+18,2,3);}
+function drawNest(x,y,level){const sizes=[[12,4],[16,6],[20,7],[24,8]];const[rw,rh]=sizes[Math.min(level,3)];bx.fillStyle='#a09070';bx.beginPath();bx.ellipse(x+16,y+6,rw,rh,0,0,Math.PI*2);bx.fill();bx.fillStyle='#b8a080';bx.beginPath();bx.ellipse(x+16,y+4,rw-3,rh-2,0,0,Math.PI*2);bx.fill();if(level>=2){bx.fillStyle='#c8b890';bx.fillRect(x+4,y+1,4,1);bx.fillRect(x+22,y+2,3,1);}if(level>=3){bx.fillStyle='#d8c8a0';bx.fillRect(x+8,y,5,1);bx.fillRect(x+20,y+1,4,1);bx.fillRect(x+14,y-1,3,1);}}
+function drawTunnel(x,y){bx.fillStyle='#8a7050';bx.fillRect(x,y,36,18);bx.fillStyle='#6a5030';bx.fillRect(x,y,36,1);bx.fillRect(x,y+17,36,1);bx.fillStyle='#1a1218';bx.beginPath();bx.ellipse(x+2,y+9,3,7,0,0,Math.PI*2);bx.fill();bx.beginPath();bx.ellipse(x+34,y+9,3,7,0,0,Math.PI*2);bx.fill();bx.strokeStyle='#7a6040';bx.lineWidth=0.5;for(let i=4;i<34;i+=3){bx.beginPath();bx.moveTo(x+i,y+1);bx.lineTo(x+i,y+17);bx.stroke();}}
+function drawFood(x,y){bx.fillStyle='#b09060';bx.fillRect(x,y,4,3);bx.fillStyle='#c8a878';bx.fillRect(x,y,4,1);}
+function drawMaterial(x,y,type){if(type==='paper'){bx.fillStyle='#d8d0c0';bx.fillRect(x,y,6,3);bx.fillStyle='#c8c0b0';bx.fillRect(x+1,y+1,4,1);}else if(type==='fluff'){bx.fillStyle='#e8e0d8';bx.fillRect(x+1,y,3,2);bx.fillRect(x,y+1,5,1);}else if(type==='cloth'){bx.fillStyle='#9888b0';bx.fillRect(x,y,5,4);bx.fillStyle='#a898c0';bx.fillRect(x+1,y+1,3,2);}}
+
+// ═══════════════════════════════════════
+//  MOOD & DAY/NIGHT
+// ═══════════════════════════════════════
+const MOOD={
+  connected:{bg:'#2a1a3a',cage:'#6a5a7a',floor:'#3a2a4a',floorLight:'#4a3a5a',bars:'#7a6a8a'},
+  neutral:{bg:'#1a1a22',cage:'#3a3a44',floor:'#2a2a32',floorLight:'#323238',bars:'#4a4a54'},
+  isolated:{bg:'#111114',cage:'#222228',floor:'#1a1a1e',floorLight:'#202024',bars:'#2a2a30'}
+};
+function lerpColor(a,b,t){const p=c=>{const h=parseInt(c.slice(1),16);return[h>>16,(h>>8)&0xff,h&0xff];};const[ar,ag,ab]=p(a),[br,bg,bb]=p(b);return`rgb(${Math.round(ar+(br-ar)*t)},${Math.round(ag+(bg-ag)*t)},${Math.round(ab+(bb-ab)*t)})`;}
+function getMoodColors(){
+  const s=state.social;
+  const bl=k=>s>0.6?lerpColor(MOOD.neutral[k],MOOD.connected[k],(s-0.6)/0.4):lerpColor(MOOD.isolated[k],MOOD.neutral[k],s/0.6);
+  const m={bg:bl('bg'),cage:bl('cage'),floor:bl('floor'),floorLight:bl('floorLight'),bars:bl('bars')};
+  // Day/night dimming
+  const dayPhase = state.dayTimer / state.dayLength; // 0-1
+  const nightDim = dayPhase > 0.7 ? (dayPhase-0.7)/0.3 * 0.4 : dayPhase < 0.1 ? (1-dayPhase/0.1)*0.4 : 0;
+  if(nightDim > 0) {
+    for(const k of Object.keys(m)) m[k] = lerpColor(m[k], '#000000', nightDim);
+  }
+  return m;
+}
+
+// ═══════════════════════════════════════
+//  GAME STATE
+// ═══════════════════════════════════════
+const WORLD_W=640, FLOOR_Y=185, CAGE_TOP=30;
+
+// ═══════════════════════════════════════
+//  INTRO SEQUENCE
+// ═══════════════════════════════════════
+let introActive = true;
+let introTimer = 0;
+const introLines = [
+  "In 1977, researcher Bruce Alexander",
+  "built a paradise for rats.",
+  "",
+  "He called it Rat Park.",
+  "",
+  "The rats had friends. Toys. Space.",
+  "They also had access to morphine water.",
+  "",
+  "The question was simple:",
+  "",
+  "If you have everything you need...",
+  "...do you still choose the drug?",
+  "",
+  "",
+  "[Press any key]"
+];
+
+function drawIntro() {
+  introTimer += 1/60;
+  bx.fillStyle = '#000';
+  bx.fillRect(0, 0, W, H);
+  bx.font = '7px "Press Start 2P"';
+  const startY = 30;
+  for (let i = 0; i < introLines.length; i++) {
+    const lineDelay = i * 0.6;
+    const a = Math.min(1, Math.max(0, (introTimer - lineDelay) / 0.8));
+    if (a <= 0) continue;
+    bx.globalAlpha = a;
+    const line = introLines[i];
+    const col = i === introLines.length - 1 ? '#b89cff' : '#c8c0d8';
+    bx.fillStyle = col;
+    if (i === introLines.length - 1 && Math.sin(introTimer * 3) < 0) { bx.globalAlpha = 0; }
+    const tw = bx.measureText(line).width;
+    bx.fillText(line, (W - tw) / 2, startY + i * 14);
+  }
+  bx.globalAlpha = 1;
+  ctxMain.clearRect(0, 0, canvas.width, canvas.height);
+  ctxMain.drawImage(buf, 0, 0, W, H, 0, 0, canvas.width, canvas.height);
+}
+
+const state = {
+  social: 0.3, time: 0, camera:{x:0},
+  // Meters (0-1)
+  food: 0.7, activity: 0.5, sleep: 0.8,
+  // Addiction
+  addiction: 0, // 0-1, builds with each drink, NOW DECAYS SLOWLY
+  drinkCount: 0,
+  tolerance: 0, // reduces euphoria
+  trust: 1, // NPCs trust, drops on drink, recovers slowly
+  // Day cycle
+  day: 1,
+  dayTimer: 0,
+  dayLength: 90, // seconds per day
+  maxDays: 3,
+  // Dialog
+  dialogActive:false, dialogText:'', dialogQueue:[], dialogCallback:null, dialogSpeaker:'',
+  dialogCharIdx:0, dialogFullText:'', dialogTimer:0,
+  // Activities
+  activity_type: null, activityTimer:0, activityData:{},
+  // Inventory
+  carrying: null,
+  // Drug effects
+  drugHigh: 0, // current high level (decays)
+  drugCrash: 0,
+  // Collapse
+  collapsing: false, collapseTimer: 0,
+  // Ending
+  ending: null, endTimer: 0,
+  // Idle animation
+  idleTimer: 0,
+  // NPC saw drug
+  npcsSawDrug: false,
+  // Night craving system
+  nightCravingTriggered: false, // per-sleep-cycle flag
+};
+
+const player = { x:80, y:FLOOR_Y, w:16, h:14, vx:0, facing:1, frame:0, frameTimer:0, speed:1.5, walkFrame:0, sprOverride:null };
+
+// ═══════════════════════════════════════
+//  NPC SYSTEM
+// ═══════════════════════════════════════
+const npcs = [
+  {
+    name:'Hazel', prefix:'hazel', x:200, y:FLOOR_Y, facing:-1,
+    friendship:0, happiness:5, visitCount:0, arc:'helper',
+    // Autonomous movement
+    aiState:'idle', aiTimer:0, aiTarget:0, homeX:200,
+    dialogs:[
+      ["Oh! You're new here.","It's not so bad once\nyou get used to it.","The wheel is actually\nkind of fun. Try it!","...I'm glad you came over."],
+      ["Hey, you're back!","I've been trying to\ntidy up the nest.","It's small but... it\ncould be cozy, right?","If you find any soft\nstuff, bring it here?"],
+      ["Can I tell you\nsomething?","I keep busy because...","...if I stop, I start\nthinking too much.","About before. About the\nlab. The tests.","Helping makes it hurt\nless. You know?"],
+      ["You're a good friend.","I used to think nobody\ncared what happened to us.","But you came over.\nYou keep coming over.","...that means everything."],
+      ["Want to help me fix\nup the nest some more?","It's starting to feel\nlike a real home."]
+    ],
+    // Trust-damaged dialog
+    drugDialogs:[
+      ["...you smell different.","Like that green water.","Please be careful."],
+      ["You drank again,\ndidn't you?","I can see it in\nyour eyes.","We're right here.\nWhy isn't that enough?"],
+      ["...","I don't know how to\nhelp you anymore."]
+    ],
+    socialBonus:[0.12,0.08,0.1,0.12,0.05], specialAction:'build'
+  },
+  {
+    name:'Bruno', prefix:'bruno', x:380, y:FLOOR_Y, facing:1,
+    friendship:0, happiness:3, visitCount:0, arc:'regret',
+    aiState:'idle', aiTimer:0, aiTarget:0, homeX:380,
+    dialogs:[
+      ["...","You smell new.","See that bottle on\nthe far end?","Don't drink from it.\nTrust me.","It makes everything quiet.\nBut then you need more."],
+      ["You're still here.","Most new ones go\nstraight for the bottle.","...you didn't though.","Hm."],
+      ["I drank from it.","More than once.","It felt... warm. Like\nnothing was wrong.","Then it wore off and\neverything was worse.","I don't go near it\nanymore. But I think\nabout it."],
+      ["Some days I just sit\nhere and stare at nothing.","Not because I'm sad.\nWell. Maybe because I'm sad.","But having you here...","You don't have to\nsay anything.","Just... stay a minute."],
+      ["...","Thanks for sitting\nwith me.","You don't know how\nmuch that helps."]
+    ],
+    drugDialogs:[
+      ["...I know that look.","I had that look.","It doesn't end well."],
+      ["You're going to end up\nlike me.","Sitting in a corner.\nStaring at the wall.","Remembering what it felt\nlike to feel nothing."],
+      ["I told you...","I told you not to\ndrink it.","...I can't watch this\nagain."]
+    ],
+    socialBonus:[0.12,0.08,0.12,0.15,0.06], specialAction:'sit'
+  },
+  {
+    name:'Pip', prefix:'pip', x:510, y:FLOOR_Y, facing:-1,
+    friendship:0, happiness:7, visitCount:0, arc:'fear',
+    aiState:'idle', aiTimer:0, aiTarget:0, homeX:510,
+    dialogs:[
+      ["hihihihi!","wanna race?? i'm fast!","this place is okay.\nthere's food and stuff.","sometimes the big ones\nwatch us. it's weird.","but we got each other\nright??"],
+      ["you came back!!","wanna wrestle??\ni'll go easy on you!","i'm the fastest rat\nin here. probably.","...don't tell Bruno\ni said that hehe"],
+      ["hey um...","you know that sound?\nwhen the door opens?","i always think they're\ncoming to take one of us.","but then it closes\nand we're all still here.","...sorry. i'm fine!\nlet's do something fun!"],
+      ["i act happy because...","because if i stop\nmoving, i get scared.","what if they take\nHazel? or Bruno?","what if they take me?","...promise you'll still\nbe here tomorrow?"],
+      ["hey!! let's wrestle\nagain!!","for real though...","i'm glad you're my\nfriend."]
+    ],
+    drugDialogs:[
+      ["you okay??","you look all wobbly!","...please don't drink\nthat stuff."],
+      ["you smell like the\ngreen water.","Bruno used to smell\nlike that.","it makes me really\nscared okay??"],
+      ["please stop.","please please please.\ni don't want you to\ngo away.","not you too."]
+    ],
+    socialBonus:[0.08,0.06,0.1,0.15,0.05], specialAction:'wrestle'
+  }
+];
+
+// ── Objects ──
+const objects = [
+  {type:'wheel', x:260, y:FLOOR_Y-24, w:20},
+  {type:'bottle', x:135, y:FLOOR_Y-21, w:12},
+  {type:'nest', x:40, y:FLOOR_Y-10, w:32},
+  {type:'tunnel', x:430, y:FLOOR_Y-16, w:36},
+  {type:'drug', x:590, y:FLOOR_Y-24, w:12},
+  {type:'food', x:160, y:FLOOR_Y-3, w:4, taken:false, respawn:0},
+  {type:'food', x:310, y:FLOOR_Y-3, w:4, taken:false, respawn:0},
+  {type:'food', x:460, y:FLOOR_Y-3, w:4, taken:false, respawn:0},
+  {type:'material', x:420, y:FLOOR_Y-3, matType:'paper', taken:false},
+  {type:'material', x:550, y:FLOOR_Y-3, matType:'fluff', taken:false},
+  {type:'material', x:300, y:FLOOR_Y-3, matType:'cloth', taken:false},
+];
+
+let nestLevel = 0;
+
+// ═══════════════════════════════════════
+//  INPUT
+// ═══════════════════════════════════════
+const keys={};
+document.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(!audioStarted)initAudio();
+  if(introActive){introActive=false;return;}
+  if(['Space','KeyE','Enter'].includes(e.code)){e.preventDefault();handleInteract();}
+});
+document.addEventListener('keyup',e=>{keys[e.code]=false;});
+canvas.addEventListener('click',()=>{if(!audioStarted)initAudio();if(introActive){introActive=false;}});
+
+// ═══════════════════════════════════════
+//  DIALOG
+// ═══════════════════════════════════════
+function setDialogText(t){state.dialogFullText=t;state.dialogCharIdx=0;state.dialogText='';state.dialogTimer=0;}
+function showDialog(speaker,lines,cb){state.dialogActive=true;state.dialogSpeaker=speaker;state.dialogQueue=lines.length>1?lines.slice(1):[];setDialogText(lines[0]);state.dialogCallback=cb||null;}
+
+function handleInteract(){
+  // Wrestling
+  if(state.activity_type==='wrestling'){state.activityData.playerPush+=8;sfx('wrestleHit');return;}
+
+  if(state.dialogActive){
+    if(state.dialogCharIdx<state.dialogFullText.length){state.dialogCharIdx=state.dialogFullText.length;state.dialogText=state.dialogFullText;return;}
+    if(state.dialogQueue.length>0){setDialogText(state.dialogQueue.shift());}
+    else{state.dialogActive=false;if(state.dialogCallback){state.dialogCallback();state.dialogCallback=null;}}
+    return;
+  }
+
+  if(state.activity_type||state.collapsing||state.ending)return;
+
+  // Carrying food → share with nearby NPC
+  if(state.carrying==='food'){
+    for(const npc of npcs){if(Math.abs(player.x-npc.x)<26){startEating(npc);return;}}
+  }
+
+  // Carrying material → deposit at nest
+  if(state.carrying&&state.carrying!=='food'){
+    const nest=objects.find(o=>o.type==='nest');
+    if(Math.abs(player.x-(nest.x+16))<28){
+      const mat=state.carrying;
+      nestLevel=Math.min(3,nestLevel+1);
+      state.carrying=null;
+      sfx('build');
+      showDialog('',["You add the "+mat+" to\nthe nest. It's getting\ncozier."],()=>{state.social=Math.min(1,state.social+0.05);});
+      return;
+    }
+  }
+
+  // NPCs
+  for(const npc of npcs){if(Math.abs(player.x-npc.x)<26){talkToNpc(npc);return;}}
+
+  // Objects
+  for(const obj of objects){
+    const ox=obj.x+(obj.w||10)/2;
+    if(Math.abs(player.x-ox)<24){interactObject(obj);return;}
+  }
+}
+
+function talkToNpc(npc){
+  // Check if drug-tainted dialog
+  if(state.drinkCount>0 && state.trust<0.7){
+    const drugTier=Math.min(state.drinkCount-1, npc.drugDialogs.length-1);
+    const lines=[...npc.drugDialogs[drugTier]];
+    const penalty=state.drinkCount*0.03;
+    showDialog(npc.name,lines,()=>{
+      npc.visitCount=Math.max(0,npc.visitCount); // don't advance friendship from drug dialog
+      state.social=Math.min(1,state.social+0.02); // tiny social even from being confronted
+    });
+    return;
+  }
+
+  const tier=Math.min(npc.visitCount, npc.dialogs.length-1);
+  const lines=[...npc.dialogs[tier]];
+  const hasSpecial=npc.specialAction&&npc.visitCount>=(npc.specialAction==='sit'?3:1);
+  const bonus=npc.socialBonus[Math.min(tier,npc.socialBonus.length-1)];
+
+  showDialog(npc.name,lines,()=>{
+    npc.visitCount++;
+    npc.friendship=Math.min(10,npc.friendship+1);
+    state.social=Math.min(1,state.social+bonus);
+    sfx('socialUp');
+    // Special actions auto-trigger
+    if(hasSpecial&&npc.visitCount>1){
+      if(npc.specialAction==='wrestle')startWrestling(npc);
+      else if(npc.specialAction==='sit')startSitting(npc);
+    }
+  });
+}
+
+function interactObject(obj){
+  if(obj.type==='food'&&!obj.taken){
+    obj.taken=true;obj.respawn=15;state.carrying='food';
+    showDialog('',["You picked up some food.\nShare it with someone!"],null);
+    return;
+  }
+  if(obj.type==='material'&&!obj.taken&&!state.carrying){
+    obj.taken=true;state.carrying=obj.matType;
+    showDialog('',["You found some "+obj.matType+"!\nBring it to the nest."],null);
+    return;
+  }
+  if(obj.type==='wheel'){
+    state.activity_meter_change={activity:0.15,food:-0.05,sleep:-0.08};
+    showDialog('',["*squeak squeak squeak*\n...that was kind of fun."],()=>{
+      state.social=Math.min(1,state.social+0.03);sfx('squeak');
+      applyMeterChange(state.activity_meter_change);
+    });
+  } else if(obj.type==='bottle'){
+    state.food=Math.min(1,state.food+0.1);
+    showDialog('',["Clean water. Refreshing."],null);
+  } else if(obj.type==='nest'){
+    if(state.carrying&&state.carrying!=='food'){
+      const mat=state.carrying;nestLevel=Math.min(3,nestLevel+1);state.carrying=null;sfx('build');
+      showDialog('',["You add the "+mat+" to\nthe nest. It's getting\ncozier."],()=>{state.social=Math.min(1,state.social+0.05);});
+    } else {
+      // Rest at nest
+      const nestTexts=["A bare spot. You curl\nup anyway. ...zzz.","Getting comfy. You rest\na while. ...zzz.","Soft and warm. A good\nnap. ...zzz.","A proper home. You sleep\npeacefully. ...zzz."];
+      showDialog('',[ nestTexts[nestLevel] ],()=>{
+        state.sleep=Math.min(1,state.sleep+0.2+nestLevel*0.05);
+        state.food=Math.max(0,state.food-0.05);
+      });
+    }
+  } else if(obj.type==='tunnel'){
+    showDialog('',["You scurry through the\ntube. Safe in here."],()=>{state.social=Math.min(1,state.social+0.02);});
+  } else if(obj.type==='drug'){
+    drinkDrug();
+  }
+}
+
+// ═══════════════════════════════════════
+//  DRUG SYSTEM
+// ═══════════════════════════════════════
+function drinkDrug(){
+  // Temptation text varies
+  const addictionLevel = state.addiction;
+  let lines;
+  if(state.drinkCount===0){
+    if(state.social>0.6){
+      showDialog('',["The water glows faintly.\nYou think about your\nfriends. ...you walk away."],null);
+      return;
+    }
+    lines=["It smells sweet. Warm.\nIt promises quiet.","Everything else is so\nloud and hard...","...maybe just a sip."];
+  } else if(state.drinkCount<3){
+    if(state.social>0.7){
+      showDialog('',["You remember what it\nfelt like. The warmth.","...but you remember\nwhat came after, too.","You walk away."],null);
+      return;
+    }
+    lines=["Your body remembers.","The warmth. The quiet.\nJust one more.","You drink."];
+  } else {
+    lines=["You barely taste it\nanymore.","But you need it.","You drink."];
+  }
+
+  showDialog('',lines,()=>{
+    doDrink();
+  });
+}
+
+function doDrink(){
+  state.drinkCount++;
+  const eff = Math.max(0.1, 1 - state.tolerance * 0.3); // diminishing returns
+
+  // "Good" part — fill meters
+  state.food = Math.min(1, state.food + 0.5 * eff);
+  state.sleep = Math.min(1, state.sleep + 0.5 * eff);
+  state.activity = Math.min(1, state.activity + 0.3 * eff);
+
+  // The cost
+  state.addiction = Math.min(1, state.addiction + 0.2);
+  state.tolerance = Math.min(1, state.tolerance + 0.15);
+  state.trust = Math.max(0, state.trust - 0.25);
+  state.social = Math.max(0, state.social - 0.15);
+
+  // Visual effects
+  state.drugHigh = 1.0 * eff;
+  warmOverlay = 1.0;
+
+  sfx('drugDrink');
+  sfx('highWarm');
+  addShake(3);
+
+  state.npcsSawDrug = true;
+
+  // After brief euphoria, crash
+  setTimeout(()=>{
+    if(state.drugHigh>0){
+      state.drugCrash = 0.8;
+      crashOverlay = 1;
+      sfx('collapse');
+      // Meters crash below what they were
+      state.food = Math.max(0, state.food - 0.3);
+      state.sleep = Math.max(0, state.sleep - 0.3);
+      state.activity = Math.max(0, state.activity - 0.2);
+      addShake(5);
+    }
+  }, 2000);
+}
+
+// ═══════════════════════════════════════
+//  NIGHT CRAVING SYSTEM
+// ═══════════════════════════════════════
+function triggerNightCraving() {
+  const a = state.addiction;
+  const s = state.social;
+  const totalFriendship = npcs.reduce((sum, n) => sum + n.friendship, 0);
+
+  addShake(2);
+  sfx('shake');
+
+  // Your friends' love vs the drug's pull
+  const resist = s > 0.5 && totalFriendship >= 5;
+  const strongResist = s > 0.7 && totalFriendship >= 10;
+
+  if (strongResist) {
+    // Friends pull you through — you barely feel it
+    showDialog('', [
+      "You wake in the dark.",
+      "The green glow calls\nfrom across the cage.",
+      "But you remember\nHazel's kindness.",
+      "Bruno's warning.\nPip's laughter.",
+      "You close your eyes.\nThe craving passes."
+    ], () => {
+      state.addiction = Math.max(0, state.addiction - 0.1);
+      state.social = Math.min(1, state.social + 0.05);
+      sfx('socialUp');
+      spawnEmote(player.x, player.y - 20, '♥', '#b89cff');
+    });
+  } else if (resist) {
+    // Friends help but it's a struggle
+    showDialog('', [
+      "You wake in the dark,\nshaking.",
+      "Every part of you wants\nto walk to the bottle.",
+      "You think about your\nfriends sleeping nearby.",
+      "...you stay. Barely."
+    ], () => {
+      state.addiction = Math.max(0, state.addiction - 0.05);
+      state.sleep = Math.max(0, state.sleep - 0.1);
+    });
+  } else if (a > 0.5) {
+    // Not enough social bonds — you spiral
+    showDialog('', [
+      "You wake in the dark.",
+      "Your body is already\nmoving.",
+      "You can't stop it.",
+      "Nobody came for you.\nNobody knew.",
+      "The green water\nglows softly."
+    ], () => {
+      // Force-walk to drug and drink
+      player.x = 570;
+      state.camera.x = Math.max(0, Math.min(WORLD_W - W, player.x - W/2));
+      doDrink();
+    });
+  } else {
+    // Mild craving — unsettling but manageable
+    showDialog('', [
+      "You stir in the dark.",
+      "Something tugs at the\nedge of your mind.",
+      "The green glow flickers\nin the distance.",
+      "...you roll over and\ntry to sleep."
+    ], () => {
+      state.sleep = Math.max(0, state.sleep - 0.05);
+    });
+  }
+}
+
+// ═══════════════════════════════════════
+//  COLLAPSE (meter hits 0)
+// ═══════════════════════════════════════
+function triggerCollapse(meter){
+  state.collapsing = true;
+  state.collapseTimer = 0;
+  fadeToBlack = 0;
+  sfx('collapse');
+  addShake(6);
+
+  const meterName = meter === 'food' ? 'hunger' : meter === 'sleep' ? 'exhaustion' : 'restlessness';
+  // Will be shown after fade
+  state.collapseReason = meterName;
+}
+
+function updateCollapse(dt){
+  state.collapseTimer += dt;
+  fadeToBlack = Math.min(1, state.collapseTimer / 2);
+
+  if(state.collapseTimer > 3){
+    // Wake up near drug
+    player.x = 570;
+    state.collapsing = false;
+    fadeToBlack = 1;
+
+    // Forced drink scene
+    showDialog('',["Everything went dark.","The "+state.collapseReason+"\noverwhelmed you.","You wake up near the\ngreen water.","Someone... something...\nmoved you here.","Your body acts before\nyour mind can stop it."],()=>{
+      doDrink();
+      // Fade back in will happen naturally as fadeToBlack decays
+    });
+  }
+}
+
+// ═══════════════════════════════════════
+//  ACTIVITIES
+// ═══════════════════════════════════════
+function applyMeterChange(changes){
+  if(changes.food) state.food=Math.max(0,Math.min(1,state.food+changes.food));
+  if(changes.activity) state.activity=Math.max(0,Math.min(1,state.activity+changes.activity));
+  if(changes.sleep) state.sleep=Math.max(0,Math.min(1,state.sleep+changes.sleep));
+}
+
+function startEating(npc){
+  state.carrying=null;state.activity_type='eating';state.activityTimer=0;
+  state.activityData={npc,phase:0};player.sprOverride='player_eat';
+}
+function updateEating(dt){
+  const d=state.activityData;state.activityTimer+=dt;
+  if(d.phase===0&&state.activityTimer>0.5){d.phase=1;state.activityTimer=0;sfx('eat');}
+  if(d.phase===1){
+    // Eating animation — bob sprites
+    if(state.activityTimer>1.5){
+      d.phase=2;state.activityTimer=0;
+      d.npc.happiness=Math.min(10,d.npc.happiness+2);
+      state.social=Math.min(1,state.social+0.08);
+      state.food=Math.min(1,state.food+0.2);
+      sfx('socialUp');player.sprOverride=null;state.activity_type=null;
+      spawnEmote(d.npc.x,d.npc.y-20,'♥','#ff8090');
+      const reacts={Hazel:"Mmm! Thank you so much!\nYou're so thoughtful.",Bruno:"...thanks.\nI forget to eat sometimes.",Pip:"YUMMM!! you're the\nbest!!! more more more!!"};
+      showDialog(d.npc.name,[reacts[d.npc.name]||"Thank you!"],null);
+    }
+  }
+}
+
+function startWrestling(npc){
+  state.activity_type='wrestling';state.activityTimer=0;
+  state.activityData={npc,bar:50,playerPush:0,pipStrength:3+npc.friendship*0.5,done:false,result:null};
+}
+function updateWrestling(dt){
+  const d=state.activityData;state.activityTimer+=dt;
+  if(d.done){if(state.activityTimer>2){state.activity_type=null;d.npc.friendship=Math.min(10,d.npc.friendship+1);state.social=Math.min(1,state.social+0.06);applyMeterChange({activity:0.15,food:-0.08,sleep:-0.1});sfx('socialUp');}return;}
+  d.bar+=d.playerPush*dt*3;d.playerPush*=0.85;
+  d.bar-=d.pipStrength*(1+Math.sin(state.time*4)*0.5)*dt*2;
+  d.bar=Math.max(0,Math.min(100,d.bar));
+  if(d.bar>=85){d.done=true;d.result='win';state.activityTimer=0;sfx('wrestleWin');showDialog('Pip',["aaagh! you got me!!\nbest two out of three??"],null);}
+  else if(d.bar<=15){d.done=true;d.result='lose';state.activityTimer=0;sfx('wrestleHit');showDialog('Pip',["hehehe!! i'm too\nstrong for you!!","...again?? please??"],null);}
+  if(!d.done&&state.activityTimer>8){d.done=true;d.result='draw';state.activityTimer=0;showDialog('Pip',["wow we're even!!\nthat was SO fun!!"],null);}
+}
+function drawWrestling(){
+  const d=state.activityData;if(!d)return;
+  const bX=60,bY=50,bW=200,bH=10;
+  bx.fillStyle='rgba(0,0,0,0.7)';bx.fillRect(bX-4,bY-16,bW+8,bH+24);
+  bx.font='6px "Press Start 2P"';bx.fillStyle='#b89cff';bx.fillText('MASH [E]!',bX,bY-6);
+  bx.fillStyle='#c8b880';bx.fillText('Pip',bX+bW-bx.measureText('Pip').width,bY-6);
+  bx.fillStyle='#222';bx.fillRect(bX,bY,bW,bH);
+  const pos=(d.bar/100)*bW;
+  bx.fillStyle='#b89cff';bx.fillRect(bX,bY,pos,bH);
+  bx.fillStyle='#c8b880';bx.fillRect(bX+pos,bY,bW-pos,bH);
+  bx.fillStyle='#fff';bx.fillRect(bX+bW/2-1,bY-2,2,bH+4);
+  bx.fillRect(bX+pos-2,bY-3,4,bH+6);
+}
+
+function startSitting(npc){state.activity_type='sitting';state.activityTimer=0;state.activityData={npc,phase:0};}
+function updateSitting(dt){
+  const d=state.activityData;state.activityTimer+=dt;
+  if(d.phase===0&&state.activityTimer>4){
+    d.phase=1;state.social=Math.min(1,state.social+0.12);d.npc.happiness=Math.min(10,d.npc.happiness+2);
+    applyMeterChange({sleep:0.1,activity:-0.05});
+    sfx('socialUp');state.activity_type=null;showDialog('Bruno',["...","...thanks."],null);
+  }
+}
+function drawSitting(){
+  const d=state.activityData;if(!d)return;const t=state.activityTimer;
+  bx.fillStyle='rgba(184,156,255,0.2)';
+  for(let i=0;i<5;i++){const px=player.x-state.camera.x+Math.sin(t*0.8+i)*15;const py=player.y-20-((t*8+i*7)%30);bx.beginPath();bx.arc(px,py,1+Math.sin(t+i)*0.5,0,Math.PI*2);bx.fill();}
+  const blink=Math.floor(t*2)%4;bx.font='8px "Press Start 2P"';bx.fillStyle='rgba(200,200,200,0.3)';
+  bx.fillText('.'.repeat(Math.min(3,blink+1)),player.x-state.camera.x-5,player.y-24);
+}
+
+// ═══════════════════════════════════════
+//  NPC AI
+// ═══════════════════════════════════════
+function updateNpcAi(npc, dt){
+  npc.aiTimer -= dt;
+
+  if(npc.aiState==='idle'){
+    if(npc.aiTimer<=0){
+      // Choose behavior based on personality
+      if(npc.name==='Pip'){
+        // Pip runs laps
+        npc.aiState='run';npc.aiTarget=100+Math.random()*440;npc.aiTimer=0;
+      } else if(npc.name==='Hazel'){
+        // Hazel tidies near nest
+        npc.aiState='walk';npc.aiTarget=40+Math.random()*80;npc.aiTimer=0;
+      } else if(npc.name==='Bruno'){
+        // Bruno barely moves — just shifts weight
+        npc.aiState='idle';npc.aiTimer=3+Math.random()*5;
+        npc.facing=Math.random()>0.5?1:-1;
+      }
+    }
+  } else if(npc.aiState==='walk'||npc.aiState==='run'){
+    const speed=npc.aiState==='run'?2.0:0.6;
+    const dir=Math.sign(npc.aiTarget-npc.x);
+    npc.x+=dir*speed;
+    npc.facing=dir;
+    if(Math.abs(npc.x-npc.aiTarget)<3){
+      npc.aiState='idle';npc.aiTimer=2+Math.random()*4;
+      if(npc.name==='Pip')npc.aiTimer=0.5+Math.random();
+    }
+    // Don't walk into player during dialog
+    if(state.dialogActive && Math.abs(npc.x-player.x)<20){
+      npc.aiState='idle';npc.aiTimer=1;
+    }
+  }
+
+  // Eventually return home-ish
+  if(npc.aiState==='idle'&&npc.aiTimer<=0&&Math.abs(npc.x-npc.homeX)>100){
+    npc.aiState='walk';npc.aiTarget=npc.homeX+Math.random()*40-20;
+  }
+
+  npc.x=Math.max(20,Math.min(WORLD_W-20,npc.x));
+}
+
+// ═══════════════════════════════════════
+//  ENDINGS
+// ═══════════════════════════════════════
+function checkEnding(){
+  if(state.day>state.maxDays && !state.ending){
+    // Determine ending
+    const s=state.social, a=state.addiction, t=state.trust;
+    if(a>0.6){
+      if(s>0.4&&t>0.3) state.ending='recovered';
+      else state.ending='addicted';
+    } else if(s>0.7&&t>0.6) state.ending='connected';
+    else if(s<0.3) state.ending='alone';
+    else state.ending='survived';
+    state.endTimer=0;
+  }
+}
+
+function drawEnding(){
+  state.endTimer+=1/60;
+  const a=Math.min(1,state.endTimer/2);
+  bx.fillStyle=`rgba(0,0,0,${a})`;bx.fillRect(0,0,W,H);
+  if(state.endTimer<2)return;
+  const textA=Math.min(1,(state.endTimer-2)/1.5);
+  bx.globalAlpha=textA;
+  bx.font='10px "Press Start 2P"';bx.fillStyle='#b89cff';
+  const endings={
+    connected:["Day "+state.maxDays+" ends.","","You found something real.","Not a cure. Not a fix.","Just... others.","","The cage is the same.","But it doesn't feel","like a cage anymore.","","CONNECTED"],
+    recovered:["Day "+state.maxDays+" ends.","","You drank the water.","More than once.","","But you also found","Hazel. Bruno. Pip.","","The pull is still there.","It never fully leaves.","But it's quieter now.","","RECOVERED"],
+    addicted:["Day "+state.maxDays+" ends.","","The water is all","you think about.","","The others tried.","They really tried.","","But you couldn't hear","them over the quiet.","","DEPENDENT"],
+    alone:["Day "+state.maxDays+" ends.","","You never went to them.","","They were right there.","The whole time.","","The cage feels smaller","every day.","","ISOLATED"],
+    survived:["Day "+state.maxDays+" ends.","","You made it through.","","Not connected. Not lost.","Just... here.","","Maybe that's enough.","Maybe it isn't.","","SURVIVED"]
+  };
+  const lines=endings[state.ending]||endings.survived;
+  const startY=40;
+  for(let i=0;i<lines.length;i++){
+    const lineA=Math.min(1,(state.endTimer-2-i*0.4)/0.5);
+    if(lineA<=0)continue;
+    bx.globalAlpha=textA*lineA;
+    const tw=bx.measureText(lines[i]).width;
+    const col=i===lines.length-1?'#e0c0ff':'#c8c0d8';
+    bx.fillStyle=col;
+    if(i===lines.length-1)bx.font='12px "Press Start 2P"';
+    bx.fillText(lines[i],(W-tw)/2,startY+i*16);
+  }
+  bx.globalAlpha=1;
+}
+
+// ═══════════════════════════════════════
+//  UPDATE
+// ═══════════════════════════════════════
+function update(dt){
+  state.time+=dt;
+
+  // Ending
+  if(state.ending){return;}
+
+  // Collapse
+  if(state.collapsing){updateCollapse(dt);return;}
+
+  // Typewriter
+  if(state.dialogActive&&state.dialogCharIdx<state.dialogFullText.length){
+    state.dialogTimer+=dt;
+    while(state.dialogTimer>0.03&&state.dialogCharIdx<state.dialogFullText.length){
+      state.dialogTimer-=0.03;state.dialogCharIdx++;
+      state.dialogText=state.dialogFullText.slice(0,state.dialogCharIdx);
+      const ch=state.dialogFullText[state.dialogCharIdx-1];
+      if(ch!==' '&&ch!=='\n'&&state.dialogCharIdx%2===0)sfx('blip',state.dialogSpeaker);
+    }
+  }
+
+  // Activity updates
+  if(state.activity_type==='eating'){updateEating(dt);return;}
+  if(state.activity_type==='wrestling')updateWrestling(dt);
+  if(state.activity_type==='sitting'){updateSitting(dt);return;}
+
+  // ── Day cycle ──
+  state.dayTimer+=dt;
+  if(state.dayTimer>=state.dayLength){
+    state.dayTimer=0;state.day++;
+    if(state.day===2){
+      showDialog('',["Day 2.","The lights dim and\nrise again.","Everything is the same.\nBut are you?"],null);
+    } else if(state.day===3){
+      showDialog('',["Day 3.","Last day in the cage.","Make it count."],null);
+    }
+    checkEnding();
+  }
+
+  // ── Meter drain ──
+  const drainMult = 1 + state.addiction * 0.8; // addiction makes meters drain faster
+  state.food = Math.max(0, state.food - 0.012 * drainMult * dt);
+  state.sleep = Math.max(0, state.sleep - 0.008 * drainMult * dt);
+  state.activity = Math.max(0, state.activity - 0.006 * dt);
+
+  // Trust recovery (slow)
+  if(state.trust < 1) state.trust = Math.min(1, state.trust + 0.005 * dt);
+
+  // Addiction decay — slow, but it DOES go down if you don't drink
+  // Social connections accelerate the decay
+  const addictionDecay = 0.008 + state.social * 0.015; // base + social bonus
+  if(state.addiction > 0) state.addiction = Math.max(0, state.addiction - addictionDecay * dt);
+
+  // ── Night craving system ──
+  // When sleeping at nest, if addiction > 0, you wake up with cravings
+  // Your social level determines if you resist or spiral
+  const dayPhase = state.dayTimer / state.dayLength;
+  const isNight = dayPhase > 0.7 || dayPhase < 0.1;
+  if(isNight && state.addiction > 0.1 && !state.nightCravingTriggered && !state.dialogActive && !state.activity_type) {
+    state.nightCravingTriggered = true;
+    triggerNightCraving();
+  }
+  if(!isNight) state.nightCravingTriggered = false;
+
+  // Drug high / crash decay
+  if(state.drugHigh > 0) state.drugHigh = Math.max(0, state.drugHigh - 0.3 * dt);
+  if(state.drugCrash > 0) state.drugCrash = Math.max(0, state.drugCrash - 0.15 * dt);
+  if(warmOverlay > 0) warmOverlay = Math.max(0, warmOverlay - 0.4 * dt);
+  if(crashOverlay > 0) crashOverlay = Math.max(0, crashOverlay - 0.2 * dt);
+  if(fadeToBlack > 0 && !state.collapsing) fadeToBlack = Math.max(0, fadeToBlack - 0.5 * dt);
+  if(screenShake > 0) screenShake = Math.max(0, screenShake - 8 * dt);
+
+  // ── Collapse check ──
+  if(state.food <= 0 && !state.dialogActive) { triggerCollapse('food'); return; }
+  if(state.sleep <= 0 && !state.dialogActive) { triggerCollapse('sleep'); return; }
+
+  // Food respawn
+  for(const obj of objects){if(obj.type==='food'&&obj.taken){obj.respawn-=dt;if(obj.respawn<=0)obj.taken=false;}}
+
+  // NPC AI
+  if(!state.dialogActive && !state.activity_type){
+    for(const npc of npcs) updateNpcAi(npc, dt);
+  }
+
+  // ── Player movement ──
+  if(!state.dialogActive && state.activity_type!=='wrestling'){
+    let move=0;
+    if(keys['ArrowLeft']||keys['KeyA'])move=-1;
+    if(keys['ArrowRight']||keys['KeyD'])move=1;
+
+    const speedMult=0.6+state.social*0.4;
+    // Sluggish when sleep is low
+    const sleepMult=0.5+state.sleep*0.5;
+    player.vx=move*player.speed*speedMult*sleepMult;
+    player.x+=player.vx;
+    player.x=Math.max(16,Math.min(WORLD_W-16,player.x));
+
+    if(move!==0){
+      player.facing=move;
+      player.frameTimer+=dt;
+      if(player.frameTimer>0.12){player.walkFrame=(player.walkFrame+1)%4;player.frameTimer=0;sfx('step');
+        // Kick up dust
+        spawnDust(player.x, player.y, 1);
+      }
+    } else {
+      player.walkFrame=0;
+      // Idle animation timer
+      state.idleTimer+=dt;
+    }
+
+    // Drug drift — stronger with addiction
+    const driftStrength = Math.max(0, state.addiction * 0.4 + (1-state.social) * 0.2);
+    if(driftStrength>0.1 && move===0){
+      player.x += Math.sign(590-player.x) * driftStrength * 0.3;
+    }
+
+    // Addiction auto-drink (standing near drug too long with high addiction)
+    if(state.addiction>0.5 && Math.abs(player.x-595)<15 && !state.dialogActive){
+      state.addiction += dt * 0.1; // addiction builds just being near
+      if(state.addiction>0.8 && Math.random()<dt*0.3){
+        drinkDrug(); // involuntary
+      }
+    }
+  }
+
+  // Camera
+  const target=player.x-W/2;
+  state.camera.x+=(target-state.camera.x)*0.06;
+  state.camera.x=Math.max(0,Math.min(WORLD_W-W,state.camera.x));
+
+  // Audio
+  updateAudio(state.social, Math.abs(player.x-590));
+  if(audioStarted&&Math.random()<0.002)sfx('drip');
+  if(audioStarted&&Math.abs(player.x-270)<80&&Math.random()<0.005)sfx('squeak');
+
+  // Particles
+  updateParticles(dt);
+
+  // Ambient dust motes
+  if(Math.random()<0.05){
+    particles.push({
+      x:state.camera.x+Math.random()*W, y:CAGE_TOP+Math.random()*(FLOOR_Y-CAGE_TOP),
+      vx:0.3+Math.random()*0.5, vy:Math.sin(state.time)*0.3,
+      life:3+Math.random()*2, maxLife:5,
+      size:1, color:'rgba(120,110,100,'
+    });
+  }
+}
+
+// ═══════════════════════════════════════
+//  DRAW
+// ═══════════════════════════════════════
+function draw(){
+  const m=getMoodColors();const cam=state.camera.x;
+
+  // Screen shake offset
+  const shakeX = screenShake > 0 ? (Math.random()-0.5)*screenShake*2 : 0;
+  const shakeY = screenShake > 0 ? (Math.random()-0.5)*screenShake*2 : 0;
+  bx.save();
+  bx.translate(shakeX, shakeY);
+
+  bx.fillStyle=m.bg;bx.fillRect(-4,-4,W+8,H+8);
+
+  // Cage bars
+  bx.strokeStyle=m.bars;bx.lineWidth=3;
+  for(let x=15;x<WORLD_W;x+=25){const sx=Math.floor(x-cam);if(sx>-4&&sx<W+4){bx.beginPath();bx.moveTo(sx,CAGE_TOP);bx.lineTo(sx,FLOOR_Y+4);bx.stroke();}}
+  bx.fillStyle=m.cage;bx.fillRect(0,CAGE_TOP-3,W,6);
+
+  // Floor
+  bx.fillStyle=m.floor;bx.fillRect(0,FLOOR_Y,W,H-FLOOR_Y);
+  bx.fillStyle=m.floorLight;
+  for(let i=0;i<80;i++){const fx=Math.floor(((i*43+17)%WORLD_W)-cam);if(fx>-4&&fx<W+4)bx.fillRect(fx,FLOOR_Y+3+(i*11)%30,2+(i%4),1);}
+
+  // Objects
+  for(const obj of objects){
+    const ox=Math.floor(obj.x-cam);if(ox<-40||ox>W+40)continue;
+    if(obj.type==='wheel')drawWheel(ox,obj.y,state.time);
+    else if(obj.type==='bottle')drawBottle(ox,obj.y,true);
+    else if(obj.type==='nest')drawNest(ox,obj.y,nestLevel);
+    else if(obj.type==='tunnel')drawTunnel(ox,obj.y);
+    else if(obj.type==='food'&&!obj.taken)drawFood(ox,obj.y);
+    else if(obj.type==='material'&&!obj.taken)drawMaterial(ox,obj.y,obj.matType);
+    else if(obj.type==='drug'){
+      const pull=Math.max(state.addiction,1-state.social);
+      const glow=0.15+pull*0.5+Math.sin(state.time*2.5)*pull*0.1;
+      const grad=bx.createRadialGradient(ox+6,obj.y+10,2,ox+6,obj.y+10,25+pull*20);
+      grad.addColorStop(0,`rgba(100,255,120,${glow*0.5})`);grad.addColorStop(1,'rgba(100,255,120,0)');
+      bx.fillStyle=grad;bx.fillRect(ox-30,obj.y-30,72,72);
+      drawBottle(ox,obj.y,false);
+    }
+  }
+
+  // NPCs
+  for(const npc of npcs){
+    const nx=Math.floor(npc.x-cam);if(nx<-20||nx>W+20)continue;
+    const flip=npc.facing<0;
+    let spr=npc.prefix+'_idle';
+    if(npc.aiState==='walk'||npc.aiState==='run'){
+      const wf=Math.floor(state.time*6)%4+1;spr=npc.prefix+'_w'+wf;
+    }
+    if(state.activity_type==='eating'&&state.activityData.npc===npc&&state.activityData.phase===1)spr=npc.prefix+'_eat';
+    drawSprite(spr,nx-8,npc.y-14,flip);
+    // Name
+    bx.font='6px "Press Start 2P"';bx.fillStyle='rgba(200,200,200,0.4)';
+    const tw=bx.measureText(npc.name).width;bx.fillText(npc.name,nx-tw/2+4,npc.y-18);
+    // Hearts
+    const hearts=Math.floor(npc.happiness/2);bx.fillStyle='rgba(255,120,150,0.5)';bx.font='4px "Press Start 2P"';
+    for(let i=0;i<hearts;i++)bx.fillText('♥',nx-hearts*3+i*6,npc.y-24);
+  }
+
+  // Player
+  const px=Math.floor(player.x-cam);
+  let sprName=player.sprOverride||'player_idle';
+  if(!player.sprOverride&&player.vx!==0){sprName='player_w'+(player.walkFrame+1);}
+  // Idle animation — subtle ear twitch
+  if(player.vx===0&&!player.sprOverride&&Math.sin(state.idleTimer*2)>0.95){
+    // Just use walk frame 1 briefly for "twitch"
+    sprName='player_w1';
+  }
+  drawSprite(sprName,px-8,player.y-14,player.facing<0);
+
+  // Carrying indicator
+  if(state.carrying){
+    bx.font='5px "Press Start 2P"';bx.fillStyle='#e0d0f0';
+    bx.fillText(state.carrying==='food'?'[food]':'['+state.carrying+']',px-12,player.y-22);
+  }
+
+  // Particles
+  drawParticles(cam);
+
+  // Activity overlays
+  if(state.activity_type==='wrestling')drawWrestling();
+  if(state.activity_type==='sitting')drawSitting();
+
+  // Interact prompt
+  if(!state.dialogActive&&!state.activity_type&&!state.collapsing){
+    let prompt=null;
+    if(state.carrying==='food'){for(const npc of npcs){if(Math.abs(player.x-npc.x)<26){prompt={text:'[E] Share food',x:Math.floor(npc.x-cam),y:npc.y-32};break;}}}
+    if(state.carrying&&state.carrying!=='food'&&!prompt){const nest=objects.find(o=>o.type==='nest');if(Math.abs(player.x-(nest.x+16))<28)prompt={text:'[E] Add to nest',x:Math.floor(nest.x+16-cam),y:FLOOR_Y-34};}
+    if(!prompt){for(const npc of npcs){if(Math.abs(player.x-npc.x)<26){prompt={text:'[E] Talk',x:Math.floor(npc.x-cam),y:npc.y-28};break;}}}
+    if(!prompt){const labels={wheel:'[E] Use wheel',bottle:'[E] Drink water',nest:state.carrying?'[E] Add to nest':'[E] Rest',tunnel:'[E] Enter',drug:'[E] ...',food:'[E] Pick up',material:'[E] Pick up'};
+      for(const obj of objects){if((obj.type==='food'||obj.type==='material')&&obj.taken)continue;if(Math.abs(player.x-(obj.x+(obj.w||10)/2))<24){prompt={text:labels[obj.type],x:Math.floor(obj.x+(obj.w||10)/2-cam),y:FLOOR_Y-34};break;}}}
+    if(prompt){bx.font='7px "Press Start 2P"';const tw=bx.measureText(prompt.text).width;bx.fillStyle='rgba(0,0,0,0.7)';bx.fillRect(prompt.x-tw/2-4,prompt.y-8,tw+8,12);bx.fillStyle='#e0d0f0';bx.fillText(prompt.text,prompt.x-tw/2,prompt.y);}
+  }
+
+  // Dialog box
+  if(state.dialogActive){
+    const dbH=52,dbY=H-dbH-8,dbX=12,dbW=W-24;
+    bx.fillStyle='rgba(8,6,16,0.92)';bx.fillRect(dbX,dbY,dbW,dbH);
+    bx.strokeStyle=m.bars;bx.lineWidth=2;bx.strokeRect(dbX,dbY,dbW,dbH);
+    if(state.dialogSpeaker){bx.fillStyle='#b89cff';bx.font='8px "Press Start 2P"';bx.fillText(state.dialogSpeaker,dbX+8,dbY+12);}
+    bx.fillStyle='#d8d0c8';bx.font='8px "Press Start 2P"';
+    const startY=state.dialogSpeaker?dbY+26:dbY+16;
+    state.dialogText.split('\n').forEach((line,i)=>{bx.fillText(line,dbX+8,startY+i*12);});
+    if(state.dialogCharIdx>=state.dialogFullText.length&&Math.sin(state.time*5)>0){bx.fillStyle='#b89cff';bx.fillText('▼',dbX+dbW-18,dbY+dbH-8);}
+  }
+
+  bx.restore(); // end shake transform
+
+  // ── HUD — top left meters ──
+  const hudX=6, hudY=8, barW=40, barH=5, gap=9;
+
+  // Background panel
+  bx.fillStyle='rgba(0,0,0,0.6)';bx.fillRect(hudX-2,hudY-2,70,gap*4+6);
+
+  const meters=[
+    {label:'♥',val:state.social,col:state.social>0.6?'#b89cff':state.social>0.3?'#6a6a78':'#3a3a48',icon:'heart'},
+    {label:'🍖',val:state.food,col:state.food>0.3?'#c8a060':state.food>0.15?'#a06030':'#ff4040',icon:'food'},
+    {label:'🏃',val:state.activity,col:state.activity>0.3?'#60a0c8':'#4060a0',icon:'run'},
+    {label:'💤',val:state.sleep,col:state.sleep>0.3?'#8080c0':state.sleep>0.15?'#6060a0':'#ff4040',icon:'sleep'},
+  ];
+  meters.forEach((m,i)=>{
+    const y=hudY+i*gap;
+    // Draw symbolic icons instead of letters
+    if(m.icon==='heart'){
+      bx.fillStyle='rgba(200,140,200,0.6)';bx.fillRect(hudX,y,2,2);bx.fillRect(hudX+3,y,2,2);bx.fillRect(hudX,y+1,5,2);bx.fillRect(hudX+1,y+2,3,2);bx.fillRect(hudX+2,y+3,1,1);
+    } else if(m.icon==='food'){
+      // Meat on bone
+      bx.fillStyle='rgba(200,160,100,0.6)';bx.fillRect(hudX,y+2,7,1); // bone
+      bx.fillRect(hudX,y+1,1,3);bx.fillRect(hudX+6,y+1,1,3); // bone ends
+      bx.fillStyle='rgba(180,80,80,0.7)';bx.fillRect(hudX+2,y,3,4); // meat
+      bx.fillStyle='rgba(200,100,100,0.6)';bx.fillRect(hudX+3,y+1,1,2); // highlight
+    } else if(m.icon==='run'){
+      // Running figure
+      bx.fillStyle='rgba(100,180,220,0.6)';
+      bx.fillRect(hudX+3,y,2,2); // head
+      bx.fillRect(hudX+2,y+2,3,3); // body
+      bx.fillRect(hudX+1,y+4,1,2);bx.fillRect(hudX+5,y+3,1,2); // legs apart
+      bx.fillRect(hudX,y+2,2,1);bx.fillRect(hudX+5,y+2,2,1); // arms
+    } else if(m.icon==='sleep'){
+      // Zzz
+      bx.fillStyle='rgba(140,140,200,0.6)';bx.font='5px "Press Start 2P"';
+      bx.fillText('z',hudX+3,y+3);bx.fillText('z',hudX+1,y+5);
+    }
+    bx.fillStyle='#111';bx.fillRect(hudX+10,y,barW,barH);
+    bx.fillStyle=m.col;bx.fillRect(hudX+10,y,m.val*barW,barH);
+    // Flash when low
+    if(m.val<0.2&&Math.sin(state.time*8)>0){bx.fillStyle='rgba(255,60,60,0.3)';bx.fillRect(hudX+10,y,barW,barH);}
+  });
+
+  // Day indicator
+  bx.font='6px "Press Start 2P"';bx.fillStyle='rgba(200,200,200,0.3)';
+  bx.fillText('Day '+state.day+'/'+state.maxDays, W-60, hudY+6);
+
+  // Addiction indicator (only show if > 0)
+  if(state.addiction>0){
+    bx.fillStyle='rgba(100,255,120,0.3)';bx.font='5px "Press Start 2P"';
+    bx.fillText('☠',hudX,hudY+gap*4+4);
+    bx.fillStyle='#111';bx.fillRect(hudX+10,hudY+gap*4+1,barW,barH);
+    bx.fillStyle='rgba(100,255,120,0.5)';bx.fillRect(hudX+10,hudY+gap*4+1,state.addiction*barW,barH);
+  }
+
+  // ── Drug proximity visual effects ──
+  const drugScreenDist = Math.abs(player.x - 590);
+  const addictionPull = state.addiction;
+
+  // Green edge bleed when isolated + near drug or addicted
+  const edgeIntensity = Math.max(0, addictionPull * 0.4 + Math.max(0, 1 - drugScreenDist/250) * (1-state.social) * 0.5);
+  if(edgeIntensity > 0.05){
+    // Left edge
+    const gL=bx.createLinearGradient(0,0,40,0);
+    gL.addColorStop(0,`rgba(60,180,80,${edgeIntensity*0.4})`);gL.addColorStop(1,'rgba(60,180,80,0)');
+    bx.fillStyle=gL;bx.fillRect(0,0,40,H);
+    // Right edge
+    const gR=bx.createLinearGradient(W,0,W-40,0);
+    gR.addColorStop(0,`rgba(60,180,80,${edgeIntensity*0.4})`);gR.addColorStop(1,'rgba(60,180,80,0)');
+    bx.fillStyle=gR;bx.fillRect(W-40,0,40,H);
+    // Top
+    const gT=bx.createLinearGradient(0,0,0,30);
+    gT.addColorStop(0,`rgba(60,180,80,${edgeIntensity*0.3})`);gT.addColorStop(1,'rgba(60,180,80,0)');
+    bx.fillStyle=gT;bx.fillRect(0,0,W,30);
+    // Bottom
+    const gB=bx.createLinearGradient(0,H,0,H-30);
+    gB.addColorStop(0,`rgba(60,180,80,${edgeIntensity*0.3})`);gB.addColorStop(1,'rgba(60,180,80,0)');
+    bx.fillStyle=gB;bx.fillRect(0,H-30,W,30);
+  }
+
+  // Warm overlay (drug euphoria)
+  if(warmOverlay>0){
+    bx.fillStyle=`rgba(255,200,100,${warmOverlay*0.25})`;bx.fillRect(0,0,W,H);
+  }
+  // Crash overlay
+  if(crashOverlay>0){
+    bx.fillStyle=`rgba(0,20,0,${crashOverlay*0.4})`;bx.fillRect(0,0,W,H);
+  }
+  // Fade to black
+  if(fadeToBlack>0){
+    bx.fillStyle=`rgba(0,0,0,${fadeToBlack})`;bx.fillRect(0,0,W,H);
+  }
+
+  // Ending screen
+  if(state.ending)drawEnding();
+
+  // Scale to display
+  ctxMain.clearRect(0,0,canvas.width,canvas.height);
+  ctxMain.drawImage(buf,0,0,W,H,0,0,canvas.width,canvas.height);
+}
+
+// ═══════════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════════
+let last=0;
+function loop(ts){const dt=Math.min((ts-last)/1000,0.05);last=ts;if(introActive){drawIntro();requestAnimationFrame(loop);return;}update(dt);draw();requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+
+} // end init
+</script>
+</body>
+</html>
