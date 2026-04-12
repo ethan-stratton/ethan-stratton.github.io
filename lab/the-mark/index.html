@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Mark</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;600&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-x:hidden;min-height:100vh}
+#game{max-width:720px;margin:0 auto;padding:16px;position:relative}
+
+/* Title screen */
+#title-screen{text-align:center;padding:120px 20px 60px}
+#title-screen h1{font-size:2.4rem;color:#e8dcc8;letter-spacing:0.12em;margin-bottom:12px;text-shadow:0 0 40px rgba(200,160,80,0.2)}
+#title-screen .sub{font-style:italic;color:#887860;font-size:1.05rem;margin-bottom:40px}
+#title-screen .start-btn{font-family:'Crimson Text',serif;font-size:1.1rem;color:#c8b890;background:none;border:1px solid rgba(200,160,80,0.3);padding:12px 36px;cursor:pointer;letter-spacing:0.06em;transition:all 0.3s}
+#title-screen .start-btn:hover{border-color:rgba(200,160,80,0.7);text-shadow:0 0 12px rgba(200,160,80,0.4)}
+
+/* HUD */
+#hud{display:flex;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid rgba(200,160,80,0.1);margin-bottom:16px;align-items:center}
+#day-label{font-family:'Inter',sans-serif;font-size:0.75rem;color:#887860;letter-spacing:0.08em;text-transform:uppercase}
+.res-bar{flex:1;min-width:130px}
+.res-bar .label{font-family:'Inter',sans-serif;font-size:0.6rem;color:#706050;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;display:flex;justify-content:space-between}
+.res-bar .bar{height:6px;background:#1e1a14;border-radius:3px;overflow:hidden}
+.res-bar .bar .fill{height:100%;border-radius:3px;transition:width 0.5s ease}
+
+/* Advisor trust */
+#advisors{display:flex;gap:16px;padding:8px 0;margin-bottom:16px;border-bottom:1px solid rgba(200,160,80,0.06)}
+.advisor{flex:1;text-align:center}
+.advisor .name{font-family:'Inter',sans-serif;font-size:0.65rem;color:#887860;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:4px}
+.advisor .portrait{font-size:1.4rem;margin-bottom:2px}
+.advisor .trust-bar{height:3px;background:#1e1a14;border-radius:2px;overflow:hidden;margin:0 auto;width:80%}
+.advisor .trust-bar .fill{height:100%;border-radius:2px;transition:width 0.5s}
+
+/* Phase display */
+#phase-area{min-height:400px;position:relative}
+.phase-title{font-family:'Inter',sans-serif;font-size:0.65rem;color:#706050;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:16px}
+
+/* Dawn - assignment */
+.assign-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(200,160,80,0.06)}
+.assign-row .role{font-size:0.95rem;color:#a89878;width:80px}
+.assign-row .desc{font-size:0.8rem;color:#685848;flex:1;padding:0 12px;font-style:italic}
+.assign-row .controls{display:flex;align-items:center;gap:8px}
+.assign-row .controls button{width:28px;height:28px;border:1px solid rgba(200,160,80,0.2);background:none;color:#c8b890;font-size:1rem;cursor:pointer;border-radius:4px}
+.assign-row .controls button:hover{border-color:rgba(200,160,80,0.5)}
+.assign-row .controls button:disabled{opacity:0.3;cursor:default}
+.assign-row .count{font-family:'Inter',sans-serif;font-size:0.85rem;color:#c8b890;min-width:20px;text-align:center}
+#workers-remaining{font-family:'Inter',sans-serif;font-size:0.75rem;color:#887860;margin:12px 0;text-align:center}
+.phase-btn{font-family:'Crimson Text',serif;font-size:1rem;color:#c8b890;background:none;border:1px solid rgba(200,160,80,0.25);padding:10px 28px;cursor:pointer;display:block;margin:20px auto 0;letter-spacing:0.04em;transition:all 0.3s}
+.phase-btn:hover{border-color:rgba(200,160,80,0.6);text-shadow:0 0 8px rgba(200,160,80,0.3)}
+
+/* Petition */
+#petition-area{padding:8px 0}
+.petition-speaker{font-size:0.8rem;color:#a08860;letter-spacing:0.04em;margin-bottom:4px;text-transform:uppercase;font-family:'Inter',sans-serif}
+.petition-text{font-size:1.05rem;line-height:1.7;color:#c8c0b0;margin-bottom:20px;padding:16px;background:rgba(200,160,80,0.03);border-left:2px solid rgba(200,160,80,0.15);border-radius:0 4px 4px 0}
+.advisor-recs{margin-bottom:16px;padding:8px 12px;background:rgba(0,0,0,0.15);border-radius:4px}
+.advisor-rec{font-size:0.8rem;color:#887860;margin:4px 0;font-style:italic}
+.advisor-rec .aname{color:#a89878;font-style:normal}
+.choice-btn{display:block;width:100%;text-align:left;font-family:'Crimson Text',serif;font-size:0.95rem;color:#c8c0b0;background:rgba(200,160,80,0.04);border:1px solid rgba(200,160,80,0.12);padding:12px 16px;margin-bottom:8px;cursor:pointer;border-radius:4px;transition:all 0.2s;line-height:1.5}
+.choice-btn:hover{background:rgba(200,160,80,0.1);border-color:rgba(200,160,80,0.35)}
+.choice-btn .cost{font-family:'Inter',sans-serif;font-size:0.7rem;color:#a08060;display:block;margin-top:4px}
+
+/* Dusk events */
+.event-line{font-size:0.95rem;line-height:1.7;color:#a89878;margin-bottom:10px;padding-left:12px;border-left:1px solid rgba(200,160,80,0.1)}
+
+/* Wren */
+.wren-line{font-size:0.95rem;color:#c8b0d0;font-style:italic;padding:16px;margin:16px 0;background:rgba(180,140,200,0.05);border-left:2px solid rgba(180,140,200,0.2);border-radius:0 4px 4px 0}
+
+/* End screen */
+#end-screen{text-align:center;padding:60px 20px}
+#end-screen h2{font-size:1.8rem;color:#e8dcc8;margin-bottom:8px;letter-spacing:0.06em}
+#end-screen .ending-name{font-size:1rem;color:#a08860;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:24px;font-family:'Inter',sans-serif}
+#end-screen .wren-final{font-size:1.15rem;color:#c8b0d0;font-style:italic;line-height:1.8;max-width:500px;margin:0 auto 32px;padding:20px;border:1px solid rgba(180,140,200,0.15);border-radius:4px}
+#end-screen .stats{font-family:'Inter',sans-serif;font-size:0.75rem;color:#685848;margin-bottom:24px}
+
+/* Game over */
+.gameover-msg{font-size:1.3rem;color:#c05040;text-align:center;margin:20px 0}
+</style>
+</head>
+<body>
+<div id="game">
+<div id="title-screen">
+<h1>THE MARK</h1>
+<p class="sub">"To miss the mark is not always to aim wrong."</p>
+<p style="color:#685848;font-size:0.9rem;line-height:1.7;max-width:480px;margin:0 auto 32px">
+Elder Maren is dead. Brannhaven is yours now.<br>
+Two hundred people behind a stone wall, and the world outside is getting worse.<br><br>
+Lead them. Thirty days.
+</p>
+<button class="start-btn" onclick="startGame()">Begin</button>
+</div>
+<div id="game-screen" style="display:none">
+<div id="hud">
+<div id="day-label">Day 1 / 30 — Dawn</div>
+<div class="res-bar" id="rb-food"><div class="label"><span>Food</span><span id="rv-food">70</span></div><div class="bar"><div class="fill" id="rf-food" style="width:70%;background:#c8a060"></div></div></div>
+<div class="res-bar" id="rb-mat"><div class="label"><span>Materials</span><span id="rv-mat">60</span></div><div class="bar"><div class="fill" id="rf-mat" style="width:60%;background:#8090a0"></div></div></div>
+<div class="res-bar" id="rb-ppl"><div class="label"><span>People</span><span id="rv-ppl">40</span></div><div class="bar"><div class="fill" id="rf-ppl" style="width:40%;background:#90b080"></div></div></div>
+<div class="res-bar" id="rb-mor"><div class="label"><span>Morale</span><span id="rv-mor">65</span></div><div class="bar"><div class="fill" id="rf-mor" style="width:65%;background:#b89cff"></div></div></div>
+</div>
+<div id="advisors">
+<div class="advisor"><div class="portrait">⚔️</div><div class="name">Rowan</div><div class="trust-bar"><div class="fill" id="trust-rowan" style="width:60%;background:#c08050"></div></div></div>
+<div class="advisor"><div class="portrait">🌿</div><div class="name">Lira</div><div class="trust-bar"><div class="fill" id="trust-lira" style="width:60%;background:#80b080"></div></div></div>
+<div class="advisor"><div class="portrait">📜</div><div class="name">Edric</div><div class="trust-bar"><div class="fill" id="trust-edric" style="width:60%;background:#8888b0"></div></div></div>
+</div>
+<div id="phase-area"></div>
+</div>
+<div id="end-screen" style="display:none"></div>
+</div>
+<script>
+// ── STATE ──
+const S={
+  day:1, maxDays:10, phase:'dawn',
+  food:70, mat:60, ppl:40, mor:65,
+  mark:0, // negative=short, positive=beyond, 0=center
+  trustRowan:60, trustLira:60, trustEdric:60,
+  assign:{farm:0,build:0,guard:0,forage:0,rest:0},
+  usedPetitions:new Set(),
+  flags:{},
+  events:[],
+  gameOver:false
+};
+
+function clamp(v,lo=0,hi=100){return Math.max(lo,Math.min(hi,v))}
+
+// ── PETITIONS DATABASE ──
+const PETITIONS=[
+{id:'burial',day:1,
+  speaker:'ROWAN, Captain of the Guard',
+  text:`Two scouts went beyond the wall. Corwin is dead — killed trying to stop Hale from defecting to the Reach. Hale's body was sent back to us, gutted, with a message carved into his belt: "We know where you are."\n\nCorwin's family wants him buried with honors. Hale's mother is at the gate, weeping, begging for her son's body. The crowd is watching.`,
+  recs:{rowan:'Bury Corwin with honors. Hang Hale\'s body from the wall as warning.',lira:'Both were someone\'s son. Bury them both.',edric:'Precedent says traitors get no rites. Corwin gets honors. Hale gets the pit.'},
+  choices:[
+    {text:'Bury Corwin with honors. Deny Hale\'s body to his mother.',cost:'Morale +5, but a grieving mother remembers.',effects:{mor:5,mark:0.5},flag:'burial_deny'},
+    {text:'Hang Hale\'s body from the wall. Bury Corwin in the square.',cost:'Morale +8 among guards. Others look away.',effects:{mor:8,mark:1.5,trustRowan:8},flag:'burial_wall'},
+    {text:'Bury them both. Corwin with honors. Hale quietly, with his mother present.',cost:'Morale −3. Rowan is furious. But Hale\'s mother will remember kindness.',effects:{mor:-3,trustRowan:-10,trustLira:10,mark:-0.3},flag:'burial_both'},
+    {text:'Give both bodies to their families. No public ceremony. Let them grieve privately.',cost:'No morale change. The crowd disperses, unsatisfied.',effects:{trustEdric:-5,mark:0},flag:'burial_private'}
+  ]},
+
+{id:'trader',minDay:2,maxDay:4,
+  speaker:'EDRIC, Elder of the Council',
+  text:`A trader arrived from downriver. Name's Marsh. He's got a cart of iron tools — axes, nails, plow blades. Things we desperately need.\n\nHis price: twenty percent of our grain stores. That's fourteen days of food for the whole settlement. He says it's fair. Says he won't find another buyer for fifty miles. He's probably right.`,
+  recs:{rowan:'We need those tools but not at that price. Threaten to take them.',lira:'We can\'t eat iron. Tell him to lower his price or move on.',edric:'The price is steep but not unreasonable. Trade is trade.'},
+  choices:[
+    {text:'Accept the deal. Twenty percent of grain for the tools.',cost:'Food −14. Materials +20.',effects:{food:-14,mat:20,mark:0},flag:'trader_deal'},
+    {text:'Counter-offer: ten percent, and he can resupply water and rest here overnight.',cost:'Food −7. Materials +12. Marsh grumbles but accepts.',effects:{food:-7,mat:12,mor:2,mark:0},flag:'trader_counter'},
+    {text:'Seize the cart. He\'s one man.',cost:'Materials +25. Morale −10. Word will spread.',effects:{mat:25,mor:-10,mark:2},flag:'trader_seize'},
+    {text:'Decline. We\'ll manage without.',cost:'No change. Marsh leaves.',effects:{mark:-0.3},flag:'trader_decline'}
+  ]},
+
+{id:'sickness',minDay:3,maxDay:5,
+  speaker:'LIRA, Healer',
+  text:`Three families in the east quarter are sick. Fever, aching joints, bloody coughs. I don't know what it is yet, but it spreads through contact.\n\nI need to quarantine the east quarter. That means twelve workers off the roster for at least five days. And I need herbs from outside the wall — a foraging run into Ash Walker territory.`,
+  recs:{rowan:'Quarantine them. Seal the quarter. We can\'t afford a plague.',lira:'I need those herbs. Send a small team — two people, fast and quiet.',edric:'Quarantine is prudent. The foraging run is reckless.'},
+  choices:[
+    {text:'Full quarantine. Seal the east quarter. No foraging run.',cost:'People −12 for 5 days. Sickness may worsen without herbs.',effects:{ppl:-8,mark:0.3},flag:'sick_seal'},
+    {text:'Quarantine and send foragers. Two volunteers.',cost:'People −14. Risk of Ash Walker encounter. Best medical outcome.',effects:{ppl:-6,food:-2,mor:3,mark:-0.2},flag:'sick_herbs'},
+    {text:'No quarantine. Lira treats them in place. Keep everyone working.',cost:'Sickness may spread. People −0 now, but risk of −20 later.',effects:{mark:-0.5},flag:'sick_ignore'},
+    {text:'Quarantine the sick families specifically — move them to the healer\'s hall. Others keep working.',cost:'People −4. Morale −4 (sick families feel singled out). Contained.',effects:{ppl:-4,mor:-4,mark:0.1},flag:'sick_isolate'}
+  ]},
+
+{id:'elif',minDay:5,maxDay:7,
+  speaker:'A voice from outside the wall',
+  text:`There's a woman at the east gate. She's got two children — a boy, maybe six, and a girl barely walking. An old man is with them, leaning on a staff.\n\nShe says her name is Elif. Their settlement was absorbed by the Reach three weeks ago. They walked south. The old man — Avi — prays in a language no one here recognizes.\n\nRowan counted: we have food for nineteen more days at current population. These four make it eighteen.`,
+  recs:{rowan:'We can\'t feed four more mouths. Turn them away.',lira:'They have children. Open the gate.',edric:'We have no precedent for refugees. This needs a council vote.'},
+  choices:[
+    {text:'Open the gate. Feed them. Find them a place to stay.',cost:'Food drain +1/day. People +2 (Elif and Avi can work). Morale +3.',effects:{food:-4,ppl:2,mor:3,trustLira:8,trustRowan:-5,mark:-0.4},flag:'elif_in'},
+    {text:'Give them three days of food and directions to the next settlement south.',cost:'Food −3. They leave. You wonder about the children.',effects:{food:-3,mark:-0.2},flag:'elif_send'},
+    {text:'Let them camp outside the wall. Bring food out daily.',cost:'Food −2/day. Not inside, not abandoned. Limbo.',effects:{food:-3,mor:-2,mark:0.1},flag:'elif_outside'},
+    {text:'Deny them. Close the gate.',cost:'Food stable. Morale −2. Rowan approves.',effects:{mor:-2,trustRowan:5,mark:0.3},flag:'elif_deny'}
+  ]},
+
+{id:'thief',minDay:3,maxDay:6,
+  speaker:'ROWAN, Captain of the Guard',
+  text:`Caught a man in the granary last night. Name's Declan. Had a sack of grain, enough for maybe three days. He didn't fight. Just said "My daughter's hungry."\n\nHe's a wall-crew worker. Good with his hands. His wife died in the spring and he's been raising the girl alone. I checked — his rations are the same as everyone else's. But the girl's been sick, and sick children need more food.\n\nHe's in the holding room. People are watching.`,
+  recs:{rowan:'Theft is theft. Five days labor punishment. Sends a message.',lira:'His daughter is sick and hungry. Punishing him helps no one.',edric:'The law is clear. Theft from communal stores carries penalty.'},
+  choices:[
+    {text:'Punish him. Five days hard labor on the wall, reduced rations.',cost:'Morale +3 (order maintained). But his daughter eats less.',effects:{mor:3,mark:0.8,trustRowan:5,trustEdric:5},flag:'thief_punish'},
+    {text:'Forgive him. Return the grain. Let him go back to work.',cost:'Morale −3 (others see weakness). But a father stays with his child.',effects:{mor:-3,mark:-0.5,trustLira:5,trustRowan:-5},flag:'thief_forgive'},
+    {text:'Forgive him — and find out why his rations aren\'t enough. Fix the distribution.',cost:'Food −2 (increased child rations for all). Materials −1 (record-keeping). Systemic fix.',effects:{food:-2,mat:-1,mor:2,mark:-0.6,trustLira:8},flag:'thief_fix'},
+    {text:'Exile him. Theft from the granary threatens everyone.',cost:'People −1. Morale +4 among some, −6 among others. A child loses her father.',effects:{ppl:-1,mor:-2,mark:1.5},flag:'thief_exile'}
+  ]},
+
+{id:'kael',minDay:6,maxDay:8,
+  speaker:'EDRIC, Elder of the Council',
+  text:`There's a man called Kael. Came in with the last group of refugees — or maybe he was already here, nobody's quite sure. Doesn't matter. He's been talking in the square.\n\nHe says the granary should be open. Says leadership hoards while families ration. Says decisions should be made by everyone, not one person in the Hearthhouse.\n\nHe's not wrong about everything. But his crowd is getting bigger, and some of them are angry, not just hungry.`,
+  recs:{rowan:'Shut him down. Arrest him if he won\'t stop. Agitators get people killed.',lira:'He\'s saying what people feel. Silencing him will make it worse.',edric:'He has no standing to speak. He\'s not on the council.'},
+  choices:[
+    {text:'Arrest Kael. Public speech without council approval is destabilizing.',cost:'Morale −8. His followers go underground. Rowan approves.',effects:{mor:-8,trustRowan:10,mark:1.5},flag:'kael_arrest'},
+    {text:'Invite him to speak at the council. Publicly. Let people hear both sides.',cost:'Morale +2. Risky — he might win people over. But it\'s fair.',effects:{mor:2,mark:-0.5,trustEdric:-5},flag:'kael_council'},
+    {text:'Ignore him. He\'ll burn out on his own.',cost:'No immediate change. But his crowd keeps growing.',effects:{mark:-0.4},flag:'kael_ignore'},
+    {text:'Open the granary records to the public. Show exactly what we have and how it\'s distributed.',cost:'Materials −1 (record-keeping). Morale +5 (transparency). Kael loses his best argument.',effects:{mat:-1,mor:5,mark:-0.7},flag:'kael_records'}
+  ]},
+
+{id:'raid',minDay:7,maxDay:9,
+  speaker:'ROWAN, Captain of the Guard',
+  text:`They hit the north farm at dawn. Four riders — Reach scouts, not Ash Walkers. Professional. They torched the grain shed and killed two of our cattle. Left before our guards arrived.\n\nNailed to the fence post: a leather scroll. "The Warden extends his hand."\n\nWe lost roughly ten days of food. Two farmworkers are injured. People are terrified.`,
+  recs:{rowan:'We need to double the guard. Now. And we should consider a retaliatory strike on their forward camp.',lira:'Treat the injured first. Then we need to talk about whether fighting back just makes this worse.',edric:'This is an act of war. We should send a formal protest to the Reach. There are rules.'},
+  choices:[
+    {text:'Double the guard. Fortify the farms. Prepare for the next raid.',cost:'People: 10 moved to guard duty. Food production halved. But the walls hold.',effects:{food:-8,ppl:-4,mor:3,mat:-5,mark:0.6,trustRowan:10},flag:'raid_fortify'},
+    {text:'Send a retaliatory strike. Hit their forward camp.',cost:'People −3 (casualties). Materials −4 (weapons). If successful: Reach backs off for now. Big risk.',effects:{ppl:-3,mat:-4,mor:5,mark:1.8,trustRowan:15},flag:'raid_strike'},
+    {text:'Do nothing militarily. Focus on rebuilding the farm and treating the injured.',cost:'Food −4 (rebuilding). Morale −5 (people feel unprotected). But no escalation.',effects:{food:-4,mor:-5,trustRowan:-10,trustLira:5,mark:-0.6},flag:'raid_rebuild'},
+    {text:'Send Lira to the Reach camp with a white flag. Open dialogue.',cost:'Risky — Lira might not come back. If she does: information. Possible negotiation.',effects:{mor:-3,mark:-0.8,trustLira:5,trustRowan:-10},flag:'raid_talk'}
+  ]},
+
+{id:'deserter',minDay:8,maxDay:10,
+  speaker:'ROWAN, Captain of the Guard',
+  text:`Found a man collapsed at the south gate this morning. Reach uniform, stripped of insignia. Beaten badly. Says his name is Nath.\n\nHe says he deserted because the Warden ordered his unit to burn a settlement that surrendered peacefully. Women, children. He couldn't do it. So he ran.\n\nHe knows the Reach\'s patrol routes, troop numbers, supply lines. Everything we\'d need to defend ourselves — or to strike.\n\nHe could also be a spy.`,
+  recs:{rowan:'Chain him. Interrogate him. If he\'s lying, he dies. If he\'s telling the truth, he\'s useful — but never trusted.',lira:'He\'s half dead. Let me treat him first. Then we talk.',edric:'A deserter has no rights under any code. But information is information.'},
+  choices:[
+    {text:'Imprison him. Interrogate for intelligence. Keep him chained.',cost:'Gain Reach intel (future petitions easier). Morale −2. A man in chains.',effects:{mor:-2,mark:1.0,trustRowan:10},flag:'nath_prison'},
+    {text:'Treat his wounds. Talk to him. See if his story holds.',cost:'Food −1. Time. If he\'s genuine, you gain an ally.',effects:{food:-1,mor:2,mark:-0.5,trustLira:10,trustRowan:-8},flag:'nath_treat'},
+    {text:'Take the intel, then send him away. He\'s too dangerous to keep.',cost:'Gain some intel. Nath disappears. Did the Reach find him?',effects:{mark:0.3},flag:'nath_expel'},
+    {text:'Give him a choice: stay as a citizen, no special treatment, no special suspicion. If he lies, we\'ll find out.',cost:'People +1. Risk. Trust as a policy.',effects:{ppl:1,food:-1,mark:-0.7,trustRowan:-10,trustLira:8},flag:'nath_citizen'}
+  ]},
+
+{id:'pacifists',minDay:9,maxDay:10,
+  speaker:'ELIF (if admitted) / A voice from outside the wall',
+  text:`Six more arrived today. Families — not soldiers. They say they're from a Reach settlement called Thornfield. When the Warden ordered all able-bodied adults into militia training, these families refused.\n\nThey buried their weapons. Literally. Dug a pit, laid their swords and bows in it, covered it with earth, and walked away.\n\nThey will work. They will farm, build, cook, heal. They will not fight. Not to defend themselves. Not even to defend Brannhaven. They say violence is a cycle and they will not continue it.\n\nRowan is incandescent.`,
+  recs:{rowan:'Absolutely not. Dead weight in a siege. Send them away.',lira:'These are the bravest people I\'ve ever seen.',edric:'We have no category for this. What are they — citizens who won\'t serve?'},
+  choices:[
+    {text:'Accept them. All of them. They work, they eat, they don\'t fight. That\'s their covenant and you\'ll honor it.',cost:'People +4 (workers only). Food −3/day. Rowan may never forgive you. But something shifts in Brannhaven.',effects:{ppl:4,food:-6,mor:3,trustRowan:-15,trustLira:15,mark:-1.0},flag:'pacifist_accept'},
+    {text:'Accept them on the condition they contribute to defense in non-combat ways — building walls, carrying supplies, treating wounded.',cost:'People +4 (limited). Food −3/day. A compromise that satisfies no one fully.',effects:{ppl:4,food:-4,mor:1,mark:0.2},flag:'pacifist_compromise'},
+    {text:'Turn them away. You can\'t protect people who won\'t protect themselves.',cost:'People stable. Morale +3 among guards. But Lira walks out of the room.',effects:{mor:2,trustRowan:10,trustLira:-12,mark:0.8},flag:'pacifist_deny'},
+    {text:'Let the community vote. This isn\'t your decision alone.',cost:'Delayed resolution. Community is split. Whatever happens, it\'s collective.',effects:{mor:-2,mark:-0.3},flag:'pacifist_vote'}
+  ]}
+];
+
+// ── WREN LINES ──
+function getWrenLine(){
+  const m=S.mark;
+  if(S.day<=3){
+    return "Wren is sitting on the wall, legs dangling. She waves at you but doesn't say anything.";
+  }
+  if(m<-1.5) return '"You look tired. Grandma used to look like that." Wren hands you a wildflower. It\'s half-wilted.';
+  if(m>3) return '"Rowan says I can\'t play outside the wall anymore. He says it\'s for my safety." She doesn\'t look at you.';
+  if(m>1.5) return '"Everyone\'s very... serious now. Is that what being safe feels like?"';
+  if(m<-0.5) return '"I like that you listen to people. Grandma always said listening is the hardest work."';
+  if(m<1) return '"I drew the settlement today. I drew the gate open. Is that okay?"';
+  return '"Are we going to be alright?" She asks it the way children do — expecting you to say yes.';
+}
+
+// ── DUSK EVENTS ──
+function generateDuskEvents(){
+  const ev=[];
+  const farmWorkers=S.assign.farm;
+  const guardWorkers=S.assign.guard;
+  const buildWorkers=S.assign.build;
+  const forageWorkers=S.assign.forage;
+  const restWorkers=S.assign.rest;
+
+  // Farm
+  if(farmWorkers>0){
+    const gain=Math.floor(farmWorkers*1.2)+Math.floor(Math.random()*3);
+    S.food=clamp(S.food+gain);
+    ev.push(`The farm crew brought in ${gain} units of food.`);
+  }
+  // Build
+  if(buildWorkers>0){
+    const gain=Math.floor(buildWorkers*0.8)+Math.floor(Math.random()*2);
+    S.mat=clamp(S.mat+gain);
+    ev.push(`The build crew reinforced walls and produced ${gain} materials.`);
+  }
+  // Guard
+  if(guardWorkers>0){
+    if(guardWorkers>=6) ev.push('The walls are well-manned. Rowan nods approvingly.');
+    else if(guardWorkers>=3) ev.push('Guards patrol the perimeter. Thin coverage, but present.');
+    else ev.push('A skeleton crew watches the walls. Rowan paces.');
+  } else {
+    if(Math.random()<0.3){
+      const loss=Math.floor(Math.random()*4)+2;
+      S.food=clamp(S.food-loss);
+      ev.push(`Ash Walkers probed the unguarded east wall. Stole ${loss} food before anyone noticed.`);
+    }
+  }
+  // Forage
+  if(forageWorkers>0){
+    if(Math.random()<0.7){
+      const fg=Math.floor(Math.random()*4)+2;
+      const fm=Math.floor(Math.random()*3)+1;
+      S.food=clamp(S.food+fg);S.mat=clamp(S.mat+fm);
+      ev.push(`Foragers returned safely with ${fg} food and ${fm} materials from the ruins.`);
+    } else {
+      S.ppl=clamp(S.ppl-1);
+      ev.push('The foraging team ran into trouble. One person didn\'t come back.');
+    }
+  }
+  // Rest
+  if(restWorkers>0){
+    const morGain=Math.floor(restWorkers*0.8);
+    S.mor=clamp(S.mor+morGain);
+    ev.push(`${restWorkers} people rested. The settlement feels slightly lighter.`);
+  }
+
+  // Daily consumption
+  const consumption=Math.floor(S.ppl*0.3)+2;
+  S.food=clamp(S.food-consumption);
+  ev.push(`The settlement consumed ${consumption} food.`);
+
+  // Morale drift
+  if(S.food<20){S.mor=clamp(S.mor-3);ev.push('Rations are thin. People are worried.');}
+  if(S.food<10){S.mor=clamp(S.mor-5);ev.push('Hunger is setting in. Children cry at night.');}
+  if(S.mor<20){ev.push('Morale is dangerously low. A family is packing to leave.');}
+  if(S.mor<10){S.ppl=clamp(S.ppl-2);ev.push('Two families left in the night. The gate was open at dawn.');}
+
+  // Wren appearance (every 2-3 days)
+  if(S.day%3===0||S.day===1){
+    ev.push('__wren__');
+  }
+
+  return ev;
+}
+
+// ── RENDER FUNCTIONS ──
+function updateHud(){
+  document.getElementById('day-label').textContent=`Day ${S.day} / ${S.maxDays} — ${S.phase.charAt(0).toUpperCase()+S.phase.slice(1)}`;
+  const res=[['food',S.food,'#c8a060'],['mat',S.mat,'#8090a0'],['ppl',S.ppl,'#90b080'],['mor',S.mor,'#b89cff']];
+  res.forEach(([k,v,c])=>{
+    document.getElementById('rv-'+k).textContent=v;
+    document.getElementById('rf-'+k).style.width=v+'%';
+    document.getElementById('rf-'+k).style.background=v<20?'#c05040':c;
+  });
+  document.getElementById('trust-rowan').style.width=S.trustRowan+'%';
+  document.getElementById('trust-lira').style.width=S.trustLira+'%';
+  document.getElementById('trust-edric').style.width=S.trustEdric+'%';
+
+  // Background color drift based on mark
+  const m=S.mark;
+  let bg;
+  if(m>2) bg=`rgb(${26+m*3},${22-m},${16-m})`;       // reddish
+  else if(m<-2) bg=`rgb(${26+m},${22+m},${16-m*0.5})`; // grey/cold
+  else bg='#1a1610';
+  document.body.style.background=bg;
+}
+
+function renderDawn(){
+  const area=document.getElementById('phase-area');
+  const avail=S.ppl;
+  const assigned=()=>Object.values(S.assign).reduce((a,b)=>a+b,0);
+  const roles=[
+    ['farm','Farm','Grow food. Weather dependent.'],
+    ['build','Build','Repair walls, construct buildings.'],
+    ['guard','Guard','Defend against raids, patrol.'],
+    ['forage','Forage','Scavenge ruins. Risky but rewarding.'],
+    ['rest','Rest','Recover morale.']
+  ];
+  let html=`<div class="phase-title">Dawn — Assign Workers</div>`;
+  roles.forEach(([key,name,desc])=>{
+    html+=`<div class="assign-row">
+      <div class="role">${name}</div>
+      <div class="desc">${desc}</div>
+      <div class="controls">
+        <button onclick="adjustAssign('${key}',-1)">−</button>
+        <span class="count" id="ac-${key}">${S.assign[key]}</span>
+        <button onclick="adjustAssign('${key}',1)">+</button>
+      </div>
+    </div>`;
+  });
+  html+=`<div id="workers-remaining">${avail-assigned()} workers unassigned of ${avail}</div>`;
+  html+=`<button class="phase-btn" onclick="endDawn()">Proceed to Petitions →</button>`;
+  area.innerHTML=html;
+}
+
+function adjustAssign(role,delta){
+  const assigned=Object.values(S.assign).reduce((a,b)=>a+b,0);
+  const nv=S.assign[role]+delta;
+  if(nv<0)return;
+  if(delta>0&&assigned>=S.ppl)return;
+  S.assign[role]=nv;
+  document.getElementById('ac-'+role).textContent=nv;
+  const remaining=S.ppl-Object.values(S.assign).reduce((a,b)=>a+b,0);
+  document.getElementById('workers-remaining').textContent=`${remaining} workers unassigned of ${S.ppl}`;
+}
+
+function endDawn(){
+  S.phase='midday';
+  updateHud();
+  renderPetitions();
+}
+
+function renderPetitions(){
+  // Find applicable petition
+  const available=PETITIONS.filter(p=>{
+    if(S.usedPetitions.has(p.id))return false;
+    if(p.day&&p.day!==S.day)return false;
+    if(p.minDay&&S.day<p.minDay)return false;
+    if(p.maxDay&&S.day>p.maxDay)return false;
+    return true;
+  });
+  if(available.length===0){
+    // No petition today
+    renderNoPetition();
+    return;
+  }
+  const pet=available[0];
+  S.usedPetitions.add(pet.id);
+  const area=document.getElementById('phase-area');
+  let html=`<div class="phase-title">Midday — Petition</div>`;
+  html+=`<div class="petition-speaker">${pet.speaker}</div>`;
+  html+=`<div class="petition-text">${pet.text.replace(/\n/g,'<br>')}</div>`;
+  html+=`<div class="advisor-recs">`;
+  html+=`<div class="advisor-rec"><span class="aname">⚔️ Rowan:</span> "${pet.recs.rowan}"</div>`;
+  html+=`<div class="advisor-rec"><span class="aname">🌿 Lira:</span> "${pet.recs.lira}"</div>`;
+  html+=`<div class="advisor-rec"><span class="aname">📜 Edric:</span> "${pet.recs.edric}"</div>`;
+  html+=`</div>`;
+  pet.choices.forEach((ch,i)=>{
+    html+=`<button class="choice-btn" onclick="choosePetition(${i})"><span>${ch.text}</span><span class="cost">${ch.cost}</span></button>`;
+  });
+  area.innerHTML=html;
+  area._currentPetition=pet;
+}
+
+function renderNoPetition(){
+  const area=document.getElementById('phase-area');
+  area.innerHTML=`<div class="phase-title">Midday</div>
+    <p style="color:#887860;font-style:italic;margin:20px 0">A quiet day. No one comes to the Hearthhouse.</p>
+    <button class="phase-btn" onclick="endMidday()">Continue to Dusk →</button>`;
+}
+
+function choosePetition(idx){
+  const pet=document.getElementById('phase-area')._currentPetition;
+  const ch=pet.choices[idx];
+  const ef=ch.effects;
+  if(ef.food) S.food=clamp(S.food+ef.food);
+  if(ef.mat) S.mat=clamp(S.mat+ef.mat);
+  if(ef.ppl) S.ppl=clamp(S.ppl+ef.ppl);
+  if(ef.mor) S.mor=clamp(S.mor+ef.mor);
+  if(ef.mark!==undefined) S.mark+=ef.mark;
+  if(ef.trustRowan) S.trustRowan=clamp(S.trustRowan+ef.trustRowan);
+  if(ef.trustLira) S.trustLira=clamp(S.trustLira+ef.trustLira);
+  if(ef.trustEdric) S.trustEdric=clamp(S.trustEdric+ef.trustEdric);
+  if(ch.flag) S.flags[ch.flag]=true;
+  updateHud();
+  endMidday();
+}
+
+function endMidday(){
+  S.phase='dusk';
+  updateHud();
+  renderDusk();
+}
+
+function renderDusk(){
+  const events=generateDuskEvents();
+  const area=document.getElementById('phase-area');
+  let html=`<div class="phase-title">Dusk — The Day's End</div>`;
+  events.forEach(ev=>{
+    if(ev==='__wren__'){
+      html+=`<div class="wren-line">${getWrenLine()}</div>`;
+    } else {
+      html+=`<div class="event-line">${ev}</div>`;
+    }
+  });
+  updateHud();
+
+  // Check game over
+  if(S.food<=0){
+    html+=`<div class="gameover-msg">The granary is empty. Brannhaven starves.</div>`;
+    html+=`<button class="phase-btn" onclick="showEnding()">...</button>`;
+    S.gameOver=true;
+  } else if(S.mor<=0){
+    html+=`<div class="gameover-msg">The last family left at dawn. Brannhaven is empty.</div>`;
+    html+=`<button class="phase-btn" onclick="showEnding()">...</button>`;
+    S.gameOver=true;
+  } else if(S.ppl<=0){
+    html+=`<div class="gameover-msg">There is no one left to lead.</div>`;
+    html+=`<button class="phase-btn" onclick="showEnding()">...</button>`;
+    S.gameOver=true;
+  } else if(S.day>=S.maxDays){
+    html+=`<button class="phase-btn" onclick="showEnding()">Day ${S.maxDays} ends...</button>`;
+  } else {
+    html+=`<button class="phase-btn" onclick="nextDay()">Sleep →</button>`;
+  }
+  area.innerHTML=html;
+}
+
+function nextDay(){
+  S.day++;
+  S.phase='dawn';
+  S.assign={farm:0,build:0,guard:0,forage:0,rest:0};
+  updateHud();
+  renderDawn();
+}
+
+function showEnding(){
+  document.getElementById('game-screen').style.display='none';
+  const end=document.getElementById('end-screen');
+  end.style.display='block';
+  const m=S.mark;
+  let title,name,wren;
+  if(S.gameOver&&S.food<=0){
+    title='Brannhaven fell.';name='THE FAMINE';
+    wren='Wren isn\'t here. You don\'t know where she went.';
+  } else if(S.gameOver&&(S.mor<=0||S.ppl<=0)){
+    title='Brannhaven emptied.';name='THE ABANDONMENT';
+    wren='"You tried to make everyone happy." She pauses. "But you never decided anything."';
+  } else if(m>3){
+    title='Brannhaven endures.';name='THE FORTRESS';
+    wren='"Are we safe now?" She looks at the walls, the guards, the locked gate. "...Then why is everyone so afraid?"';
+  } else if(m>1.5){
+    title='Brannhaven stands.';name='THE IRON LAW';
+    wren='"You never missed a rule. But I think you missed something."';
+  } else if(m<-2){
+    title='Brannhaven drifts.';name='THE RUIN';
+    wren='"You didn\'t want to hurt anyone. But not choosing is a choice too."';
+  } else if(m<-0.5){
+    title='Brannhaven persists.';name='THE OPEN GATE';
+    wren='"I like that the gate is open. Grandma would\'ve liked it too. But some people left because of it."';
+  } else {
+    title='Brannhaven lives.';name='THE SHEPHERD';
+    wren='"When I\'m old enough, I want to lead like you. Not because it\'s easy. Because you made it look hard, and did it anyway."';
+  }
+  end.innerHTML=`
+    <h2>${title}</h2>
+    <div class="ending-name">${name}</div>
+    <div class="wren-final">${wren}</div>
+    <div class="stats">
+      Day ${S.day} / ${S.maxDays}<br>
+      Food: ${S.food} · Materials: ${S.mat} · People: ${S.ppl} · Morale: ${S.mor}<br>
+      Rowan: ${S.trustRowan}% · Lira: ${S.trustLira}% · Edric: ${S.trustEdric}%
+    </div>
+    <button class="start-btn" onclick="location.reload()">Play Again</button>
+  `;
+}
+
+function startGame(){
+  document.getElementById('title-screen').style.display='none';
+  document.getElementById('game-screen').style.display='block';
+  updateHud();
+  renderDawn();
+}
+</script>
+</body>
+</html>
