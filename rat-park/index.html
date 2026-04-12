@@ -17,7 +17,17 @@
 <span class="font-preload">.</span>
 <canvas id="c"></canvas>
 <script>
-document.fonts.ready.then(() => { init(); });
+// Wait for Press Start 2P font to actually load
+(async () => {
+  try { await document.fonts.load('8px "Press Start 2P"'); } catch(e) {}
+  // Extra safety: wait up to 2s for the font
+  const start = Date.now();
+  while(Date.now()-start < 2000) {
+    if(document.fonts.check('8px "Press Start 2P"')) break;
+    await new Promise(r=>setTimeout(r,100));
+  }
+  init();
+})();
 
 function init() {
 
@@ -1445,23 +1455,23 @@ function draw(){
   bx.restore(); // end shake transform
 
   // ── HUD — top left meters ──
-  const hudX=6, hudY=8, barW=40, barH=6, gap=11;
+  const hudX=6, hudY=8, barW=34, barH=6, gap=11;
 
   // Background panel
-  bx.fillStyle='rgba(0,0,0,0.7)';bx.fillRect(hudX-3,hudY-3,74,gap*4+8);
+  bx.fillStyle='rgba(0,0,0,0.7)';bx.fillRect(hudX-3,hudY-3,78,gap*4+8);
 
   const meters=[
-    {val:state.social,col:state.social>0.6?'#b89cff':state.social>0.3?'#6a6a78':'#3a3a48',sym:'♥',symCol:'#d090c0'},
-    {val:state.food,col:state.food>0.3?'#c8a060':state.food>0.15?'#a06030':'#ff4040',sym:'♨',symCol:'#c8a060'},
-    {val:state.activity,col:state.activity>0.3?'#60a0c8':'#4060a0',sym:'⚡',symCol:'#80b8d8'},
-    {val:state.sleep,col:state.sleep>0.3?'#8080c0':state.sleep>0.15?'#6060a0':'#ff4040',sym:'☽',symCol:'#a0a0d0'},
+    {val:state.social,col:state.social>0.6?'#b89cff':state.social>0.3?'#6a6a78':'#3a3a48',sym:'SOC',symCol:'#d090c0'},
+    {val:state.food,col:state.food>0.3?'#c8a060':state.food>0.15?'#a06030':'#ff4040',sym:'FD',symCol:'#c8a060'},
+    {val:state.activity,col:state.activity>0.3?'#60a0c8':'#4060a0',sym:'ACT',symCol:'#80b8d8'},
+    {val:state.sleep,col:state.sleep>0.3?'#8080c0':state.sleep>0.15?'#6060a0':'#ff4040',sym:'SLP',symCol:'#a0a0d0'},
   ];
   meters.forEach((m,i)=>{
     const y=hudY+i*gap;
-    bx.font='8px sans-serif';
+    bx.font='5px "Press Start 2P"';
     bx.fillStyle=m.symCol;
     bx.fillText(m.sym,hudX,y+7);
-    const barX=hudX+11;
+    const barX=hudX+24;
     bx.fillStyle='#111';bx.fillRect(barX,y+1,barW,barH);
     bx.fillStyle=m.col;bx.fillRect(barX,y+1,m.val*barW,barH);
     // Flash when low
@@ -1472,7 +1482,7 @@ function draw(){
   const dayPhaseHud = state.dayTimer / state.dayLength;
   const isNightHud = dayPhaseHud > 0.7 || dayPhaseHud < 0.1;
   bx.font='6px "Press Start 2P"';
-  bx.fillStyle='rgba(200,200,200,0.3)';
+  bx.fillStyle='rgba(200,200,200,0.7)';
   bx.fillText('Day '+state.day+'/'+state.maxDays, W-70, hudY+6);
   // Sun/moon icon + progress bar
   const clockX=W-70, clockY=hudY+12, clockW=50;
@@ -1492,7 +1502,8 @@ function draw(){
   // Sun/moon label
   bx.font='5px "Press Start 2P"';
   bx.fillStyle=isNightHud?'#6060a0':'#c0a040';
-  bx.fillText(isNightHud?'☾':'☀',clockX+clockW+4,clockY+5);
+  const timeLabel = dayPhaseHud < 0.1 ? 'NIGHT' : dayPhaseHud < 0.25 ? 'MORN' : dayPhaseHud < 0.5 ? 'DAY' : dayPhaseHud < 0.7 ? 'EVE' : 'NIGHT';
+  bx.fillText(timeLabel,clockX+clockW+4,clockY+5);
   // "Dusk approaches" warning
   if(dayPhaseHud > 0.6 && dayPhaseHud < 0.7) {
     const warnA = Math.sin(state.time*4)*0.3+0.5;
