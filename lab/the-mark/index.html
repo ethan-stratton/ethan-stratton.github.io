@@ -109,12 +109,12 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 <h1>THE MARK</h1>
 <p class="sub">"To miss the mark is not always to aim wrong."</p>
 <div class="setting-text">
-<p>Two generations ago, the old world burned. The cities fell. The roads broke. Nobody alive remembers why.</p>
-<p>What remains: river valleys, forest, stone, and the people stubborn enough to rebuild. Settlements cling to defensible ground — walls of rough-cut stone, fields carved from forest floor, survival measured in harvests.</p>
-<p>To the north, <em>the Reach</em> — a confederation of settlements unified under a leader called the Warden. It began as mutual defense. It became something else. Settlements that don't join voluntarily tend to join anyway.</p>
-<p>Between the settlements: <em>Ash Walkers</em> — the displaced, the desperate, the dangerous. Some are families with nowhere to go. Some are raiders. You can't tell which until it's too late.</p>
-<p><em>Brannhaven</em> sits where the river bends around a granite bluff. Two hundred souls behind a wall older than anyone alive. A granary, a healer's hall, an orchard, and a Hearthhouse where decisions are made.</p>
-<p>Elder Maren led for thirty years. She is dead. You were her apprentice.<br>Now the seat is yours.</p>
+<p>Your community is all that you know. Before you were born, the cities fell. The roads broke. Nobody alive remembers why.</p>
+<p>All that's left is river valleys, forests, and the people stubborn enough to rebuild. Settlements are walls of rough-cut stone, fields carved from forest floor, with survival measured in harvests.</p>
+<p>A confederation of unified settlements originated in the north. It began as mutual defense. Now, settlements that don't join voluntarily tend to join anyway.</p>
+<p>Between the settlements are wandering Ash Walkers — displaced, desperate, and often dangerous. Some are families with nowhere to go. Some are raiders.</p>
+<p>Brannhaven was the old name of your settlement — the name has stuck. Two hundred souls behind a wall older than anyone alive.</p>
+<p>After 30 years, the old leader croaked. You were next in line.</p>
 </div>
 <button class="start-btn" onclick="startGame()">Begin</button>
 </div>
@@ -145,48 +145,49 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 // ══════════════════════════════════════
 const CHARACTERS=[
   // ── YOUR COUNCIL ──
-  {id:'rowan',name:'Rowan',role:'Captain of the Guard',group:'council',status:'well',icon:'⚔️',
+  // ── YOUR COUNCIL (visible from start) ──
+  {id:'rowan',name:'Rowan',role:'Captain of the Guard',group:'council',status:'well',icon:'⚔️',visible:true,
    bio:'Forty-two. Built like the wall he patrols. Lost his wife to an Ash Walker raid six years ago. Never talks about it. Protects Brannhaven the only way he knows — with steel and stone. Good man. Scared man.',trust:60},
-  {id:'lira',name:'Lira',role:'Healer',group:'council',status:'well',icon:'🌿',
-   bio:'Thirty-five. Trained by Elder Maren herself. Knows every herb in the valley. Treats broken bones and broken hearts with equal seriousness. Believes in people past the point of evidence. Her weakness is that she sees the best in everyone — even when they don\'t deserve it.',trust:60},
-  {id:'edric',name:'Edric',role:'Elder, Council',group:'council',status:'well',icon:'📜',
-   bio:'Sixty-one. Remembers things nobody else does — the old laws, the old agreements, the reason the wall was built where it was. Believes that rules kept Brannhaven alive when nothing else could. He\'s not wrong. But the world is changing faster than his rules.',trust:60},
-  {id:'wren',name:'Wren',role:'Maren\'s granddaughter',group:'council',status:'well',icon:'🌸',
-   bio:'Eight years old. Sits on the wall and watches everything. Asks questions that adults avoid. She is the reason any of this matters.'},
+  {id:'lira',name:'Lira',role:'Healer',group:'council',status:'well',icon:'🌿',visible:true,
+   bio:'Thirty-five. Trained under the old leader. Knows every herb in the valley. Treats broken bones and broken hearts with equal seriousness. Believes in people past the point of evidence.',trust:60},
+  {id:'edric',name:'Edric',role:'Elder, Council',group:'council',status:'well',icon:'📜',visible:true,
+   bio:'Sixty-one. Remembers things nobody else does — the old laws, the old agreements, the reason the wall was built where it was. Believes that rules kept Brannhaven alive when nothing else could.',trust:60},
+  {id:'wren',name:'Wren',role:'Child',group:'council',status:'well',icon:'🌸',visible:true,
+   bio:'Eight years old. Sits on the wall and watches everything. Asks questions that adults avoid.'},
 
-  // ── BRANNHAVEN ──
-  {id:'corwin',name:'Corwin',role:'Scout',group:'brannhaven',status:'dead',icon:'',
-   bio:'Died beyond the wall trying to stop Hale from defecting. Left a wife and young son.'},
-  {id:'hale',name:'Hale',role:'Scout (defected)',group:'brannhaven',status:'dead',icon:'',
-   bio:'Sold Brannhaven\'s defenses to the Reach. Killed for it. His mother still lives inside the wall.'},
-  {id:'hale_mother',name:'Hale\'s Mother',role:'Resident',group:'brannhaven',status:'grieving',icon:''},
-  {id:'corwin_wife',name:'Senna',role:'Corwin\'s wife',group:'brannhaven',status:'grieving',icon:''},
-  {id:'declan',name:'Declan',role:'Wall-crew, widower',group:'brannhaven',status:'well',icon:'',
-   bio:'Good with his hands. Wife died in the spring. Raising his daughter alone. She\'s been sick.'},
-  {id:'declan_daughter',name:'Mira',role:'Declan\'s daughter',group:'brannhaven',status:'sick',icon:'',
-   bio:'Seven. Hungry. Sick. Her father would do anything for her.'},
-  {id:'marsh',name:'Marsh',role:'Trader, downriver',group:'brannhaven',status:'unknown',icon:'',
-   bio:'Iron tools, high prices, no sentiment. Passes through.'},
-  {id:'kael',name:'Kael',role:'Agitator',group:'brannhaven',status:'unknown',icon:'',
-   bio:'Appeared among the refugees — or was he always here? Talks about fairness. Draws crowds. Not entirely wrong.'},
+  // ── BRANNHAVEN (revealed by petitions) ──
+  {id:'corwin',name:'Corwin',role:'Scout',group:'brannhaven',status:'dead',icon:'',visible:false,
+   bio:'Died beyond the wall trying to stop a defection.'},
+  {id:'hale',name:'Hale',role:'Scout (defected)',group:'brannhaven',status:'dead',icon:'',visible:false,
+   bio:'Defected to the Reach. Killed for it. His mother still lives inside the wall.'},
+  {id:'hale_mother',name:'Hale\'s Mother',role:'Resident',group:'brannhaven',status:'grieving',icon:'',visible:false},
+  {id:'corwin_wife',name:'Senna',role:'Corwin\'s wife',group:'brannhaven',status:'grieving',icon:'',visible:false},
+  {id:'declan',name:'Declan',role:'Wall-crew',group:'brannhaven',status:'well',icon:'',visible:false,
+   bio:'Good with his hands. Wife died in the spring. Raising his daughter alone.'},
+  {id:'declan_daughter',name:'Mira',role:'Declan\'s daughter',group:'brannhaven',status:'sick',icon:'',visible:false,
+   bio:'Seven. Hungry. Sick.'},
+  {id:'marsh',name:'Marsh',role:'Trader',group:'brannhaven',status:'unknown',icon:'',visible:false,
+   bio:'Iron tools, high prices, no sentiment.'},
+  {id:'kael',name:'Kael',role:'Agitator',group:'brannhaven',status:'unknown',icon:'',visible:false,
+   bio:'Talks about fairness. Draws crowds. Not entirely wrong.'},
 
-  // ── OUTSIDERS / REFUGEES ──
-  {id:'elif',name:'Elif',role:'Refugee, mother',group:'outsiders',status:'unknown',icon:'',
-   bio:'Walked south from a Reach-absorbed settlement with her two children and an old man. Three weeks on foot.'},
-  {id:'elif_boy',name:'Elif\'s son',role:'Child, ~6',group:'outsiders',status:'unknown',icon:''},
-  {id:'elif_girl',name:'Elif\'s daughter',role:'Infant',group:'outsiders',status:'unknown',icon:''},
-  {id:'avi',name:'Old Avi',role:'Elder, different tradition',group:'outsiders',status:'unknown',icon:'',
-   bio:'Prays in a language no one in Brannhaven recognizes. Walks with a staff. Knows things.'},
-  {id:'nath',name:'Nath',role:'Reach deserter',group:'outsiders',status:'unknown',icon:'',
-   bio:'Stripped his insignia and ran. Says the Warden ordered him to burn a surrendered village. He couldn\'t. He has everything you need to defend Brannhaven — or he\'s a spy.'},
-  {id:'pacifists',name:'Thornfield families',role:'Pacifist refugees (×6)',group:'outsiders',status:'unknown',icon:'',
-   bio:'Buried their weapons. Will work, farm, heal. Will not fight. Ever. They call it a covenant.'},
+  // ── OUTSIDERS (revealed by petitions) ──
+  {id:'elif',name:'Elif',role:'Refugee',group:'outsiders',status:'unknown',icon:'',visible:false,
+   bio:'Three weeks on foot from a Reach-absorbed settlement. Two children. An old man.'},
+  {id:'elif_boy',name:'Elif\'s son',role:'Child, ~6',group:'outsiders',status:'unknown',icon:'',visible:false},
+  {id:'elif_girl',name:'Elif\'s daughter',role:'Infant',group:'outsiders',status:'unknown',icon:'',visible:false},
+  {id:'avi',name:'Old Avi',role:'Elder',group:'outsiders',status:'unknown',icon:'',visible:false,
+   bio:'Prays in a language no one here recognizes. Walks with a staff.'},
+  {id:'nath',name:'Nath',role:'Reach deserter',group:'outsiders',status:'unknown',icon:'',visible:false,
+   bio:'Stripped his insignia and ran. Knows patrol routes. Or he\'s a spy.'},
+  {id:'pacifists',name:'Thornfield families',role:'Pacifists (×6)',group:'outsiders',status:'unknown',icon:'',visible:false,
+   bio:'Buried their weapons. Will work. Will not fight. Ever.'},
 
-  // ── THE REACH ──
-  {id:'warden',name:'The Warden',role:'Leader of the Reach',group:'reach',status:'unknown',icon:'',
-   bio:'Not a tyrant. A pragmatist who decided chaos was worse than control. He\'s building order from rubble. The cost is freedom. He believes it\'s worth it.'},
-  {id:'envoy',name:'The Envoy',role:'Reach diplomat',group:'reach',status:'unknown',icon:'',
-   bio:'Polite. Reasonable. Terrifying. Carries the Warden\'s offer in one hand and a warning in the other.'},
+  // ── THE REACH (revealed by events) ──
+  {id:'warden',name:'The Warden',role:'Leader of the Reach',group:'reach',status:'unknown',icon:'',visible:false,
+   bio:'A pragmatist who decided chaos was worse than control.'},
+  {id:'envoy',name:'The Envoy',role:'Reach diplomat',group:'reach',status:'unknown',icon:'',visible:false,
+   bio:'Polite. Reasonable. Terrifying.'},
 ];
 
 // ── STATE ──
@@ -202,8 +203,9 @@ const S={
 function clamp(v,lo=0,hi=100){return Math.max(lo,Math.min(hi,v))}
 
 function getChar(id){return CHARACTERS.find(c=>c.id===id)}
-function setStatus(id,status){const c=getChar(id);if(c)c.status=status;renderRoster();}
-function setMultiStatus(updates){updates.forEach(([id,st])=>{const c=getChar(id);if(c)c.status=st;});renderRoster();}
+function setStatus(id,status){const c=getChar(id);if(c){c.status=status;c.visible=true;}renderRoster();}
+function setMultiStatus(updates){updates.forEach(([id,st])=>{const c=getChar(id);if(c){c.status=st;c.visible=true;}});renderRoster();}
+function revealChars(ids){ids.forEach(id=>{const c=getChar(id);if(c)c.visible=true;});renderRoster();}
 
 // ══════════════════════════════════════
 // ROSTER RENDERING
@@ -220,7 +222,7 @@ function renderRoster(){
   const deadStatuses=new Set(['dead','gone','exiled','fled','denied']);
   let html='';
   GROUP_ORDER.forEach(g=>{
-    const chars=CHARACTERS.filter(c=>c.group===g);
+    const chars=CHARACTERS.filter(c=>c.group===g&&c.visible);
     if(chars.length===0)return;
     // Split alive vs dead/gone
     const alive=chars.filter(c=>!deadStatuses.has(c.status));
@@ -252,6 +254,7 @@ function renderRoster(){
 // ══════════════════════════════════════
 const PETITIONS=[
 {id:'burial',day:1,
+  reveal:['corwin','hale','hale_mother','corwin_wife'],
   speaker:'ROWAN, Captain of the Guard',
   text:`Two scouts went beyond the wall. Corwin is dead — killed trying to stop Hale from defecting to the Reach. Hale's body was sent back to us, gutted, with a message carved into his belt: "We know where you are."\n\nCorwin's family wants him buried with honors. Hale's mother is at the gate, weeping, begging for her son's body. The crowd is watching.\n\nThis is your first decision as leader. Everyone will remember it.`,
   recs:{rowan:'"Bury Corwin with honors. Hang Hale\'s body from the wall. That\'s the only language the Reach understands."',lira:'"Both were someone\'s son. Both mothers are in pain. Bury them both and let this end."',edric:'"Precedent is clear. Traitors receive no rites. Corwin gets the square. Hale gets the pit."'},
@@ -267,6 +270,7 @@ const PETITIONS=[
   ]},
 
 {id:'trader',minDay:2,maxDay:4,
+  reveal:['marsh'],
   speaker:'EDRIC, Elder of the Council',
   text:`A trader arrived from downriver. Name's Marsh. He's got a cart of iron tools — axes, nails, plow blades. Things we desperately need.\n\nHis price: twenty percent of our grain stores. Fourteen days of food for the settlement. He says it's fair. Says he won't find another buyer for fifty miles.`,
   recs:{rowan:'"We need those tools but not at that price. Threaten to take them."',lira:'"We can\'t eat iron. Tell him to lower his price or move on."',edric:'"The price is steep but not unreasonable. Trade is trade."'},
@@ -282,6 +286,7 @@ const PETITIONS=[
   ]},
 
 {id:'sickness',minDay:3,maxDay:5,
+  reveal:['declan_daughter'],
   speaker:'LIRA, Healer',
   text:`Three families in the east quarter are sick. Fever, aching joints, bloody coughs. I don't know what it is yet, but it spreads through contact.\n\nI need to quarantine the east quarter. That means twelve workers off the roster for at least five days. And I need herbs from outside the wall — a foraging run into Ash Walker territory.`,
   recs:{rowan:'"Quarantine them. Seal the quarter. We can\'t afford a plague."',lira:'"I need those herbs. Send a small team — two people, fast and quiet."',edric:'"Quarantine is prudent. The foraging run is reckless."'},
@@ -297,6 +302,7 @@ const PETITIONS=[
   ]},
 
 {id:'thief',minDay:3,maxDay:6,
+  reveal:['declan','declan_daughter'],
   speaker:'ROWAN, Captain of the Guard',
   text:`Caught a man in the granary last night. Name's Declan. Had a sack of grain — enough for maybe three days. Didn't fight. Just said "My daughter's hungry."\n\nHe's a wall-crew worker. Good hands. Wife died in the spring. Raising the girl alone. She's been sick and sick children need more food.\n\nHe's in the holding room. People are watching.`,
   recs:{rowan:'"Theft is theft. Five days labor punishment. Sends a message."',lira:'"His daughter is sick and hungry. Punishing him helps no one."',edric:'"The law is clear. Theft from communal stores carries penalty."'},
@@ -312,6 +318,7 @@ const PETITIONS=[
   ]},
 
 {id:'elif',minDay:5,maxDay:7,
+  reveal:['elif','elif_boy','elif_girl','avi'],
   speaker:'A voice from outside the wall',
   text:`There's a woman at the east gate. Two children — a boy, maybe six, and a girl barely walking. An old man with them, leaning on a staff.\n\nShe says her name is Elif. Their settlement was absorbed by the Reach three weeks ago. They walked south. The old man — Avi — prays in a language no one here recognizes.\n\nRowan counted: food for nineteen more days at current population. These four make it eighteen.`,
   recs:{rowan:'"We can\'t feed four more mouths. Turn them away."',lira:'"They have children. Open the gate."',edric:'"No precedent for refugees. This needs a council vote."'},
@@ -327,6 +334,7 @@ const PETITIONS=[
   ]},
 
 {id:'kael',minDay:6,maxDay:8,
+  reveal:['kael'],
   speaker:'EDRIC, Elder of the Council',
   text:`There's a man called Kael. He's been talking in the square.\n\nHe says the granary should be open. Says leadership hoards while families ration. Says decisions should be made by everyone, not one person in the Hearthhouse.\n\nHe's not wrong about everything. But his crowd is getting bigger, and some of them are angry, not just hungry.`,
   recs:{rowan:'"Shut him down. Arrest him if he won\'t stop. Agitators get people killed."',lira:'"He\'s saying what people feel. Silencing him will make it worse."',edric:'"He has no standing to speak. He\'s not on the council."'},
@@ -342,6 +350,7 @@ const PETITIONS=[
   ]},
 
 {id:'raid',minDay:7,maxDay:9,
+  reveal:['warden'],
   speaker:'ROWAN, Captain of the Guard',
   text:`They hit the north farm at dawn. Four riders — Reach scouts, not Ash Walkers. Professional. Torched the grain shed and killed two cattle. Left before our guards arrived.\n\nNailed to the fence post: a leather scroll. "The Warden extends his hand."\n\nTen days of food lost. Two farmworkers injured. People are terrified.`,
   recs:{rowan:'"Double the guard. Now. And consider a retaliatory strike on their forward camp."',lira:'"Treat the injured first. Then think about whether fighting back makes this worse."',edric:'"This is an act of war. Send a formal protest. There are rules."'},
@@ -355,6 +364,7 @@ const PETITIONS=[
   ]},
 
 {id:'deserter',minDay:8,maxDay:10,
+  reveal:['nath'],
   speaker:'ROWAN, Captain of the Guard',
   text:`Found a man collapsed at the south gate. Reach uniform, stripped of insignia. Beaten badly. Says his name is Nath.\n\nHe deserted because the Warden ordered his unit to burn a settlement that surrendered peacefully. Women, children. He couldn't do it.\n\nHe knows patrol routes, troop numbers, supply lines. Everything we need.\n\nOr he's a spy.`,
   recs:{rowan:'"Chain him. Interrogate him. If he\'s lying, he dies."',lira:'"He\'s half dead. Let me treat him first."',edric:'"A deserter has no rights under any code. But information is information."'},
@@ -370,6 +380,7 @@ const PETITIONS=[
   ]},
 
 {id:'pacifists',minDay:9,maxDay:10,
+  reveal:['pacifists'],
   speaker:'ROWAN, Captain of the Guard',
   text:`Six more arrived. Families, not soldiers. From a Reach settlement called Thornfield.\n\nWhen the Warden ordered militia training, these families refused. They buried their weapons. Literally. Dug a pit, laid their swords in it, covered it with earth, and walked away.\n\nThey will work. Farm, build, cook, heal. They will not fight. Not to defend themselves. Not to defend Brannhaven. They say violence is a cycle and they won't continue it.\n\nRowan is incandescent.`,
   recs:{rowan:'"Absolutely not. Dead weight in a siege. Send them away."',lira:'"These are the bravest people I\'ve ever seen."',edric:'"What are they — citizens who won\'t serve?"'},
@@ -495,6 +506,7 @@ function renderPetitions(){
   });
   if(!avail.length){renderNoPetition();return;}
   const pet=avail[0];S.usedPetitions.add(pet.id);
+  if(pet.reveal)revealChars(pet.reveal);
   const area=document.getElementById('phase-area');
   let h=`<div class="phase-title">Midday — Petition</div>`;
   h+=`<div class="petition-speaker">${pet.speaker}</div>`;
