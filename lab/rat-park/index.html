@@ -1461,7 +1461,7 @@ function draw(){
   bx.font='5px "Press Start 2P"';
   bx.fillStyle=isNightHud?'#6060a0':'#c0a040';
   const timeLabel = dayPhaseHud < 0.1 ? 'NIGHT' : dayPhaseHud < 0.25 ? 'MORN' : dayPhaseHud < 0.5 ? 'DAY' : dayPhaseHud < 0.7 ? 'EVE' : 'NIGHT';
-  bx.fillText(timeLabel,W-28,hudY+6);
+  bx.fillText(timeLabel,clockX,clockY+14);
   // "Dusk approaches" warning
   if(dayPhaseHud > 0.6 && dayPhaseHud < 0.7) {
     const warnA = Math.sin(state.time*4)*0.3+0.5;
