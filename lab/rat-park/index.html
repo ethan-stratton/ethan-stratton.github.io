@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rat Park</title>
+<style>
+  * { margin: 0; padding: 0; }
+  body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+  canvas { image-rendering: pixelated; cursor: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// ── CONFIG ──
+const SCALE = 3;
+const W = 256, H = 224; // SNES res
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = W * SCALE;
+canvas.height = H * SCALE;
+ctx.imageSmoothingEnabled = false;
+
+// Offscreen buffer at native res
+const buf = document.createElement('canvas');
+buf.width = W; buf.height = H;
+const bx = buf.getContext('2d');
+
+// ── COLORS — mood-dependent ──
+const MOOD = {
+  connected: {
+    bg: '#2a1a3a',
+    cage: '#5a4a6a',
+    floor: '#3a2a4a',
+    accent: '#b89cff',
+    sky: '#1a0a2a'
+  },
+  neutral: {
+    bg: '#1a1a22',
+    cage: '#3a3a44',
+    floor: '#2a2a32',
+    accent: '#7a7a88',
+    sky: '#0e0e14'
+  },
+  isolated: {
+    bg: '#111114',
+    cage: '#222228',
+    floor: '#1a1a1e',
+    accent: '#444450',
+    sky: '#08080c'
+  }
+};
+
+// ── GAME STATE ──
+const state = {
+  social: 0.3,        // 0 = isolated, 1 = deeply connected
+  drugPull: 0,         // how much the drug is calling (computed)
+  time: 0,
+  camera: { x: 0 },
+  dialogActive: false,
+  dialogText: '',
+  dialogQueue: [],
+  dialogCallback: null,
+  interactPrompt: null  // {text, x, y}
+};
+
+// ── WORLD ──
+const WORLD_W = 600;   // total cage width in pixels
+const FLOOR_Y = 170;
+const CAGE_TOP = 40;
+
+// ── PLAYER (the new rat) ──
+const player = {
+  x: 80, y: FLOOR_Y - 16,
+  w: 14, h: 16,
+  vx: 0,
+  facing: 1,     // 1 = right, -1 = left
+  frame: 0,
+  frameTimer: 0,
+  speed: 1.2,
+  talking: false
+};
+
+// ── NPCs ──
+const npcs = [
+  {
+    name: 'Hazel',
+    x: 180, y: FLOOR_Y - 16,
+    w: 14, h: 16,
+    facing: -1,
+    color: '#e8a0b0',   // pinkish
+    bow: true,
+    dialog: [
+      "Oh! You're new here.",
+      "It's not so bad once you get used to it.",
+      "The wheel is actually kind of fun. Try it!",
+      "...I'm glad you came over."
+    ],
+    talked: false,
+    socialBonus: 0.15
+  },
+  {
+    name: 'Bruno',
+    x: 350, y: FLOOR_Y - 16,
+    w: 16, h: 16,
+    facing: 1,
+    color: '#8a7060',   // brown
+    bow: false,
+    dialog: [
+      "...",
+      "You smell new.",
+      "See that water bottle on the far end?",
+      "Don't drink from it. Trust me.",
+      "...it makes everything quiet. But then you need more."
+    ],
+    talked: false,
+    socialBonus: 0.15
+  },
+  {
+    name: 'Pip',
+    x: 480, y: FLOOR_Y - 16,
+    w: 12, h: 14,
+    facing: -1,
+    color: '#c8c0a0',   // cream/yellow
+    bow: false,
+    dialog: [
+      "hihihihi!",
+      "wanna race? I'm fast!",
+      "this place is okay. there's food and stuff.",
+      "sometimes the big ones watch us. it's weird.",
+      "but we got each other right??"
+    ],
+    talked: false,
+    socialBonus: 0.1
+  }
+];
+
+// ── OBJECTS ──
+const objects = [
+  { type: 'wheel',   x: 230, y: FLOOR_Y - 28, w: 24, h: 28 },
+  { type: 'bottle',  x: 120, y: FLOOR_Y - 22, w: 10, h: 22, label: 'water' },
+  { type: 'nest',    x: 40,  y: FLOOR_Y - 10, w: 30, h: 10 },
+  { type: 'tunnel',  x: 400, y: FLOOR_Y - 20, w: 32, h: 20 },
+  // The drugged water — always at the far end
+  { type: 'drug',    x: 555, y: FLOOR_Y - 24, w: 14, h: 24, glow: 0 }
+];
+
+// ── INPUT ──
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space' || e.code === 'KeyE' || e.code === 'Enter') {
+    e.preventDefault();
+    handleInteract();
+  }
+});
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// ── INTERACT ──
+function handleInteract() {
+  if (state.dialogActive) {
+    advanceDialog();
+    return;
+  }
+
+  // Check NPC proximity
+  for (const npc of npcs) {
+    if (Math.abs(player.x - npc.x) < 28 && Math.abs(player.y - npc.y) < 20) {
+      startDialog(npc);
+      return;
+    }
+  }
+
+  // Check object proximity
+  for (const obj of objects) {
+    if (Math.abs(player.x - obj.x) < 24 && Math.abs(player.y - obj.y) < 20) {
+      interactObject(obj);
+      return;
+    }
+  }
+}
+
+function startDialog(npc) {
+  state.dialogActive = true;
+  state.dialogQueue = [...npc.dialog];
+  state.dialogText = state.dialogQueue.shift();
+  state.dialogSpeaker = npc.name;
+  player.talking = true;
+
+  state.dialogCallback = () => {
+    if (!npc.talked) {
+      npc.talked = true;
+      state.social = Math.min(1, state.social + npc.socialBonus);
+    }
+    player.talking = false;
+  };
+}
+
+function advanceDialog() {
+  if (state.dialogQueue.length > 0) {
+    state.dialogText = state.dialogQueue.shift();
+  } else {
+    state.dialogActive = false;
+    state.dialogText = '';
+    if (state.dialogCallback) {
+      state.dialogCallback();
+      state.dialogCallback = null;
+    }
+  }
+}
+
+function interactObject(obj) {
+  if (obj.type === 'wheel') {
+    state.dialogActive = true;
+    state.dialogQueue = [];
+    state.dialogText = "*squeak squeak squeak* ...that was actually kind of fun.";
+    state.dialogSpeaker = '';
+    state.dialogCallback = () => { state.social = Math.min(1, state.social + 0.03); };
+  } else if (obj.type === 'drug') {
+    state.dialogActive = true;
+    state.dialogSpeaker = '';
+    if (state.social > 0.5) {
+      state.dialogQueue = [];
+      state.dialogText = "The water glows faintly. You think about your friends. ...you walk away.";
+      state.dialogCallback = null;
+    } else {
+      state.dialogQueue = [
+        "It smells sweet. Warm. It promises quiet.",
+        "Everything else is so loud and hard...",
+        "...maybe just a sip."
+      ];
+      state.dialogText = state.dialogQueue.shift();
+      state.dialogCallback = () => {
+        state.social = Math.max(0, state.social - 0.2);
+        // The world gets greyer
+      };
+    }
+  } else if (obj.type === 'bottle') {
+    state.dialogActive = true;
+    state.dialogQueue = [];
+    state.dialogText = "Clean water. Refreshing.";
+    state.dialogSpeaker = '';
+    state.dialogCallback = null;
+  } else if (obj.type === 'nest') {
+    state.dialogActive = true;
+    state.dialogQueue = [];
+    state.dialogText = "Soft bedding. Smells like home... or it could.";
+    state.dialogSpeaker = '';
+    state.dialogCallback = null;
+  } else if (obj.type === 'tunnel') {
+    state.dialogActive = true;
+    state.dialogQueue = [];
+    state.dialogText = "A cardboard tunnel. You scurry through it. Safe in here.";
+    state.dialogSpeaker = '';
+    state.dialogCallback = () => { state.social = Math.min(1, state.social + 0.02); };
+  }
+}
+
+// ── DRAWING HELPERS ──
+function lerpColor(a, b, t) {
+  const ah = parseInt(a.slice(1), 16);
+  const bh = parseInt(b.slice(1), 16);
+  const ar = ah >> 16, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
+  const br = bh >> 16, bg = (bh >> 8) & 0xff, bb = bh & 0xff;
+  const r = Math.round(ar + (br - ar) * t);
+  const g = Math.round(ag + (bg - ag) * t);
+  const b2 = Math.round(ab + (bb - ab) * t);
+  return `rgb(${r},${g},${b2})`;
+}
+
+function getMoodColors() {
+  const s = state.social;
+  if (s > 0.6) {
+    const t = (s - 0.6) / 0.4;
+    return {
+      bg: lerpColor(MOOD.neutral.bg, MOOD.connected.bg, t),
+      cage: lerpColor(MOOD.neutral.cage, MOOD.connected.cage, t),
+      floor: lerpColor(MOOD.neutral.floor, MOOD.connected.floor, t),
+      accent: lerpColor(MOOD.neutral.accent, MOOD.connected.accent, t),
+      sky: lerpColor(MOOD.neutral.sky, MOOD.connected.sky, t)
+    };
+  } else {
+    const t = s / 0.6;
+    return {
+      bg: lerpColor(MOOD.isolated.bg, MOOD.neutral.bg, t),
+      cage: lerpColor(MOOD.isolated.cage, MOOD.neutral.cage, t),
+      floor: lerpColor(MOOD.isolated.floor, MOOD.neutral.floor, t),
+      accent: lerpColor(MOOD.isolated.accent, MOOD.neutral.accent, t),
+      sky: lerpColor(MOOD.isolated.sky, MOOD.neutral.sky, t)
+    };
+  }
+}
+
+// ── DRAW RAT ──
+function drawRat(x, y, w, h, color, facing, frame, bow) {
+  const cx = x - state.camera.x;
+  // Body
+  bx.fillStyle = color;
+  bx.fillRect(cx - w/2, y - h, w, h);
+
+  // Head (slightly forward)
+  const headX = cx - w/2 + (facing > 0 ? w - 2 : -4);
+  bx.fillRect(headX, y - h - 2, 6, 7);
+
+  // Eyes
+  bx.fillStyle = '#000';
+  const eyeX = headX + (facing > 0 ? 4 : 1);
+  bx.fillRect(eyeX, y - h - 1, 1, 1);
+
+  // Ear
+  bx.fillStyle = color;
+  const earX = headX + (facing > 0 ? 3 : 2);
+  bx.fillRect(earX, y - h - 4, 2, 2);
+
+  // Inner ear (lighter)
+  bx.fillStyle = '#ffccdd';
+  bx.fillRect(earX, y - h - 3, 1, 1);
+
+  // Tail
+  bx.strokeStyle = color;
+  bx.lineWidth = 1;
+  bx.beginPath();
+  const tailX = cx - w/2 + (facing > 0 ? 0 : w);
+  bx.moveTo(tailX, y - 3);
+  bx.lineTo(tailX + (-facing * 8), y - 6 + Math.sin(state.time * 3) * 2);
+  bx.stroke();
+
+  // Legs (simple, animated)
+  bx.fillStyle = color;
+  const legOffset = Math.sin(frame * 0.5) * 2;
+  // Front legs
+  bx.fillRect(cx - w/2 + (facing > 0 ? w - 4 : 1) + legOffset, y - 2, 2, 3);
+  // Back legs
+  bx.fillRect(cx - w/2 + (facing > 0 ? 2 : w - 5) - legOffset, y - 2, 2, 3);
+
+  // Bow for girl rat
+  if (bow) {
+    bx.fillStyle = '#ff6090';
+    const bowX = earX + (facing > 0 ? -1 : 2);
+    bx.fillRect(bowX, y - h - 5, 3, 2);
+    bx.fillRect(bowX + 1, y - h - 6, 1, 1);
+  }
+
+  // Whiskers
+  bx.strokeStyle = 'rgba(200,200,200,0.3)';
+  bx.lineWidth = 0.5;
+  const whiskerBaseX = headX + (facing > 0 ? 5 : 0);
+  const whiskerBaseY = y - h + 2;
+  for (let i = -1; i <= 1; i += 2) {
+    bx.beginPath();
+    bx.moveTo(whiskerBaseX, whiskerBaseY);
+    bx.lineTo(whiskerBaseX + facing * 6, whiskerBaseY + i * 2);
+    bx.stroke();
+  }
+}
+
+// ── DRAW WORLD ──
+function drawWorld() {
+  const c = getMoodColors();
+  const cam = state.camera.x;
+
+  // Sky / background
+  bx.fillStyle = c.sky;
+  bx.fillRect(0, 0, W, H);
+
+  // Cage bars (background)
+  bx.strokeStyle = c.cage;
+  bx.lineWidth = 2;
+  for (let x = 20; x < WORLD_W; x += 30) {
+    const sx = x - cam;
+    if (sx > -5 && sx < W + 5) {
+      bx.beginPath();
+      bx.moveTo(sx, CAGE_TOP);
+      bx.lineTo(sx, FLOOR_Y + 10);
+      bx.stroke();
+    }
+  }
+
+  // Top bar
+  bx.fillStyle = c.cage;
+  bx.fillRect(0, CAGE_TOP - 2, W, 4);
+
+  // Floor
+  bx.fillStyle = c.floor;
+  bx.fillRect(0, FLOOR_Y, W, H - FLOOR_Y);
+
+  // Floor texture (wood shavings)
+  bx.fillStyle = 'rgba(255,255,200,0.03)';
+  for (let i = 0; i < 40; i++) {
+    const fx = ((i * 37 + 13) % WORLD_W) - cam;
+    if (fx > -10 && fx < W + 10) {
+      const fy = FLOOR_Y + 5 + (i * 7) % 20;
+      bx.fillRect(fx, fy, 3 + (i % 3), 1);
+    }
+  }
+
+  // Objects
+  for (const obj of objects) {
+    const ox = obj.x - cam;
+    if (ox < -40 || ox > W + 40) continue;
+
+    if (obj.type === 'wheel') {
+      bx.strokeStyle = c.accent;
+      bx.lineWidth = 1.5;
+      bx.beginPath();
+      bx.arc(ox + obj.w/2, obj.y + obj.h/2, 11, 0, Math.PI * 2);
+      bx.stroke();
+      // Spokes
+      for (let a = 0; a < 4; a++) {
+        const angle = a * Math.PI / 2 + state.time * 0.5;
+        bx.beginPath();
+        bx.moveTo(ox + obj.w/2, obj.y + obj.h/2);
+        bx.lineTo(ox + obj.w/2 + Math.cos(angle) * 10, obj.y + obj.h/2 + Math.sin(angle) * 10);
+        bx.stroke();
+      }
+    } else if (obj.type === 'bottle') {
+      bx.fillStyle = 'rgba(100, 140, 255, 0.3)';
+      bx.fillRect(ox, obj.y, obj.w, obj.h);
+      bx.strokeStyle = 'rgba(150, 180, 255, 0.5)';
+      bx.lineWidth = 1;
+      bx.strokeRect(ox, obj.y, obj.w, obj.h);
+    } else if (obj.type === 'nest') {
+      bx.fillStyle = 'rgba(180, 150, 100, 0.3)';
+      bx.beginPath();
+      bx.ellipse(ox + obj.w/2, obj.y + obj.h/2, obj.w/2, obj.h/2, 0, 0, Math.PI * 2);
+      bx.fill();
+    } else if (obj.type === 'tunnel') {
+      bx.fillStyle = 'rgba(120, 90, 60, 0.4)';
+      bx.fillRect(ox, obj.y, obj.w, obj.h);
+      bx.fillStyle = '#0a0a0e';
+      bx.beginPath();
+      bx.arc(ox + (obj.w * 0.2), obj.y + obj.h/2, 6, 0, Math.PI * 2);
+      bx.fill();
+      bx.beginPath();
+      bx.arc(ox + (obj.w * 0.8), obj.y + obj.h/2, 6, 0, Math.PI * 2);
+      bx.fill();
+    } else if (obj.type === 'drug') {
+      // Drugged water — glows based on isolation
+      const pull = 1 - state.social;
+      const glow = 0.2 + pull * 0.6 + Math.sin(state.time * 2) * 0.1 * pull;
+      obj.glow = glow;
+
+      // Glow aura
+      const grad = bx.createRadialGradient(ox + obj.w/2, obj.y + obj.h/2, 2, ox + obj.w/2, obj.y + obj.h/2, 20 + pull * 15);
+      grad.addColorStop(0, `rgba(120, 255, 120, ${glow * 0.4})`);
+      grad.addColorStop(1, 'rgba(120, 255, 120, 0)');
+      bx.fillStyle = grad;
+      bx.fillRect(ox - 20, obj.y - 20, obj.w + 40, obj.h + 40);
+
+      // Bottle
+      bx.fillStyle = `rgba(120, 255, 120, ${0.3 + glow * 0.3})`;
+      bx.fillRect(ox, obj.y, obj.w, obj.h);
+      bx.strokeStyle = `rgba(120, 255, 120, ${0.5 + glow * 0.3})`;
+      bx.lineWidth = 1;
+      bx.strokeRect(ox, obj.y, obj.w, obj.h);
+    }
+  }
+}
+
+// ── DRAW DIALOG ──
+function drawDialog() {
+  if (!state.dialogActive) return;
+
+  // Box
+  bx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+  bx.fillRect(10, H - 58, W - 20, 48);
+  bx.strokeStyle = getMoodColors().accent;
+  bx.lineWidth = 1;
+  bx.strokeRect(10, H - 58, W - 20, 48);
+
+  // Speaker name
+  if (state.dialogSpeaker) {
+    bx.fillStyle = getMoodColors().accent;
+    bx.font = '7px monospace';
+    bx.fillText(state.dialogSpeaker, 16, H - 48);
+  }
+
+  // Text
+  bx.fillStyle = '#c8c0b8';
+  bx.font = '6px monospace';
+  const words = state.dialogText.split(' ');
+  let line = '';
+  let lineY = state.dialogSpeaker ? H - 38 : H - 44;
+  for (const word of words) {
+    const test = line + word + ' ';
+    if (bx.measureText(test).width > W - 40) {
+      bx.fillText(line, 16, lineY);
+      line = word + ' ';
+      lineY += 9;
+    } else {
+      line = test;
+    }
+  }
+  bx.fillText(line, 16, lineY);
+
+  // Continue prompt
+  const blink = Math.sin(state.time * 5) > 0;
+  if (blink) {
+    bx.fillStyle = getMoodColors().accent;
+    bx.fillText('▼', W - 26, H - 14);
+  }
+}
+
+// ── DRAW INTERACT PROMPT ──
+function drawInteractPrompt() {
+  if (state.dialogActive) return;
+
+  let prompt = null;
+
+  // Check NPCs
+  for (const npc of npcs) {
+    if (Math.abs(player.x - npc.x) < 28 && Math.abs(player.y - npc.y) < 20) {
+      prompt = { text: `[E] Talk to ${npc.name}`, x: npc.x - state.camera.x, y: npc.y - npc.h - 10 };
+      break;
+    }
+  }
+
+  // Check objects
+  if (!prompt) {
+    for (const obj of objects) {
+      if (Math.abs(player.x - obj.x) < 24 && Math.abs(player.y - obj.y) < 20) {
+        const labels = {
+          wheel: '[E] Use wheel',
+          bottle: '[E] Drink',
+          nest: '[E] Rest',
+          tunnel: '[E] Explore',
+          drug: '[E] Drink...'
+        };
+        prompt = { text: labels[obj.type] || '[E]', x: obj.x - state.camera.x + obj.w/2, y: obj.y - 10 };
+        break;
+      }
+    }
+  }
+
+  if (prompt) {
+    bx.fillStyle = 'rgba(0,0,0,0.6)';
+    const tw = bx.measureText(prompt.text).width;
+    bx.fillRect(prompt.x - tw/2 - 3, prompt.y - 6, tw + 6, 10);
+    bx.fillStyle = getMoodColors().accent;
+    bx.font = '5px monospace';
+    bx.fillText(prompt.text, prompt.x - tw/2, prompt.y);
+  }
+}
+
+// ── DRAW HUD ──
+function drawHUD() {
+  // Social meter (small, top-left)
+  const mw = 40, mh = 4;
+  const mx = 8, my = 8;
+
+  bx.fillStyle = 'rgba(0,0,0,0.4)';
+  bx.fillRect(mx - 1, my - 1, mw + 2, mh + 2);
+
+  // Bar
+  const fill = state.social * mw;
+  const barColor = state.social > 0.6 ? '#b89cff' : state.social > 0.3 ? '#7a7a88' : '#444450';
+  bx.fillStyle = barColor;
+  bx.fillRect(mx, my, fill, mh);
+
+  // Label
+  bx.fillStyle = 'rgba(200,200,200,0.3)';
+  bx.font = '4px monospace';
+  bx.fillText('connection', mx, my - 2);
+}
+
+// ── UPDATE ──
+function update(dt) {
+  state.time += dt;
+
+  if (!state.dialogActive) {
+    // Movement
+    let move = 0;
+    if (keys['ArrowLeft'] || keys['KeyA']) move = -1;
+    if (keys['ArrowRight'] || keys['KeyD']) move = 1;
+
+    // Sluggish controls when isolated
+    const speedMult = 0.6 + state.social * 0.4;
+    player.vx = move * player.speed * speedMult;
+    player.x += player.vx;
+    player.x = Math.max(20, Math.min(WORLD_W - 20, player.x));
+
+    if (move !== 0) {
+      player.facing = move;
+      player.frameTimer += dt;
+      if (player.frameTimer > 0.12) {
+        player.frame++;
+        player.frameTimer = 0;
+      }
+    } else {
+      player.frame = 0;
+      player.frameTimer = 0;
+    }
+
+    // Drug drift — when isolated, controls drift toward the drug
+    if (state.social < 0.3) {
+      const drugX = 555;
+      const drift = (1 - state.social / 0.3) * 0.15;
+      const dir = Math.sign(drugX - player.x);
+      if (move === 0) {
+        player.x += dir * drift;
+      }
+    }
+  }
+
+  // Camera follow
+  const targetCamX = player.x - W / 2;
+  state.camera.x += (targetCamX - state.camera.x) * 0.08;
+  state.camera.x = Math.max(0, Math.min(WORLD_W - W, state.camera.x));
+}
+
+// ── MAIN LOOP ──
+let lastTime = 0;
+
+function gameLoop(timestamp) {
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.05);
+  lastTime = timestamp;
+
+  update(dt);
+
+  // Draw to buffer
+  bx.clearRect(0, 0, W, H);
+  drawWorld();
+
+  // Draw NPCs
+  for (const npc of npcs) {
+    drawRat(npc.x, npc.y + npc.h, npc.w, npc.h, npc.color, npc.facing, 0, npc.bow);
+  }
+
+  // Draw player
+  drawRat(player.x, player.y + player.h, player.w, player.h, '#c8b8a8', player.facing, player.frame, false);
+
+  drawInteractPrompt();
+  drawDialog();
+  drawHUD();
+
+  // Scale up to display canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(buf, 0, 0, W, H, 0, 0, canvas.width, canvas.height);
+
+  requestAnimationFrame(gameLoop);
+}
+
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
