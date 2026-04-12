@@ -302,6 +302,10 @@
         <canvas class="tile-canvas" data-tile="snaketd"></canvas>
         <div class="tile-label">Snake TD</div>
       </a>
+      <a href="/lab/the-mark/" class="sidebar-tile" title="The Mark">
+        <canvas class="tile-canvas" data-tile="themark"></canvas>
+        <div class="tile-label">The Mark</div>
+      </a>
       <div class="sidebar-tile" title="Iron & Ether — In Development">
         <canvas class="tile-canvas" data-tile="ironether"></canvas>
         <div class="tile-label">Iron & Ether</div>
@@ -514,6 +518,27 @@
           ctx.fillStyle = '#e04040';
           ctx.fillRect(w/2+Math.cos(ea)*er-2, h/2+Math.sin(ea)*er-2, 4, 4);
         }
+      } else if (type === 'themark') {
+        ctx.fillStyle = '#1a1610'; ctx.fillRect(0, 0, w, h);
+        // Warm central glow (the mark)
+        const glow = 0.15 + Math.sin(time * 1.2) * 0.08;
+        const grd = ctx.createRadialGradient(w/2, h/2, 2, w/2, h/2, 50);
+        grd.addColorStop(0, `rgba(200,160,80,${glow})`);
+        grd.addColorStop(1, 'rgba(200,160,80,0)');
+        ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+        // Target rings
+        for (let r = 3; r >= 1; r--) {
+          ctx.beginPath(); ctx.arc(w/2, h/2, r * 18, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(200,160,80,${0.08 * r})`; ctx.lineWidth = 1; ctx.stroke();
+        }
+        // Center dot
+        ctx.beginPath(); ctx.arc(w/2, h/2, 3, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(200,160,80,${0.4 + Math.sin(time * 2) * 0.2})`; ctx.fill();
+        // Drifting point (the player's mark, orbiting)
+        const pa = time * 0.4;
+        const pr = 20 + Math.sin(time * 0.7) * 12;
+        ctx.beginPath(); ctx.arc(w/2 + Math.cos(pa) * pr, h/2 + Math.sin(pa) * pr, 2, 0, Math.PI * 2);
+        ctx.fillStyle = '#c8c0b0'; ctx.fill();
       } else if (type === 'ironether') {
         ctx.fillStyle = '#0a0810'; ctx.fillRect(0, 0, w, h);
         ctx.strokeStyle = `rgba(255,140,60,${0.3+0.15*Math.sin(time*1.5)})`;
