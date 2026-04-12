@@ -38,6 +38,300 @@ const buf = document.createElement('canvas');
 buf.width = W; buf.height = H;
 const bx = buf.getContext('2d');
 
+// ── AUDIO ENGINE ──
+// All sound is synthesized — no files needed
+let audioCtx = null;
+let audioStarted = false;
+const audio = {
+  masterGain: null,
+  // Ambient layers
+  ambientNoise: null,     // brown noise (cage hum)
+  ambientGain: null,
+  // Music layers (pentatonic, layered by social)
+  musicOscs: [],
+  musicGains: [],
+  bassOsc: null,
+  bassGain: null,
+  // Drug drone
+  drugOsc: null,
+  drugGain: null,
+  drugOsc2: null,
+  // Footstep scheduling
+  lastStepTime: 0,
+  // Dialog blip
+  blipCharCount: 0
+};
+
+function initAudio() {
+  if (audioStarted) return;
+  audioStarted = true;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  audio.masterGain = audioCtx.createGain();
+  audio.masterGain.gain.value = 0.5;
+  audio.masterGain.connect(audioCtx.destination);
+
+  // ── Brown noise (ambient cage) ──
+  const noiseLen = audioCtx.sampleRate * 2;
+  const noiseBuf = audioCtx.createBuffer(1, noiseLen, audioCtx.sampleRate);
+  const noiseData = noiseBuf.getChannelData(0);
+  let lastNoise = 0;
+  for (let i = 0; i < noiseLen; i++) {
+    const white = Math.random() * 2 - 1;
+    lastNoise = (lastNoise + (0.02 * white)) / 1.02; // brown noise formula
+    noiseData[i] = lastNoise * 3.5;
+  }
+  audio.ambientNoise = audioCtx.createBufferSource();
+  audio.ambientNoise.buffer = noiseBuf;
+  audio.ambientNoise.loop = true;
+  audio.ambientGain = audioCtx.createGain();
+  audio.ambientGain.gain.value = 0.08;
+  // Low-pass filter for warmth
+  const noiseLPF = audioCtx.createBiquadFilter();
+  noiseLPF.type = 'lowpass';
+  noiseLPF.frequency.value = 300;
+  audio.ambientNoise.connect(noiseLPF);
+  noiseLPF.connect(audio.ambientGain);
+  audio.ambientGain.connect(audio.masterGain);
+  audio.ambientNoise.start();
+
+  // ── Music system — pentatonic layers ──
+  // Notes: C3, Eb3, F3, G3, Bb3, C4 (minor pentatonic for melancholy warmth)
+  const musicNotes = [130.81, 155.56, 174.61, 196.00, 233.08, 261.63];
+
+  // Layer 1: bass drone (always present, louder when connected)
+  audio.bassOsc = audioCtx.createOscillator();
+  audio.bassOsc.type = 'sine';
+  audio.bassOsc.frequency.value = 65.41; // C2
+  audio.bassGain = audioCtx.createGain();
+  audio.bassGain.gain.value = 0;
+  const bassFilter = audioCtx.createBiquadFilter();
+  bassFilter.type = 'lowpass';
+  bassFilter.frequency.value = 200;
+  audio.bassOsc.connect(bassFilter);
+  bassFilter.connect(audio.bassGain);
+  audio.bassGain.connect(audio.masterGain);
+  audio.bassOsc.start();
+
+  // Layers 2-4: melody oscillators that fade in with social meter
+  for (let i = 0; i < 3; i++) {
+    const osc = audioCtx.createOscillator();
+    osc.type = i === 0 ? 'triangle' : i === 1 ? 'sine' : 'triangle';
+    osc.frequency.value = musicNotes[i * 2]; // start frequencies
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 800 + i * 400;
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(audio.masterGain);
+    osc.start();
+    audio.musicOscs.push(osc);
+    audio.musicGains.push(gain);
+  }
+
+  // ── Drug drone (eerie, detuned) ──
+  audio.drugOsc = audioCtx.createOscillator();
+  audio.drugOsc.type = 'sawtooth';
+  audio.drugOsc.frequency.value = 55; // A1
+  audio.drugOsc2 = audioCtx.createOscillator();
+  audio.drugOsc2.type = 'sawtooth';
+  audio.drugOsc2.frequency.value = 55.8; // slightly detuned = beating
+  audio.drugGain = audioCtx.createGain();
+  audio.drugGain.gain.value = 0;
+  const drugFilter = audioCtx.createBiquadFilter();
+  drugFilter.type = 'lowpass';
+  drugFilter.frequency.value = 180;
+  audio.drugOsc.connect(drugFilter);
+  audio.drugOsc2.connect(drugFilter);
+  drugFilter.connect(audio.drugGain);
+  audio.drugGain.connect(audio.masterGain);
+  audio.drugOsc.start();
+  audio.drugOsc2.start();
+}
+
+// ── Sound effects (one-shot) ──
+function playFootstep() {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  if (now - audio.lastStepTime < 0.18) return;
+  audio.lastStepTime = now;
+
+  // Tiny noise burst — like a soft patter on bedding
+  const len = Math.floor(audioCtx.sampleRate * 0.04);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    const env = 1 - i / len;
+    data[i] = (Math.random() * 2 - 1) * env * env * 0.3;
+  }
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const hpf = audioCtx.createBiquadFilter();
+  hpf.type = 'highpass';
+  hpf.frequency.value = 2000 + Math.random() * 2000;
+  const g = audioCtx.createGain();
+  g.gain.value = 0.15;
+  src.connect(hpf);
+  hpf.connect(g);
+  g.connect(audio.masterGain);
+  src.start();
+}
+
+function playDialogBlip(speaker) {
+  if (!audioCtx) return;
+  // Different pitch per character — like Undertale
+  const pitchMap = {
+    'Hazel': 420,
+    'Bruno': 180,
+    'Pip': 550,
+    '': 300  // narrator
+  };
+  const baseFreq = pitchMap[speaker] || 300;
+  const freq = baseFreq + (Math.random() - 0.5) * 40;
+
+  const osc = audioCtx.createOscillator();
+  osc.type = 'square';
+  osc.frequency.value = freq;
+  const g = audioCtx.createGain();
+  g.gain.value = 0.06;
+  g.gain.setTargetAtTime(0, audioCtx.currentTime + 0.04, 0.02);
+  osc.connect(g);
+  g.connect(audio.masterGain);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.08);
+}
+
+function playWheelSqueak() {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = 800 + Math.random() * 400;
+  osc.frequency.setTargetAtTime(1200 + Math.random() * 300, audioCtx.currentTime + 0.05, 0.03);
+  const g = audioCtx.createGain();
+  g.gain.value = 0.04;
+  g.gain.setTargetAtTime(0, audioCtx.currentTime + 0.08, 0.03);
+  osc.connect(g);
+  g.connect(audio.masterGain);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.15);
+}
+
+function playWaterDrip() {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = 1800;
+  osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.06);
+  const g = audioCtx.createGain();
+  g.gain.value = 0.07;
+  g.gain.setTargetAtTime(0, audioCtx.currentTime + 0.04, 0.02);
+  osc.connect(g);
+  g.connect(audio.masterGain);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.12);
+}
+
+function playSocialUp() {
+  if (!audioCtx) return;
+  // Warm ascending arpeggio
+  const notes = [261.63, 329.63, 392.00]; // C4, E4, G4
+  notes.forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const g = audioCtx.createGain();
+    g.gain.value = 0;
+    const t = audioCtx.currentTime + i * 0.1;
+    g.gain.setValueAtTime(0.08, t);
+    g.gain.setTargetAtTime(0, t + 0.12, 0.06);
+    osc.connect(g);
+    g.connect(audio.masterGain);
+    osc.start(t);
+    osc.stop(t + 0.3);
+  });
+}
+
+function playSocialDown() {
+  if (!audioCtx) return;
+  // Descending minor — sad
+  const notes = [293.66, 233.08, 174.61]; // D4, Bb3, F3
+  notes.forEach((freq, i) => {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const g = audioCtx.createGain();
+    g.gain.value = 0;
+    const t = audioCtx.currentTime + i * 0.15;
+    g.gain.setValueAtTime(0.07, t);
+    g.gain.setTargetAtTime(0, t + 0.15, 0.08);
+    osc.connect(g);
+    g.connect(audio.masterGain);
+    osc.start(t);
+    osc.stop(t + 0.4);
+  });
+}
+
+function playDrugDrink() {
+  if (!audioCtx) return;
+  // Sickly sweet shimmer then crash
+  const osc = audioCtx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = 440;
+  osc.frequency.setTargetAtTime(220, audioCtx.currentTime + 0.5, 0.3);
+  const g = audioCtx.createGain();
+  g.gain.value = 0.12;
+  g.gain.setTargetAtTime(0, audioCtx.currentTime + 0.8, 0.2);
+  // Chorus via second osc
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = 'sine';
+  osc2.frequency.value = 443;
+  osc2.frequency.setTargetAtTime(218, audioCtx.currentTime + 0.5, 0.3);
+  osc.connect(g); osc2.connect(g);
+  g.connect(audio.masterGain);
+  osc.start(); osc2.start();
+  osc.stop(audioCtx.currentTime + 1.2);
+  osc2.stop(audioCtx.currentTime + 1.2);
+}
+
+// ── Update audio state (called each frame) ──
+function updateAudio(social, drugDist) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+
+  // Ambient noise — slightly louder when isolated (silence feels loud)
+  const noiseVol = 0.05 + (1 - social) * 0.06;
+  audio.ambientGain.gain.setTargetAtTime(noiseVol, t, 0.5);
+
+  // Bass drone — present always, warmer when connected
+  const bassVol = 0.03 + social * 0.06;
+  audio.bassGain.gain.setTargetAtTime(bassVol, t, 0.5);
+
+  // Music layers fade in with social level
+  // Layer 0 (triangle): fades in at social > 0.3
+  // Layer 1 (sine): fades in at social > 0.5
+  // Layer 2 (triangle): fades in at social > 0.7
+  const thresholds = [0.3, 0.5, 0.7];
+  const musicNotes = [130.81, 155.56, 174.61, 196.00, 233.08, 261.63];
+
+  for (let i = 0; i < 3; i++) {
+    const layerVol = Math.max(0, Math.min(0.06, (social - thresholds[i]) / 0.2 * 0.06));
+    audio.musicGains[i].gain.setTargetAtTime(layerVol, t, 0.8);
+
+    // Slowly shift pitch (dreamy wandering melody)
+    const noteIdx = Math.floor((state.time * 0.15 + i * 1.7) % musicNotes.length);
+    const targetFreq = musicNotes[noteIdx];
+    audio.musicOscs[i].frequency.setTargetAtTime(targetFreq, t, 2.0);
+  }
+
+  // Drug drone — louder when close to drug and isolated
+  const drugProximity = Math.max(0, 1 - drugDist / 200);
+  const isolation = 1 - social;
+  const drugVol = drugProximity * isolation * 0.08;
+  audio.drugGain.gain.setTargetAtTime(drugVol, t, 0.3);
+}
+
 // ── PIXEL ART SPRITE SYSTEM ──
 // Sprites are defined as arrays of [x, y, color] relative to top-left
 // We cache them as ImageData for fast drawing
@@ -364,12 +658,14 @@ const objects = [
 const keys = {};
 document.addEventListener('keydown', e => {
   keys[e.code] = true;
+  if (!audioStarted) initAudio();
   if (['Space','KeyE','Enter'].includes(e.code)) {
     e.preventDefault();
     handleInteract();
   }
 });
 document.addEventListener('keyup', e => { keys[e.code] = false; });
+canvas.addEventListener('click', () => { if (!audioStarted) initAudio(); });
 
 // ── DIALOG ──
 function setDialogText(text) {
@@ -405,7 +701,7 @@ function handleInteract() {
       state.dialogQueue = [...npc.dialog];
       setDialogText(state.dialogQueue.shift());
       state.dialogCallback = () => {
-        if (!npc.talked) { npc.talked = true; state.social = Math.min(1, state.social + npc.socialBonus); }
+        if (!npc.talked) { npc.talked = true; state.social = Math.min(1, state.social + npc.socialBonus); playSocialUp(); }
       };
       return;
     }
@@ -421,7 +717,7 @@ function handleInteract() {
       if (obj.type === 'wheel') {
         setDialogText("*squeak squeak squeak*\n...that was kind of fun.");
         state.dialogQueue = [];
-        state.dialogCallback = () => { state.social = Math.min(1, state.social + 0.03); };
+        state.dialogCallback = () => { state.social = Math.min(1, state.social + 0.03); playWheelSqueak(); };
       } else if (obj.type === 'bottle') {
         setDialogText("Clean water. Refreshing.");
         state.dialogQueue = [];
@@ -445,7 +741,7 @@ function handleInteract() {
             "Everything else is so\nloud and hard...",
             "...maybe just a sip."
           ];
-          state.dialogCallback = () => { state.social = Math.max(0, state.social - 0.2); };
+          state.dialogCallback = () => { state.social = Math.max(0, state.social - 0.2); playSocialDown(); playDrugDrink(); };
         }
       }
       return;
@@ -464,6 +760,11 @@ function update(dt) {
       state.dialogTimer -= 0.03;
       state.dialogCharIdx++;
       state.dialogText = state.dialogFullText.slice(0, state.dialogCharIdx);
+      // Dialog blip on every other character (not spaces/newlines)
+      const ch = state.dialogFullText[state.dialogCharIdx - 1];
+      if (ch !== ' ' && ch !== '\n' && state.dialogCharIdx % 2 === 0) {
+        playDialogBlip(state.dialogSpeaker);
+      }
     }
   }
 
@@ -480,7 +781,7 @@ function update(dt) {
     if (move !== 0) {
       player.facing = move;
       player.frameTimer += dt;
-      if (player.frameTimer > 0.15) { player.frame = 1 - player.frame; player.frameTimer = 0; }
+      if (player.frameTimer > 0.15) { player.frame = 1 - player.frame; player.frameTimer = 0; playFootstep(); }
     } else {
       player.frame = 0;
     }
@@ -496,6 +797,19 @@ function update(dt) {
   const target = player.x - W / 2;
   state.camera.x += (target - state.camera.x) * 0.06;
   state.camera.x = Math.max(0, Math.min(WORLD_W - W, state.camera.x));
+
+  // Audio update
+  const drugDist = Math.abs(player.x - 590);
+  updateAudio(state.social, drugDist);
+
+  // Random ambient drip (water bottle)
+  if (audioStarted && Math.random() < 0.002) {
+    playWaterDrip();
+  }
+  // Random wheel squeak if near wheel
+  if (audioStarted && Math.abs(player.x - 270) < 80 && Math.random() < 0.005) {
+    playWheelSqueak();
+  }
 }
 
 // ── DRAW ──
