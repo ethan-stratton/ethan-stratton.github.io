@@ -279,62 +279,8 @@ const WORLD_W=640, FLOOR_Y=185, CAGE_TOP=30;
 // ═══════════════════════════════════════
 //  INTRO SEQUENCE
 // ═══════════════════════════════════════
-let introActive = true;
-let introTimer = 0;
-let introFadeOut = 0; // fade-out when dismissed
-const introLines = [
-  "In 1977, researcher Bruce Alexander",
-  "built a paradise for rats.",
-  "",
-  "He called it Rat Park.",
-  "",
-  "The rats had friends. Toys. Space.",
-  "They also had access to morphine water.",
-  "",
-  "The question was simple:",
-  "",
-  "If you have everything you need...",
-  "...do you still choose the drug?",
-  "",
-  "",
-  "[Press any key]"
-];
-let introDismissed = false;
-
-function updateIntro(dt) {
-  if (introDismissed) {
-    introFadeOut = Math.min(1, introFadeOut + dt * 1.5);
-    if (introFadeOut >= 1) { introActive = false; gameStartFade = 1.0; }
-  } else {
-    introTimer += dt;
-  }
-}
-
-let gameStartFade = 0; // fades from 1 to 0 after intro ends
-
-function drawIntro() {
-  bx.fillStyle = '#000';
-  bx.fillRect(0, 0, W, H);
-
-  const globalFade = introDismissed ? 1 - introFadeOut : 1;
-  bx.font = '7px "Press Start 2P"';
-  const startY = 30;
-  for (let i = 0; i < introLines.length; i++) {
-    const lineDelay = i * 0.6;
-    const a = Math.min(1, Math.max(0, (introTimer - lineDelay) / 0.8)) * globalFade;
-    if (a <= 0) continue;
-    bx.globalAlpha = a;
-    const line = introLines[i];
-    const col = i === introLines.length - 1 ? '#b89cff' : '#c8c0d8';
-    bx.fillStyle = col;
-    if (i === introLines.length - 1 && Math.sin(introTimer * 3) < 0) { bx.globalAlpha = 0; }
-    const tw = bx.measureText(line).width;
-    bx.fillText(line, (W - tw) / 2, startY + i * 14);
-  }
-  bx.globalAlpha = 1;
-  ctxMain.clearRect(0, 0, canvas.width, canvas.height);
-  ctxMain.drawImage(buf, 0, 0, W, H, 0, 0, canvas.width, canvas.height);
-}
+let introActive = false;
+let gameStartFade = 0.8; // brief fade-in from dark
 
 function dismissIntro() {
   if (!introDismissed && introTimer > 1) introDismissed = true;
