@@ -298,6 +298,10 @@
         <canvas class="tile-canvas" data-tile="ratpark"></canvas>
         <div class="tile-label">Rat Park</div>
       </a>
+      <a href="/lab/snake-td/" class="sidebar-tile" title="Snake TD">
+        <canvas class="tile-canvas" data-tile="snaketd"></canvas>
+        <div class="tile-label">Snake TD</div>
+      </a>
       <div class="sidebar-tile" title="Iron & Ether — In Development">
         <canvas class="tile-canvas" data-tile="ironether"></canvas>
         <div class="tile-label">Iron & Ether</div>
@@ -482,6 +486,33 @@
         ctx.strokeStyle = 'rgba(100,100,120,0.2)'; ctx.lineWidth = 2;
         for (let bx = 8; bx < w; bx += 14) {
           ctx.beginPath(); ctx.moveTo(bx, 0); ctx.lineTo(bx, h*0.75); ctx.stroke();
+        }
+      } else if (type === 'snaketd') {
+        ctx.fillStyle = '#0a0a14'; ctx.fillRect(0, 0, w, h);
+        // Core glow
+        const glow = 0.2 + Math.sin(time * 2) * 0.1;
+        const grd = ctx.createRadialGradient(w/2, h/2, 4, w/2, h/2, 40);
+        grd.addColorStop(0, `rgba(180,140,255,${glow})`);
+        grd.addColorStop(1, 'rgba(180,140,255,0)');
+        ctx.fillStyle = grd; ctx.fillRect(0, 0, w, h);
+        // Core
+        ctx.fillStyle = '#d8a0ff'; ctx.fillRect(w/2-4, h/2-4, 8, 8);
+        // Snake coiling around core
+        const segs = 12;
+        for (let i = 0; i < segs; i++) {
+          const a = time * 0.8 + i * 0.5;
+          const r = 18 + i * 1.5;
+          const sx = w/2 + Math.cos(a) * r, sy = h/2 + Math.sin(a) * r;
+          const bright = i === 0 ? 1 : 0.6;
+          ctx.fillStyle = `rgba(64,216,112,${bright})`;
+          ctx.fillRect(sx-3, sy-3, 6, 6);
+        }
+        // Enemy dots approaching
+        for (let i = 0; i < 3; i++) {
+          const ea = time * 0.3 + i * 2.1;
+          const er = 60 + Math.sin(time + i) * 10;
+          ctx.fillStyle = '#e04040';
+          ctx.fillRect(w/2+Math.cos(ea)*er-2, h/2+Math.sin(ea)*er-2, 4, 4);
         }
       } else if (type === 'ironether') {
         ctx.fillStyle = '#0a0810'; ctx.fillRect(0, 0, w, h);
