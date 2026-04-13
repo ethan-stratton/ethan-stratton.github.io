@@ -74,6 +74,8 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 .ambient-label{font-family:'Inter',sans-serif;font-size:0.6rem;color:#504838;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px}
 .advisor-dusk{font-size:0.95rem;color:#a89878;padding:12px 16px;margin:8px 0;background:rgba(200,160,80,0.03);border-left:2px solid rgba(200,160,80,0.12);border-radius:0 4px 4px 0;line-height:1.7}
 .advisor-dusk .adv-dusk-name{font-family:'Inter',sans-serif;font-size:0.6rem;color:#706050;letter-spacing:0.08em;text-transform:uppercase;display:block;margin-bottom:4px}
+.maren-line{font-size:0.95rem;color:#b8a890;padding:12px 16px;margin:8px 0;background:rgba(160,140,110,0.04);border-left:2px solid rgba(160,140,110,0.15);border-radius:0 4px 4px 0;line-height:1.7}
+.maren-line .maren-name{font-family:'Inter',sans-serif;font-size:0.6rem;color:#8A7A6A;letter-spacing:0.08em;text-transform:uppercase;display:block;margin-bottom:4px}
 .gameover-msg{font-size:1.3rem;color:#c05040;text-align:center;margin:20px 0}
 
 /* End screen */
@@ -239,6 +241,10 @@ const CHARACTERS=[
    bio:'A pragmatist who decided chaos was worse than control.'},
   {id:'envoy',name:'The Envoy',role:'Reach diplomat',group:'reach',status:'unknown',icon:'',visible:false,portrait:'#5A5A6A',
    bio:'Polite. Reasonable. Terrifying.'},
+
+  // ── YOUR PEOPLE (personal connections) ──
+  {id:'maren',name:'Maren',role:'The old leader\'s widow',group:'brannhaven',status:'well',icon:'',visible:true,portrait:'#8A7A6A',
+   bio:'Knew you before you were leader. Remembers when you were just someone who helped carry water.'},
 ];
 
 // ── STATE ──
@@ -557,6 +563,65 @@ const AMBIENTS=[
   {id:'stars',minDay:2,maxDay:10,
    text:'The stars are impossibly clear tonight. No light for miles except Brannhaven\'s fires. A guard on the wall is pointing out constellations to someone. "That one\'s the Shepherd," she says. "He watches the flock all night." You stand in the dark and look up.',
    mood:'peace'},
+
+  // ── MAREN — your personal connection (#6) ──
+  {id:'maren_morning',minDay:1,maxDay:2,
+   text:'Maren is waiting outside the Hearthhouse. She hands you a cup of something warm. "You didn\'t eat this morning. Don\'t argue — I can tell." She watches you drink. "You look like him, you know. Not your face. Your shoulders. He carried everything there too."',
+   mood:'warmth'},
+  {id:'maren_name',minDay:2,maxDay:4,
+   text:'"Everyone calls you \'leader\' now. I remember when they called you the kid who fell in the river." Maren shakes her head. "You cried for an hour. Now you decide who eats." She pats your arm. "Don\'t forget you\'re still that kid."',
+   mood:'warmth'},
+  {id:'maren_gate',minDay:3,maxDay:6,
+   text:'Maren is at the gate when you come back from the wall. She does this every evening. Doesn\'t say why. "Just checking," she says. "Force of habit." You realize she used to wait for the old leader too. This is how she keeps people alive — by expecting them to come home.',
+   mood:'warmth'},
+  {id:'maren_advice',minDay:4,maxDay:7,
+   text:'"He made mistakes too, you know. The old man. Big ones." Maren is mending a shirt. Yours. You didn\'t ask her to. "The difference is he forgave himself. You haven\'t figured that part out yet."',
+   mood:'quiet'},
+  {id:'maren_argues',minDay:5,maxDay:8,requires:()=>S.mark>1,
+   text:'"You\'re getting hard." Maren says it at dinner, in front of no one. Just you. "I\'ve seen it before. The wall goes up inside before it goes up outside." She puts down her spoon. "He went hard too, near the end. Don\'t do what he did."',
+   mood:'growth'},
+  {id:'maren_soft',minDay:5,maxDay:8,requires:()=>S.mark<-0.5,
+   text:'"You\'re trying to carry all of them." Maren finds you sitting on the steps at midnight. "You can\'t. He couldn\'t either, and he was twice your size." She sits beside you. Says nothing else. Stays until you go inside.',
+   mood:'warmth'},
+  {id:'maren_soup',minDay:3,maxDay:6,requires:()=>S.ambientsSeen.has('senna_soup'),
+   text:'"Senna brings you broth. Did you know?" Maren says it casually. "She doesn\'t do that for anyone else. Corwin used to say she only cooked for people she was worried about." Pause. "She\'s worried about you."',
+   mood:'warmth'},
+  {id:'maren_sick',minDay:7,maxDay:9,requires:()=>S.food<25||S.mor<30,
+   text:'Maren is coughing. She waves you off. "It\'s nothing. Old lungs." But she\'s thinner than last week. She\'s been giving away her rations — you\'re sure of it. When you confront her: "I\'ve had sixty years of meals. That boy in the east quarter has had six."',
+   mood:'dread'},
+  {id:'maren_last',minDay:9,maxDay:10,
+   text:'Maren takes your hand. Her fingers are cold. "Whatever happens — you did your best. I know that. He would\'ve known that." She squeezes once. "Now go. They\'re waiting for you."',
+   mood:'quiet'},
+
+  // ── DEATH AS ABSENCE (#5) ──
+  // These trigger ONLY when specific characters are dead
+  {id:'absence_corwin_path',minDay:3,maxDay:6,requires:()=>getChar('corwin')?.status==='dead',
+   text:'The path Corwin used to take along the south wall is growing over. Grass in the bootprints. In a week there\'ll be no sign anyone walked there at all.',
+   mood:'loss'},
+  {id:'absence_hale_post',minDay:3,maxDay:7,requires:()=>getChar('hale')?.status==='dead',
+   text:'Hale\'s mother sits by the south gate every morning. She doesn\'t speak. She just sits where her son used to stand his watch. Nobody asks her to move.',
+   mood:'loss'},
+  {id:'absence_forager',minDay:4,maxDay:8,requires:()=>S.flags._forager_died,
+   text:'Someone left wildflowers at the south gate. No name. No marker. Just flowers where a forager walked out and didn\'t walk back.',
+   mood:'loss'},
+  {id:'absence_meal',minDay:5,maxDay:10,requires:()=>CHARACTERS.filter(c=>c.status==='dead'&&c.visible).length>=2,
+   text:'The evening meal is quieter now. Not the words — the space. Tables that used to be full have gaps. Nobody rearranges the benches. The gaps stay.',
+   mood:'loss'},
+  {id:'absence_name',minDay:6,maxDay:10,requires:()=>{const d=CHARACTERS.find(c=>c.status==='dead'&&c.visible&&c.group==='brannhaven');return d&&d.id!=='corwin'&&d.id!=='hale';},
+   text:()=>{const d=CHARACTERS.find(c=>c.status==='dead'&&c.visible&&c.group==='brannhaven'&&c.id!=='corwin'&&c.id!=='hale');return `A child asks where ${d.name} went. The mother says "away." The child asks when ${d.name} is coming back. The mother doesn't answer.`;},
+   mood:'loss'},
+  {id:'absence_senna_tools',minDay:8,maxDay:10,requires:()=>S.flags._senna_dead,
+   text:'Someone finally moved Senna\'s trowel. It was leaning against the east wall for days. They put it in the tool shed. That shouldn\'t feel like a second death, but it does.',
+   mood:'loss'},
+  {id:'absence_senna_bowl',minDay:8,maxDay:10,requires:()=>S.flags._senna_dead&&S.ambientsSeen.has('senna_soup_gone'),
+   text:'You find Senna\'s bowl in the Hearthhouse. Cleaned. Put away on the shelf with the others. You take it down. Hold it. Put it back. You don\'t know what you expected.',
+   mood:'loss'},
+  {id:'absence_mira',minDay:8,maxDay:10,requires:()=>S.flags._mira_dead||S.flags._mira_dead_plague,
+   text:'Declan doesn\'t come to the morning assembly anymore. Lira says he works his shift and goes straight back to their room. The drawings Mira made are still on the wall. He hasn\'t taken them down.',
+   mood:'loss'},
+  {id:'absence_quiet_night',minDay:6,maxDay:10,requires:()=>CHARACTERS.filter(c=>c.status==='dead'&&c.visible).length>=3,
+   text:'You walk the wall at night. It\'s quieter than it used to be. Not fewer sounds — fewer voices. The settlement is the same size but it feels emptier. Like a house after someone moves out. The furniture is all there. Something isn\'t.',
+   mood:'loss'},
 ];
 
 function getAmbient(){
@@ -573,6 +638,10 @@ function getAmbient(){
   available.sort((a,b)=>(priority[b.mood]||0)-(priority[a.mood]||0));
   const pick=available[Math.floor(Math.random()*Math.min(3,available.length))];
   return pick;
+}
+
+function getAmbientText(ambient){
+  return typeof ambient.text==='function'?ambient.text():ambient.text;
 }
 
 // ══════════════════════════════════════
@@ -692,6 +761,29 @@ function getAdvisorDuskLine(advisor){
 }
 
 // ══════════════════════════════════════
+// MAREN — Personal Connection (#6)
+// ══════════════════════════════════════
+const MAREN_DUSK=[
+  {requires:()=>S.day===1, text:'"First day." She\'s standing in the doorway. "He threw up on his first day. True story. Don\'t tell anyone." She brings you water. "You\'ll be fine."'},
+  {requires:()=>S.day<=3, text:'"People keep asking me what you\'re like. What kind of leader you\'ll be." She folds laundry that isn\'t hers. "I tell them you carry water without being asked. That\'s all they need to know."'},
+  {requires:()=>S.flags.burial_both, text:'"He would\'ve done what Rowan wanted. Hung the body. Made the point." She\'s quiet for a moment. "I\'m glad you\'re not him."'},
+  {requires:()=>S.flags.elif_in, text:'"The children are sleeping in the store room. I brought them blankets." She looks at you. "You did a good thing. A hard thing, but a good one. Those are usually the same."'},
+  {requires:()=>S.flags._senna_dead, text:'Maren doesn\'t come to the Hearthhouse tonight. You find her later, sitting with Hale\'s mother. Two women who\'ve buried people. Not talking. Just sitting. Sometimes that\'s what grief looks like.'},
+  {requires:()=>S.food<20, text:'"I\'m not eating tomorrow. Don\'t argue." She holds up a hand. "I\'m sixty-three. That boy in the east quarter is six. The math is simple."'},
+  {requires:()=>S.mor<25, text:'"They\'re scared. All of them. They won\'t say it to you because you\'re the leader." She presses something into your hand. A small stone, smooth from the river. "He used to hold this during council meetings. Said it kept him honest. Your turn now."'},
+  {requires:()=>S.mark>2, text:'"I don\'t recognize you today." She says it plainly. Not angry. Sad. "The person I knew would\'ve asked questions before giving orders." She leaves before you can answer.'},
+  {requires:()=>S.mark<-1.5, text:'"You\'re going to break if you keep this up." She catches your arm. "Not from the decisions. From believing every single one of them is your fault." She doesn\'t let go. "Some things just happen. Even to good leaders."'},
+  {requires:()=>S.day>=S.maxDays-1, text:'"Whatever tomorrow brings — thank you. For trying." Her eyes are wet but she doesn\'t cry. "He would\'ve been proud. I know I am."'},
+  {requires:()=>true, text:'Maren left something on your chair. A folded cloth with dried herbs inside — the kind that help you sleep. No note. She never leaves notes. She just knows.'},
+];
+
+function getMarenDuskLine(){
+  const available=MAREN_DUSK.filter(l=>l.requires());
+  if(!available.length)return null;
+  return available[(S.day*13)%available.length].text;
+}
+
+// ══════════════════════════════════════
 // DUSK EVENTS
 // ══════════════════════════════════════
 function generateDuskEvents(){
@@ -709,7 +801,7 @@ function generateDuskEvents(){
   }
   if(a.forage>0){
     if(Math.random()<0.7){const fg=Math.floor(Math.random()*4)+2,fm=Math.floor(Math.random()*3)+1;S.food=clamp(S.food+fg);S.mat=clamp(S.mat+fm);ev.push(`Foragers returned with ${fg} food and ${fm} materials.`);}
-    else{S.ppl=clamp(S.ppl-1);ev.push('Foraging team hit trouble. One didn\'t come back.');}
+    else{S.ppl=clamp(S.ppl-1);S.flags._forager_died=true;ev.push('Foraging team hit trouble. One didn\'t come back.');}
   }
   if(a.rest>0){const g=Math.floor(a.rest*0.8);S.mor=clamp(S.mor+g);ev.push(`${a.rest} rested. Settlement feels lighter.`);}
   // Consumption
@@ -780,6 +872,12 @@ function generateDuskEvents(){
   const todayAdvisor=advisorOrder[(S.day-1)%3];
   const advLine=getAdvisorDuskLine(todayAdvisor);
   if(advLine)ev.push('__advisor__'+todayAdvisor+'__'+advLine);
+
+  // Maren personal line (every 3 days, offset from advisors)
+  if(S.day%3===2||S.day===1){
+    const marenLine=getMarenDuskLine();
+    if(marenLine)ev.push('__maren__'+marenLine);
+  }
 
   return ev;
 }
@@ -855,12 +953,13 @@ function endDawn(){
   const ambient=getAmbient();
   if(ambient){
     S.ambientsSeen.add(ambient.id);
+    const ambientText=getAmbientText(ambient);
     const area=document.getElementById('phase-area');
     let h=`<div class="ambient-label">— a moment —</div>`;
-    h+=`<div class="ambient-moment">${ambient.text}</div>`;
+    h+=`<div class="ambient-moment">${ambientText}</div>`;
     h+=`<button class="phase-btn" onclick="renderPetitions()">Continue →</button>`;
     area.innerHTML=h;
-    logEvent(ambient.text,'ambient');
+    logEvent(ambientText,'ambient');
   }else{
     renderPetitions();
   }
@@ -935,6 +1034,11 @@ function renderDusk(){
       const icons={rowan:'⚔️',lira:'🌿',edric:'📜'};
       h+=`<div class="advisor-dusk"><span class="adv-dusk-name">${icons[parts[0]]||''} ${name}</span>${line}</div>`;
       logEvent(`${name}: ${line}`);
+    }
+    else if(ev.startsWith('__maren__')){
+      const line=ev.slice(9);
+      h+=`<div class="maren-line"><span class="maren-name">Maren</span>${line}</div>`;
+      logEvent(`Maren: ${line}`);
     }
     else{h+=`<div class="event-line">${ev}</div>`;logEvent(ev);}
   });
