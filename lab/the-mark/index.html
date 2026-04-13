@@ -153,7 +153,7 @@ const CHARACTERS=[
    bio:'Thirty-five. Trained under the old leader. Knows every herb in the valley. Treats broken bones and broken hearts with equal seriousness. Believes in people past the point of evidence.',trust:60},
   {id:'edric',name:'Edric',role:'Elder, Council',group:'council',status:'well',icon:'📜',visible:true,portrait:'#6B6B8D',
    bio:'Sixty-one. Remembers things nobody else does — the old laws, the old agreements, the reason the wall was built where it was. Believes that rules kept Brannhaven alive when nothing else could.',trust:60},
-  {id:'wren',name:'Wren',role:'Child',group:'council',status:'well',icon:'🌸',visible:true,portrait:'#B08DAB',
+  {id:'wren',name:'Wren',role:'Child',group:'council',status:'well',icon:'🌸',visible:false,portrait:'#B08DAB',
    bio:'Eight years old. Sits on the wall and watches everything. Asks questions that adults avoid.'},
 
   // ── BRANNHAVEN (revealed by petitions) ──
@@ -237,7 +237,7 @@ function renderRoster(){
       const cls=isDead?'char-entry dead':isDying?'char-entry dying':'char-entry';
       const stCls=STATUS_CLASSES[c.status]||'status-unknown';
       const stTxt=STATUS_TEXT[c.status]||c.status;
-      const trustHtml=(c.trust!==undefined)?`<span style="font-family:Inter,sans-serif;font-size:0.5rem;color:#504838;margin-left:3px">${c.trust}%</span>`:'';
+      const trustHtml='';
       // Portrait: colored circle with initial, or emoji if set
       const initial=c.name.charAt(0).toUpperCase();
       const pColor=isDead?'#3A3030':c.portrait||'#605040';
@@ -454,7 +454,7 @@ function generateDuskEvents(){
     setStatus('declan_daughter','dead');
   }
   // Wren
-  if(S.day%3===0||S.day===1)ev.push('__wren__');
+  if(S.day%3===0||S.day===1){ev.push('__wren__');revealChars(['wren']);}
   return ev;
 }
 
