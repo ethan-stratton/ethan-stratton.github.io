@@ -7,7 +7,7 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;600&display=swap');
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-x:hidden;min-height:100vh}
+body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-x:hidden;min-height:100vh;transition:background-color 2s ease,color 2s ease}
 
 /* Layout: left panel + main + sidebar */
 #app{display:flex;max-width:1200px;margin:0 auto;min-height:100vh}
@@ -179,6 +179,7 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 <p>After 30 years, the old leader croaked. You were next in line.</p>
 </div>
 <button class="start-btn" onclick="startGame()">Begin</button>
+<div id="ng-plus" style="font-size:0.8rem;color:#504838;margin-top:12px;font-style:italic;text-align:center"></div>
 </div>
 
 <div id="game-screen" style="display:none">
@@ -237,6 +238,26 @@ function soundPetition(){playTone(262,0.5,'triangle',0.08);}
 function soundChoice(){playTone(440,0.2,'triangle',0.1);setTimeout(()=>playTone(554,0.3,'triangle',0.08),100);}
 function soundDread(){playTone(73,4,'sawtooth',0.04);}
 function soundMaren(){playTone(392,0.4,'sine',0.05);setTimeout(()=>playTone(330,0.6,'sine',0.05),300);}
+
+// ══════════════════════════════════════
+// NEW GAME+ (localStorage memory)
+// ══════════════════════════════════════
+function getPrevRun(){try{return JSON.parse(localStorage.getItem('themark_prev'))||null;}catch(e){return null;}}
+function savePrevRun(){
+  try{localStorage.setItem('themark_prev',JSON.stringify({
+    ending:getEndingName(),mark:S.mark,day:S.day,
+    dead:CHARACTERS.filter(c=>c.status==='dead').map(c=>c.id),
+    flags:Object.keys(S.flags).filter(k=>!k.startsWith('_'))
+  }));}catch(e){}
+}
+function getEndingName(){
+  const m=S.mark;
+  if(S.gameOver&&S.food<=0)return 'THE FAMINE';
+  if(S.gameOver&&(S.mor<=0||S.ppl<=0))return 'THE ABANDONMENT';
+  if(m>3)return 'THE FORTRESS';if(m>1.5)return 'THE IRON LAW';
+  if(m<-2)return 'THE RUIN';if(m<-0.5)return 'THE OPEN GATE';
+  return 'THE SHEPHERD';
+}
 // ══════════════════════════════════════
 // CHARACTER ROSTER
 // ══════════════════════════════════════
@@ -563,6 +584,7 @@ const PETITIONS=[
 
 {id:'winter',minDay:15,maxDay:18,
   speaker:'EDRIC, Elder of the Council',
+  fatigueText:'Edric opens the ledger. Two months of food. Three months of winter. "Someone eats less. Who?"',
   text:`Edric opens the ledger. The numbers are simple: at current consumption, the granary empties before the first thaw. Three months of winter. Two months of food.\n\n"Someone has to eat less. The question is who."\n\nRowan says the guards need full rations or the wall falls. Lira says the sick and elderly can't survive on half portions. Edric says equal cuts, no exceptions.`,
   recs:{rowan:'"Guards eat full. Everyone else adjusts. If the wall falls, rations don\'t matter."',lira:'"Protect the vulnerable. The strong can survive on less."',edric:'"Across-the-board cuts. Twenty percent. No exceptions. Fair is fair."'},
   choices:[
@@ -574,6 +596,7 @@ const PETITIONS=[
 
 {id:'power',minDay:17,maxDay:19,
   speaker:'YOU',
+  fatigueText:'The Hearthhouse. Late. Fire low. Ledger on the table. Map on the wall. All of it waiting for you.\n\nYou could keep going. Or you could give it back.',
   text:`You're sitting alone in the Hearthhouse. The fire is low. Outside, Brannhaven sleeps.\n\nEdric's ledger is open on the table. Rowan's patrol map pinned to the wall. Lira's herb inventory in a neat stack. All of them waiting for you to decide.\n\nYou could keep going. Nobody would stop you. The people trust you — or fear you — enough to let you continue.\n\nOr you could do what the old leader never did. What Benjamin of the old stories never did.\n\nYou could give it back.`,
   recs:{rowan:'"Don\'t. Not now. The Reach is still out there."',lira:'"...Do you mean it?"',edric:'"If you do this — do it properly. Write the charter. Make it last."'},
   choices:[
@@ -585,6 +608,7 @@ const PETITIONS=[
 
 {id:'final_raid',minDay:18,maxDay:20,requires:()=>S.flags.envoy_refuse||S.flags.envoy_negotiate,
   speaker:'ROWAN, Captain of the Guard',
+  fatigueText:'Forty riders at dawn. South gate burning. Wounded in the square. Rowan bleeding. "Hours, not days."',
   text:`They came at dawn. Not four riders this time. Forty. The Warden's full western company.\n\nThe wall holds — for now. But the south gate is burning and there are wounded in the square. This isn't a raid. This is a siege.\n\nRowan is bleeding from the shoulder but still standing. "We have hours, not days. What do we do?"`,
   recs:{rowan:'"Fight. Every soul on the wall. This is what we built it for."',lira:'"Open the gate. Negotiate. People are dying."',edric:'"Send runners to neighboring settlements. We need allies."'},
   choices:[
@@ -909,7 +933,16 @@ function getAdvisorDuskLine(advisor){
 // MAREN — Personal Connection (#6)
 // ══════════════════════════════════════
 const MAREN_DUSK=[
-  {requires:()=>S.day===1, text:'"First day." She\'s standing in the doorway. "He threw up on his first day. True story. Don\'t tell anyone." She brings you water. "You\'ll be fine."'},
+  {requires:()=>S.day===1, text:()=>{
+    const prev=getPrevRun();
+    if(!prev)return '"First day." She\'s standing in the doorway. "He threw up on his first day. True story. Don\'t tell anyone." She brings you water. "You\'ll be fine."';
+    if(prev.ending==='THE FORTRESS')return '"You remind me of the last one." She\'s standing in the doorway. Quiet for a long time. "He built walls too. Higher and higher. Until he couldn\'t see over them." She brings you water. "Try to be different."';
+    if(prev.ending==='THE FAMINE')return '"You remind me of the last one." She sets down a cup. "She meant well. They always mean well. But meaning well doesn\'t fill a granary." Long pause. "Eat something today."';
+    if(prev.ending==='THE RUIN')return '"You remind me of the last one." She leans in the doorway. "She tried to save everyone. Burned herself up doing it. Gentle as rain — and just as useless in a drought." She brings you water. "Be kinder to yourself this time."';
+    if(prev.ending==='THE SHEPHERD')return '"You remind me of the last one." She smiles — actually smiles. "He was good. Really good. Gave it all back in the end." She brings you water. "Big shoes."';
+    if(prev.ending==='THE ABANDONMENT')return '"You remind me of the last one." She doesn\'t look at you. "He couldn\'t decide. About anything. People left." She brings you water. "Decide something. Even if it\'s wrong."';
+    return '"First day." She\'s standing in the doorway. "He threw up on his first day. True story." She brings you water. "You\'ll be fine."';
+  }},
   {requires:()=>S.day<=3, text:'"People keep asking me what you\'re like. What kind of leader you\'ll be." She folds laundry that isn\'t hers. "I tell them you carry water without being asked. That\'s all they need to know."'},
   {requires:()=>S.flags.burial_both, text:'"He would\'ve done what Rowan wanted. Hung the body. Made the point." She\'s quiet for a moment. "I\'m glad you\'re not him."'},
   {requires:()=>S.flags.elif_in, text:'"The children are sleeping in the store room. I brought them blankets." She looks at you. "You did a good thing. A hard thing, but a good one. Those are usually the same."'},
@@ -925,7 +958,8 @@ const MAREN_DUSK=[
 function getMarenDuskLine(){
   const available=MAREN_DUSK.filter(l=>l.requires());
   if(!available.length)return null;
-  return available[(S.day*13)%available.length].text;
+  const pick=available[(S.day*13)%available.length];
+  return typeof pick.text==='function'?pick.text():pick.text;
 }
 
 // ══════════════════════════════════════
@@ -1057,11 +1091,17 @@ function updateHud(){
   // Update advisor trust display in roster
   const r=getChar('rowan'),l=getChar('lira'),e=getChar('edric');
   if(r)r.trust=S.trustRowan;if(l)l.trust=S.trustLira;if(e)e.trust=S.trustEdric;
-  // Background drift
-  const m=S.mark;
-  if(m>2)document.body.style.background=`rgb(${Math.min(40,26+m*3)},${Math.max(14,22-m)},${Math.max(10,16-m)})`;
-  else if(m<-2)document.body.style.background=`rgb(${Math.max(16,26+m)},${Math.max(16,22+m)},${Math.min(24,16-m*0.5)})`;
-  else document.body.style.background='#1a1610';
+  // Color drift — imperceptible shift with mark
+  const m=clamp(S.mark,-5,5);
+  // Fortress drift: cooler, bluer, grayer. Mercy drift: warmer, amber
+  const baseR=26,baseG=22,baseB=16;
+  const r2=Math.round(baseR + m*-0.8); // fortress=cooler(less red), mercy=warmer(more red)
+  const g2=Math.round(baseG + m*-0.6); // fortress=less green
+  const b2=Math.round(baseB + m*1.2);  // fortress=more blue, mercy=less blue
+  document.body.style.background=`rgb(${clamp(r2,14,34)},${clamp(g2,14,28)},${clamp(b2,10,28)})`;
+  // Text color drift too
+  const tr=200+Math.round(m*-3),tg=192+Math.round(m*-2),tb=176+Math.round(m*2);
+  document.body.style.color=`rgb(${clamp(tr,180,210)},${clamp(tg,178,200)},${clamp(tb,165,195)})`;
   renderAdvisors();
   updateSpirit();
   renderRoster();
@@ -1135,23 +1175,99 @@ function renderPetitions(){
     if(p.day&&p.day!==S.day)return false;
     if(p.minDay&&S.day<p.minDay)return false;
     if(p.maxDay&&S.day>p.maxDay)return false;
+    if(p.requires&&!p.requires())return false;
     return true;
   });
+  
+  // The Empty Petition — Day 15 or 16, if no petition available anyway or forced
+  if(S.day>=15&&S.day<=16&&!S.flags._empty_petition&&(avail.length===0||Math.random()<0.4)){
+    S.flags._empty_petition=true;
+    const area=document.getElementById('phase-area');
+    let h=`<div class="phase-title">Midday</div>`;
+    h+=`<div class="petition-text" style="font-style:italic;color:#887860">Nobody comes. The Hearthhouse is empty. Fire low. Your chair. The table. Edric's ledger, closed. Rowan's patrol map on the wall. Lira's herb list in a neat stack.<br><br>Just you. Just the quiet.</div>`;
+    h+=`<button class="choice-btn" onclick="endMidday()"><span>Wait.</span><span class="cost">Nothing happens. That's the point.</span></button>`;
+    h+=`<button class="choice-btn" onclick="showLedger();"><span>Read Edric's ledger.</span><span class="cost">See yourself through his eyes.</span></button>`;
+    h+=`<button class="choice-btn" onclick="endMidday()"><span>Go for a walk.</span><span class="cost">The river is silver today.</span></button>`;
+    area.innerHTML=h;
+    logEvent('A quiet day. Nobody came to the Hearthhouse.','ambient');
+    return;
+  }
+  
   if(!avail.length){renderNoPetition();return;}
   const pet=avail[0];S.usedPetitions.add(pet.id);
   soundPetition();
   if(pet.reveal)revealChars(pet.reveal);
   const area=document.getElementById('phase-area');
+  
+  // Petition fatigue — late game prose compression
+  let petText=pet.text;
+  if(S.day>=16&&pet.fatigueText)petText=pet.fatigueText;
+  
+  // Precedent quoting — modify advisor recs based on past choices
+  let recs={...pet.recs};
+  recs=addPrecedents(recs,pet.id);
+  
   let h=`<div class="phase-title">Midday — Petition</div>`;
   h+=`<div class="petition-speaker">${pet.speaker}</div>`;
-  h+=`<div class="petition-text">${pet.text.replace(/\n/g,'<br>')}</div>`;
+  h+=`<div class="petition-text">${petText.replace(/\n/g,'<br>')}</div>`;
   h+=`<div class="advisor-recs">`;
-  h+=`<div class="advisor-rec"><span class="aname">⚔️ Rowan:</span> ${pet.recs.rowan}</div>`;
-  h+=`<div class="advisor-rec"><span class="aname">🌿 Lira:</span> ${pet.recs.lira}</div>`;
-  h+=`<div class="advisor-rec"><span class="aname">📜 Edric:</span> ${pet.recs.edric}</div>`;
+  h+=`<div class="advisor-rec"><span class="aname">⚔️ Rowan:</span> ${recs.rowan}</div>`;
+  h+=`<div class="advisor-rec"><span class="aname">🌿 Lira:</span> ${recs.lira}</div>`;
+  h+=`<div class="advisor-rec"><span class="aname">📜 Edric:</span> ${recs.edric}</div>`;
   h+=`</div>`;
-  pet.choices.forEach((ch,i)=>{h+=`<button class="choice-btn" onclick="choosePetition(${i})"><span>${ch.text}</span><span class="cost">${ch.cost}</span></button>`;});
+  pet.choices.forEach((ch,i)=>{
+    if(ch.requires&&!ch.requires())return; // skip unavailable choices
+    h+=`<button class="choice-btn" onclick="choosePetition(${i})"><span>${ch.text}</span><span class="cost">${ch.cost}</span></button>`;
+  });
   area.innerHTML=h;area._currentPetition=pet;
+}
+
+// ══════════════════════════════════════
+// PRECEDENT SYSTEM — choices quote you back
+// ══════════════════════════════════════
+function addPrecedents(recs,petId){
+  const r={...recs};
+  // Thief petition — reference burial
+  if(petId==='thief'){
+    if(S.flags.burial_both)r.edric+=' <span style="color:#706050;font-style:italic">"You showed mercy to a traitor. Will you show it to a thief?"</span>';
+    if(S.flags.burial_wall)r.rowan+=' <span style="color:#706050;font-style:italic">"You hung a body from the wall. People know what kind of leader you are."</span>';
+  }
+  // Elif — reference trader
+  if(petId==='elif'){
+    if(S.flags.trader_seize)r.lira+=' <span style="color:#706050;font-style:italic">"We killed the last stranger who came to our gate."</span>';
+    if(S.flags.trader_deal||S.flags.trader_counter)r.edric+=' <span style="color:#706050;font-style:italic">"We traded fairly with Marsh. We can deal fairly with these people too."</span>';
+  }
+  // Kael — reference thief
+  if(petId==='kael'){
+    if(S.flags.thief_exile)r.lira+=' <span style="color:#706050;font-style:italic">"You exiled a man for stealing bread. Now someone speaks and you want to silence them too?"</span>';
+    if(S.flags.thief_fix)r.edric+=' <span style="color:#706050;font-style:italic">"You reformed the rations when Declan stole. Perhaps Kael deserves the same hearing."</span>';
+  }
+  // Deserter — reference elif
+  if(petId==='deserter'){
+    if(S.flags.elif_in)r.lira+=' <span style="color:#706050;font-style:italic">"You took in Elif. You took in her children. This man walked further and suffered more."</span>';
+    if(S.flags.elif_deny)r.rowan+=' <span style="color:#706050;font-style:italic">"You turned away families with children. Now you\'re considering a Reach soldier?"</span>';
+  }
+  // Pacifists — reference raid
+  if(petId==='pacifists'){
+    if(S.flags.raid_strike)r.rowan+=' <span style="color:#706050;font-style:italic">"We just lost people hitting the Reach. And now you want to take in people who won\'t fight?"</span>';
+    if(S.flags.raid_rebuild)r.lira+=' <span style="color:#706050;font-style:italic">"You chose not to retaliate. These people chose the same. Can you blame them?"</span>';
+  }
+  // Winter — reference school
+  if(petId==='winter'){
+    if(S.flags.school_open)r.edric+=' <span style="color:#706050;font-style:italic">"We committed workers to a school. Now we\'re rationing. Every choice has a cost."</span>';
+  }
+  // Power — reference trial + kael
+  if(petId==='power'){
+    if(S.flags.trial_accept)r.edric+=' <span style="color:#706050;font-style:italic">"You gave them trials. This is the next step. Or was that as far as you meant to go?"</span>';
+    if(S.flags.kael_arrest)r.rowan+=' <span style="color:#706050;font-style:italic">"You arrested the man who wanted shared power. Now you\'re considering it yourself?"</span>';
+    if(S.flags.trial_self)r.lira+=' <span style="color:#706050;font-style:italic">"You stood trial. You survived it. You know what it costs. This costs more."</span>';
+  }
+  // Envoy — reference raid
+  if(petId==='envoy'){
+    if(S.flags.raid_strike)r.rowan+=' <span style="color:#706050;font-style:italic">"We already drew blood. They know we\'ll fight."</span>';
+    if(S.flags.raid_talk)r.lira+=' <span style="color:#706050;font-style:italic">"We sent a white flag once. This is different — they\'re offering terms."</span>';
+  }
+  return r;
 }
 
 function renderNoPetition(){
@@ -1338,6 +1454,7 @@ function showEnding(){
   document.getElementById('sidebar').style.display='none';
   document.getElementById('left-panel').style.display='none';
   if(settlementRAF)cancelAnimationFrame(settlementRAF);
+  savePrevRun();
   const end=document.getElementById('end-screen');end.style.display='block';
   const m=S.mark;let title,name,wren;
   if(S.gameOver&&S.food<=0){title='Brannhaven fell.';name='THE FAMINE';wren='Wren isn\'t here. You don\'t know where she went.';}
@@ -1402,6 +1519,9 @@ function startGame(){
 
 // Init roster on load
 renderRoster();
+
+// New Game+ title screen hint
+(function(){const p=getPrevRun();if(p){const el=document.getElementById('ng-plus');if(el)el.textContent='Maren remembers the last one.';}})();
 
 // ══════════════════════════════════════
 // ADVISOR MOODS (sidebar)
@@ -1586,6 +1706,30 @@ function paintSettlement(){
   }
   if(S.ambientsSeen.has('elif_girl_wall')){
     ctx.fillStyle='rgba(200,160,80,0.25)';ctx.fillRect(115,wallY+8,2,5);ctx.fillRect(120,wallY+8,2,5);
+  }
+  // Wren's drawings — reactive to mark
+  if(getChar('wren')?.visible&&S.day>=4){
+    ctx.globalAlpha=0.25;
+    if(S.mark<0){
+      // Merciful: gate drawn open, sun, flowers
+      ctx.fillStyle='#c8a060';
+      ctx.fillRect(55,wallY+14,8,10); // open gate shape
+      ctx.fillRect(57,wallY+12,4,2); // arch
+      ctx.fillStyle='#90b080';
+      ctx.fillRect(50,wallY+22,2,3);ctx.fillRect(65,wallY+22,2,3); // tiny flowers
+    }else if(S.mark>1){
+      // Fortress: tall walls, guards, closed gate
+      ctx.fillStyle='#8090a0';
+      ctx.fillRect(55,wallY+10,2,14); // tall line
+      ctx.fillRect(60,wallY+10,2,14);
+      ctx.fillRect(55,wallY+24,8,1); // bottom bar (closed)
+    }else{
+      // Neutral: a house with a triangle roof
+      ctx.fillStyle='#c8a060';
+      ctx.fillRect(56,wallY+16,6,6); // house
+      ctx.beginPath();ctx.moveTo(55,wallY+16);ctx.lineTo(59,wallY+12);ctx.lineTo(63,wallY+16);ctx.fill();
+    }
+    ctx.globalAlpha=1.0;
   }
   // Thornfield garden
   if(S.flags.pacifist_accept){
