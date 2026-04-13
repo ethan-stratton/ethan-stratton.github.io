@@ -52,6 +52,8 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 .fmt-slot .key{font-size:0.55rem;color:#6a6248;font-family:'Inter',sans-serif;letter-spacing:0.04em}
 .fmt-slot .name{font-size:0.5rem;color:#8a7a50;font-family:'Cinzel',serif;letter-spacing:0.05em;margin-top:1px}
 .fmt-slot.active .key,.fmt-slot.active .name{color:#c8a040}
+.fmt-desc{font-size:0.4rem;color:#5a5238;display:none;margin-top:1px}
+.fmt-slot.active .fmt-desc{display:block}
 #terrain-indicator{position:fixed;bottom:14px;left:14px;z-index:5;pointer-events:none;display:none}
 .terrain-name{font-size:0.65rem;font-family:'Inter',sans-serif;letter-spacing:0.06em;transition:color 0.3s}
 
@@ -69,6 +71,20 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 /* ── Callout ── */
 #callout{position:fixed;top:45px;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;text-align:center;opacity:0;transition:opacity 0.4s;max-width:400px}
 #callout .callout-text{font-size:0.65rem;color:#c8a040;font-family:'Cinzel',serif;letter-spacing:0.04em;background:rgba(10,10,6,0.8);padding:6px 16px;border:1px solid rgba(200,160,64,0.15);border-radius:2px;line-height:1.4}
+
+/* ── Camp overlay ── */
+#camp-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,6,0.95);z-index:18;display:none;flex-direction:column;align-items:center;justify-content:center}
+#camp-overlay h2{font-family:'Cinzel',serif;font-size:1.5rem;color:#c8a040;letter-spacing:0.1em;margin-bottom:8px}
+#camp-overlay .camp-sub{font-size:0.65rem;color:#5a5238;margin-bottom:20px;font-style:italic}
+.camp-btn{display:block;width:320px;text-align:left;font-size:0.7rem;padding:8px 12px;margin:4px 0;border:1px solid rgba(200,160,64,0.15);background:rgba(20,20,12,0.8);color:#a89868;font-family:'Inter',sans-serif;cursor:pointer;border-radius:2px;transition:all 0.2s}
+.camp-btn:hover{border-color:rgba(200,160,64,0.4);background:rgba(200,160,64,0.05)}
+.camp-btn:disabled{opacity:0.4;cursor:default}
+.camp-btn .camp-flavor{font-size:0.55rem;color:#5a5238;margin-top:4px;font-style:italic}
+
+/* ── Morale bar ── */
+#morale-bar-wrap{width:120px;height:6px;background:#2a2a1a;border:1px solid #4a4230;border-radius:2px;margin-bottom:2px;margin-top:2px}
+#morale-fill{width:70%;height:100%;border-radius:1px;transition:width 0.5s,background 0.5s;background:#6a8a3a}
+#morale-desc{font-size:0.55rem;color:#6a6248;margin-bottom:4px}
 
 /* ── Headcount overlay ── */
 #headcount-overlay{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:15;display:none;background:rgba(10,10,6,0.92);border:1px solid rgba(200,160,64,0.15);border-radius:4px;padding:16px 24px;min-width:200px;font-family:'Inter',sans-serif}
@@ -173,6 +189,9 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
   <div id="army-count">40 soldiers</div>
   <div id="scout-count" style="display:none"></div>
   <div id="ally-count" style="display:none"></div>
+  <div class="label">Morale</div>
+  <div id="morale-bar-wrap"><div id="morale-fill"></div></div>
+  <div id="morale-desc">Confident</div>
   <div class="sep"></div>
   <div id="concealment-status" style="display:none;font-size:0.6rem"></div>
   <div class="sep"></div>
@@ -184,11 +203,11 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 
 <div id="formation-bar">
   <div class="fmt-group">
-    <div class="fmt-slot active" id="fmt-1"><div class="key">1</div><div class="name">Circle</div></div>
-    <div class="fmt-slot" id="fmt-2"><div class="key">2</div><div class="name">Wedge</div></div>
-    <div class="fmt-slot" id="fmt-3"><div class="key">3</div><div class="name">Column</div></div>
-    <div class="fmt-slot" id="fmt-4"><div class="key">4</div><div class="name">Line</div></div>
-    <div class="fmt-slot" id="fmt-5"><div class="key">5</div><div class="name">Travel</div></div>
+    <div class="fmt-slot active" id="fmt-1"><div class="key">1</div><div class="name">Circle</div><div class="fmt-desc">🛡 Defensive hold</div></div>
+    <div class="fmt-slot" id="fmt-2"><div class="key">2</div><div class="name">Wedge</div><div class="fmt-desc">⚔ Charge bonus</div></div>
+    <div class="fmt-slot" id="fmt-3"><div class="key">3</div><div class="name">Column</div><div class="fmt-desc">🏃 Fast march</div></div>
+    <div class="fmt-slot" id="fmt-4"><div class="key">4</div><div class="name">Line</div><div class="fmt-desc">🔰 Shield wall</div></div>
+    <div class="fmt-slot" id="fmt-5"><div class="key">5</div><div class="name">Travel</div><div class="fmt-desc">💨 Fastest</div></div>
   </div>
 </div>
 
@@ -223,6 +242,16 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
   <h2 style="font-family:'Cinzel',serif;font-size:1.5rem;color:#c8a040;letter-spacing:0.1em;margin-bottom:16px">Paused</h2>
   <button class="mercy-btn" onclick="togglePause()">Resume</button>
   <button class="mercy-btn" style="margin-top:8px" onclick="returnToTimeline()">Quit to Timeline</button>
+</div>
+
+<div id="camp-overlay">
+  <h2>⛺ Camp</h2>
+  <div class="camp-sub">Prepare your forces before the mission</div>
+  <button class="camp-btn" id="camp-armor" onclick="campArmor()">🛡 Equip Armor<div class="camp-flavor" id="camp-armor-flavor"></div></button>
+  <button class="camp-btn" id="camp-pray" onclick="campPray()">🙏 Pray &amp; Preach<div class="camp-flavor" id="camp-pray-flavor"></div></button>
+  <button class="camp-btn" id="camp-intel" onclick="campIntel()">🔭 Review Intelligence<div class="camp-flavor" id="camp-intel-flavor"></div></button>
+  <button class="camp-btn" id="camp-council" onclick="campCouncil()">⚔ War Council<div class="camp-flavor" id="camp-council-flavor"></div></button>
+  <button class="camp-btn" style="margin-top:16px;text-align:center;color:#c8a040;border-color:rgba(200,160,64,0.3)" onclick="campBegin()">▸ Begin Mission</button>
 </div>
 
 <script>
@@ -333,6 +362,11 @@ const S={
   // Timers for delayed feedback
   _positionReminderTimer:0,
   _waitReminderTimer:0,
+  // Formation combat
+  formationChangeTime:0,
+  campArmor:false,
+  _travelScatter:false,
+  _travelScatterTimer:0,
 };
 
 // ══════════════════════════════════════
@@ -428,7 +462,7 @@ function makeUnit(x,y,team){
     armored:team==='nephite',barkTimer:0,sweatTimer:0,
     circleAngle:0,circleRing:0,
     state:'idle',aggroRange:80,spotted:false,
-    waypointIdx:0,isLehi:false,
+    waypointIdx:0,isLehi:false,facing:0,
     // Scout state
     scoutFacing:0,returning:false,scoutImmunity:0,scoutWaypoints:null,scoutWpIdx:0,
   };
@@ -751,6 +785,15 @@ function doHeadcount(){
   if(allyAlive>0)html+=`<div class="hc-row">Lehi's force: <span>~${allyAlive}</span></div>`;
   html+=`<div class="hc-row" style="margin-top:6px">Enemy spotted: <span>${enemySpotted>0?'~'+enemySpotted:'unknown'}</span></div>`;
   if(enemyDead>0)html+=`<div class="hc-row">Enemy dead: <span>${enemyDead}</span></div>`;
+  const alive2=S.soldiers.filter(s=>!s.dead);
+  const avgMorale2=alive2.length?alive2.reduce((s,u)=>s+u.morale,0)/alive2.length:0;
+  let vibe='';
+  if(avgMorale2>85)vibe='🔥 Your men are fired up. They\'re ready to charge through a wall.';
+  else if(avgMorale2>65)vibe='💪 Spirits are good. The men trust your command.';
+  else if(avgMorale2>45)vibe='😐 The men are holding steady, but there\'s tension in the ranks.';
+  else if(avgMorale2>25)vibe='😰 You can see fear in their eyes. Some are whispering about retreat.';
+  else vibe='💀 The army is on the verge of breaking. One more blow could shatter them.';
+  html+=`<div class="hc-row" style="margin-top:8px;color:#a89868;font-style:italic">${vibe}</div>`;
   document.getElementById('hc-body').innerHTML=html;
 }
 document.getElementById('headcount-overlay').addEventListener('click',()=>{doHeadcount();});
@@ -820,9 +863,12 @@ function update(dt){
   }
 
   if(S.rallying){S.rallyTimer-=dt;if(S.rallyTimer<=0)S.rallying=false;
-    S.soldiers.forEach(s=>{if(!s.dead){s.morale=Math.min(100,s.morale+dt*20);s.fleeing=false;}});
+    S.soldiers.forEach(s=>{if(!s.dead){s.morale=Math.min(100,Math.max(s.morale,40));s.fleeing=false;s.state='idle';}});
     S.faith=Math.min(100,S.faith+dt*2);
   }
+
+  // Travel scatter recovery
+  if(S._travelScatter){S._travelScatterTimer-=dt;if(S._travelScatterTimer<=0){S._travelScatter=false;S.soldiers.forEach(s=>{if(!s.dead)s.fleeing=false;});}}
 
   // ── Soldiers ──
   const alive=S.soldiers.filter(s=>!s.dead);
@@ -842,6 +888,7 @@ function update(dt){
       if(!wp){e.state='idle';return;}
       const ddx=wp.x-e.x+((e.id%7)-3)*2,ddy=wp.y-e.y+((e.id%5)-2)*2;
       const d=Math.sqrt(ddx*ddx+ddy*ddy);
+      if(d>2)e.facing=Math.atan2(ddy,ddx);
       if(d<18){e.waypointIdx++;return;}
       const ts=terrainSpeed(e.x,e.y);
       e.x+=ddx/d*e.speed*ts*dt;e.y+=ddy/d*e.speed*ts*dt;
@@ -862,6 +909,7 @@ function update(dt){
     if(target){
       const ddx=target.x-e.x,ddy=target.y-e.y;
       const d=Math.sqrt(ddx*ddx+ddy*ddy);
+      if(d>2)e.facing=Math.atan2(ddy,ddx);
       if(d<20){doCombat(e,target,dt);}
       else{moveToward(e,target.x,target.y,e.speed,dt);}
     }
@@ -1002,12 +1050,39 @@ function update(dt){
 // SOLDIER MOVEMENT
 // ══════════════════════════════════════
 function moveSoldierToTarget(s,dt){
+  // Scatter recovery
+  if(s._scatterTimer>0){s._scatterTimer-=dt;if(s._scatterTimer<=0)s.fleeing=false;}
+  if(s.fleeing&&s._scatterTimer>0){
+    const ne=findNearest(s.x,s.y,200,S.enemies);
+    if(ne){const fx=s.x-ne.x,fy=s.y-ne.y,fl=Math.sqrt(fx*fx+fy*fy)||1;s.x+=fx/fl*s.speed*dt;s.y+=fy/fl*s.speed*dt;}
+    return;
+  }
   let ddx=s.tx-s.x,ddy=s.ty-s.y;
   let dist=Math.sqrt(ddx*ddx+ddy*ddy);
   s.barkTimer=Math.max(0,s.barkTimer-dt);
   if(s.sweatTimer>0)s.sweatTimer-=dt;
+  // Update facing based on movement
+  if(dist>2)s.facing=Math.atan2(ddy,ddx);
   if(dist<1.5){s.vx*=0.5;s.vy*=0.5;return;}
-  const ts=terrainSpeed(s.x,s.y);
+  let ts=terrainSpeed(s.x,s.y);
+  // Formation speed modifiers
+  if(S.formation==='circle')ts*=0.7;
+  else if(S.formation==='column')ts*=1.2;
+  else if(S.formation==='travel')ts*=1.3;
+  // Morale speed penalty
+  if(s.morale<30)ts*=0.8;
+  // Morale pre-rout drift
+  if(s.morale<15&&!s.fleeing){
+    const ne=findNearest(s.x,s.y,80,S.enemies);
+    if(ne){const fx=s.x-ne.x,fy=s.y-ne.y,fl=Math.sqrt(fx*fx+fy*fy)||1;ddx+=fx/fl*15;ddy+=fy/fl*15;dist=Math.sqrt(ddx*ddx+ddy*ddy);}
+  }
+  // Morale rout
+  if(s.morale<=0&&!s.fleeing){s.fleeing=true;s.state='rout';}
+  if(s.fleeing&&!s._scatterTimer){
+    const ne=findNearest(s.x,s.y,200,S.enemies);
+    if(ne){const fx=s.x-ne.x,fy=s.y-ne.y,fl=Math.sqrt(fx*fx+fy*fy)||1;s.x+=fx/fl*s.speed*1.2*dt;s.y+=fy/fl*s.speed*1.2*dt;}
+    return;
+  }
   // Sweat when wading through river
   if(inRiver(s.x,s.y)&&s.sweatTimer<=0)s.sweatTimer=1.5;
   let maxSpd,accel;
@@ -1037,10 +1112,64 @@ function findNearest(x,y,range,list){
 function doCombat(atk,def,dt){
   atk.attackCd-=dt;if(atk.attackCd>0)return;
   atk.attackCd=0.8+Math.random()*0.4;
-  const dmg=atk.team==='nephite'?1:0.6;
+  let dmg=atk.team==='nephite'?1:0.6;
+  let defMult=1; // multiplier on damage taken by defender
+
+  // ── Flanking & Facing ──
+  const atkAngle=Math.atan2(atk.y-def.y,atk.x-def.x);
+  const defFacing=def.team==='nephite'?S.facing:def.facing;
+  let angleDiff=Math.abs(atkAngle-defFacing);
+  if(angleDiff>Math.PI)angleDiff=2*Math.PI-angleDiff;
+  let flankZone='front';
+  if(angleDiff>Math.PI*2/3){flankZone='rear';defMult*=1.8;def.morale-=15;def._flankedTimer=1.5;}
+  else if(angleDiff>Math.PI/3){flankZone='side';defMult*=1.3;}
+
+  // ── Formation Combat Bonuses ──
+  if(def.team==='nephite'&&!def.isLehi){
+    const fm=S.formation;
+    if(fm==='circle'){defMult*=0.6;} // circle: no facing weakness override
+    if(fm==='wedge'&&flankZone!=='front')defMult*=1.3;
+    if(fm==='line'){
+      // front row = lower index soldiers
+      const idx=S.soldiers.indexOf(def);
+      const alive=S.soldiers.filter(s=>!s.dead).length;
+      const frontRow=idx<Math.ceil(alive/2);
+      if(frontRow)defMult*=0.7;
+      if(flankZone!=='front')defMult*=1.5;
+    }
+    if(fm==='column')defMult*=1.4;
+    // circle overrides facing weakness
+    if(fm==='circle'){angleDiff=0;flankZone='front';}
+  }
+  if(atk.team==='nephite'&&!atk.isLehi){
+    const fm=S.formation;
+    if(fm==='wedge'){
+      const elapsed=S.time-S.formationChangeTime;
+      if(elapsed<3){
+        const idx=S.soldiers.indexOf(atk);
+        const alive=S.soldiers.filter(s=>!s.dead).length;
+        if(idx<Math.ceil(alive/3))dmg*=2;
+      }
+    }
+  }
+
+  // ── Terrain Combat ──
+  if(onHill(def.x,def.y)){defMult*=0.75;dmg*=1.1;}
+  if(onHill(atk.x,atk.y)&&!onHill(def.x,def.y))dmg*=1.3; // downhill charge
+  if(inTrees(def.x,def.y)){defMult*=0.8;dmg*=0.9;}
+  if(inRiver(def.x,def.y)){defMult*=1.3;dmg*=0.8;}
+  if(inTrees(atk.x,atk.y))dmg*=0.9;
+  if(inRiver(atk.x,atk.y))dmg*=0.8;
+
+  // ── Travel scatter ──
+  if(def.team==='nephite'&&S.formation==='travel'&&!S._travelScatter){
+    S._travelScatter=true;S._travelScatterTimer=2;
+    S.soldiers.forEach(s=>{if(!s.dead){s.fleeing=true;s._scatterTimer=1.5;}});
+  }
+
   const blocked=def.armored&&Math.random()<0.3;
   if(!blocked){
-    def.hp-=dmg;def.morale-=8;
+    def.hp-=dmg*defMult;def.morale-=8;
     if(def.hp<=0){
       def.dead=true;
       const allies=def.team==='nephite'?S.soldiers.concat(S.allies):S.enemies;
@@ -1072,6 +1201,20 @@ function updateHtmlHud(){
   const alEl=document.getElementById('ally-count');
   const alAlive=S.allies.filter(a=>!a.dead).length;
   if(alAlive>0){alEl.style.display='block';alEl.textContent='⚔ '+alAlive+' allies (Lehi)';}else if(S.lehiAttacking){alEl.style.display='block';alEl.textContent='⚔ Lehi\'s force: wiped';}else{alEl.style.display='none';}
+
+  // Morale bar
+  const aliveS=S.soldiers.filter(s=>!s.dead);
+  const avgMorale=aliveS.length?aliveS.reduce((s,u)=>s+u.morale,0)/aliveS.length:0;
+  const mFill=document.getElementById('morale-fill');
+  mFill.style.width=Math.max(0,Math.min(100,avgMorale))+'%';
+  mFill.style.background=avgMorale>70?'#6a8a3a':avgMorale>40?'#a89840':'#aa4030';
+  const mDesc=document.getElementById('morale-desc');
+  if(avgMorale>90)mDesc.textContent='Zealous';
+  else if(avgMorale>70)mDesc.textContent='Confident';
+  else if(avgMorale>50)mDesc.textContent='Steady';
+  else if(avgMorale>35)mDesc.textContent='Uneasy';
+  else if(avgMorale>20)mDesc.textContent='Skittish';
+  else mDesc.textContent='Breaking';
 
   const t=terrainName(S.cx,S.cy);
   const tn=document.getElementById('terrain-name');
@@ -1208,6 +1351,7 @@ function returnToTimeline(){
   document.getElementById('epilogue').style.display='none';
   document.getElementById('return-btn').style.display='none';
   document.getElementById('pause-overlay').style.display='none';
+  document.getElementById('camp-overlay').style.display='none';
   document.getElementById('title-screen').style.display='flex';
   document.getElementById('hud').style.display='none';
   document.getElementById('mission-text').style.display='none';
@@ -1251,6 +1395,12 @@ function render(){
     if(s.armored){ctx.fillStyle='rgba(200,180,120,0.3)';ctx.fillRect(Math.floor(s.x),Math.floor(s.y-2),1,1);}
     if(s.hp<s.maxHp){ctx.fillStyle='rgba(200,180,60,0.6)';ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-4),Math.ceil(2*(s.hp/s.maxHp)),1);}
     if(s.barkTimer>0){const bA=Math.min(1,s.barkTimer*2);ctx.fillStyle=`rgba(255,220,80,${bA})`;ctx.fillRect(Math.floor(s.x),Math.floor(s.y-7),1,3);ctx.fillRect(Math.floor(s.x),Math.floor(s.y-3),1,1);}
+    // Flanked bark
+    if(s._flankedTimer>0){s._flankedTimer-=1/60;const fa=Math.min(1,s._flankedTimer);ctx.fillStyle=`rgba(255,80,40,${fa})`;ctx.font='3px Inter';ctx.fillText('⚔',Math.floor(s.x-3),Math.floor(s.y-8));}
+    // Morale visual tells
+    if(s.morale>80&&Math.random()<0.003){s.barkTimer=0.8;}
+    if(s.morale<30&&s.barkTimer<=0&&Math.random()<0.005){ctx.fillStyle='rgba(180,160,120,0.5)';ctx.font='3px Inter';ctx.fillText('…',Math.floor(s.x-2),Math.floor(s.y-6));}
+    if(s.morale<50&&s.morale>30){const shake=Math.sin(S.time*15+s.bobPhase)*0.3;ctx.fillStyle=`rgb(${b},${g},${bl})`;ctx.fillRect(Math.floor(s.x-1+shake),Math.floor(s.y),1,1);}
     // Sweat droplet — only when wading through river
     if(s.sweatTimer>0&&inRiver(s.x,s.y)){
       const sa=Math.min(1,s.sweatTimer*0.8);
@@ -1470,9 +1620,30 @@ function gameLoop(t){
   requestAnimationFrame(gameLoop);
 }
 
-function beginMission(idx){
-  if(idx!==0)return; // only mission 1 playable
-  document.getElementById('title-screen').style.display='none';
+// ══════════════════════════════════════
+// CAMP
+// ══════════════════════════════════════
+function campArmor(){
+  S.campArmor=true;
+  document.getElementById('camp-armor-flavor').textContent='Your men don their breastplates, arm-shields, and head-plates. (Alma 43:19)';
+  document.getElementById('camp-armor').disabled=true;document.getElementById('camp-armor').style.opacity='0.4';
+}
+function campPray(){
+  S.faith=Math.min(100,S.faith+15);
+  S.soldiers.forEach(s=>{if(!s.dead)s.morale=Math.min(100,s.morale+10);});
+  document.getElementById('camp-pray-flavor').textContent='You gather the men and pray. Their faith strengthens. (+15 Faith, +10 Morale)';
+  document.getElementById('camp-pray').disabled=true;document.getElementById('camp-pray').style.opacity='0.4';
+}
+function campIntel(){
+  document.getElementById('camp-intel-flavor').textContent='Scouts report ~80 Lamanite warriors west of the river, moving east. Led by Zerahemnah. They carry no armor — only swords and scimitars.';
+  document.getElementById('camp-intel').disabled=true;document.getElementById('camp-intel').style.opacity='0.4';
+}
+function campCouncil(){
+  document.getElementById('camp-council-flavor').textContent='Captain Lehi nods. "My men will hold the northern wilderness. When you spring the trap, we\'ll cut off their retreat." He clasps your arm. "God be with you, brother."';
+  document.getElementById('camp-council').disabled=true;document.getElementById('camp-council').style.opacity='0.4';
+}
+function campBegin(){
+  document.getElementById('camp-overlay').style.display='none';
   document.getElementById('hud').style.display='block';
   document.getElementById('formation-bar').style.display='block';
   document.getElementById('terrain-indicator').style.display='block';
@@ -1481,6 +1652,17 @@ function beginMission(idx){
   spawnLehi();
   S.phase='briefing';
   showStory(BRIEFING);
+}
+
+function beginMission(idx){
+  if(idx!==0)return;
+  document.getElementById('title-screen').style.display='none';
+  // Reset camp buttons
+  ['camp-armor','camp-pray','camp-intel','camp-council'].forEach(id=>{
+    const el=document.getElementById(id);if(el){el.disabled=false;el.style.opacity='1';}
+    const fl=document.getElementById(id+'-flavor');if(fl)fl.textContent='';
+  });
+  document.getElementById('camp-overlay').style.display='flex';
 }
 
 function resize(){
