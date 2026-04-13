@@ -325,7 +325,7 @@ const S={
   formation:'circle',faith:70,
   rallying:false,rallyTimer:0,
   time:0,camX:0,camY:0,
-  enemies:[],scouts:[],allies:[],
+  enemies:[],scouts:[],allies:[],messengers:[],
   deadSoldiers:0,deadAllies:0,totalLamanites:0,
   knownEnemies:new Map(),nextId:0,
   // Mission phases: briefing → scout → position → wait → battle → surround → results
@@ -516,8 +516,9 @@ function getFormationTarget(soldier,idx,total,formation){
     return{x:(col-(rc-1)/2)*7,y:(maxR-row)*7,ws:false};
   }
   if(formation==='column'){
-    const half=Math.floor(total/2),rel=idx-half,col=(idx%3)-1;
-    return{x:col*6,y:-rel*4,ws:false};
+    // Fixed world-relative positions — don't flip when facing changes
+    const col=(idx%3)-1;const row=Math.floor(idx/3);
+    return{x:col*6,y:row*5-(Math.floor(total/3)*5/2),ws:true};
   }
   if(formation==='line'){return{x:(idx-total/2)*5,y:0,ws:false};}
   if(formation==='travel'){
@@ -785,7 +786,17 @@ function update(dt){
   S.moving=dx!==0||dy!==0;
   if(S.moving){
     const len=Math.sqrt(dx*dx+dy*dy);dx/=len;dy/=len;
+    const prevFacing=S.facing;
     S.facing=Math.atan2(dy,dx);
+    // Spawn messengers on significant direction change in column formation
+    const facingDelta=Math.abs(S.facing-prevFacing);
+    if(facingDelta>0.8&&S.formation==='column'&&S.messengers.length<2){
+      // Send 2 messengers: one forward, one back along the column
+      const total=S.soldiers.filter(s=>!s.dead).length;
+      const frontY=-(Math.floor(total/3)*5/2),backY=Math.floor(total/3)*5/2;
+      S.messengers.push({x:S.cx,y:S.cy,tx:S.cx,ty:S.cy+frontY*1.5,progress:0,speed:3});
+      S.messengers.push({x:S.cx,y:S.cy,tx:S.cx,ty:S.cy+backY*1.5,progress:0,speed:3});
+    }
     const ts=terrainSpeed(S.cx,S.cy);
     const spd=S.speed*ts*(S.rallying?0.7:1);
     let nx=S.cx+dx*spd*dt,ny=S.cy+dy*spd*dt;
@@ -860,6 +871,15 @@ function update(dt){
       moveToward(a,a.tx,a.ty,a.speed,dt);
     }
     if(a.morale<=0){a.dead=true;S.deadAllies++;}
+  });
+
+  // ── Messengers ──
+  S.messengers=S.messengers.filter(m=>{
+    m.progress+=dt*m.speed;
+    const t=Math.min(1,m.progress);
+    m.cx=m.x+(m.tx-m.x)*t;m.cy=m.y+(m.ty-m.y)*t;
+    if(t>=1)return false; // done
+    return true;
   });
 
   // ── Scouts & Retrievers ──
@@ -980,7 +1000,7 @@ function moveSoldierToTarget(s,dt){
     ty=FORD_Y;
     if(Math.abs(s.y-FORD_Y)<FORD_HALF_H+4&&Math.abs(s.x-tx)<10){
       s._crossState=2;
-      s._sweating=true;s.sweatTimer=2.5;
+      s.sweatTimer=2.5;
     }
   }else if(s._crossState===2){
     // Phase 2: move through ford to other side
@@ -988,17 +1008,16 @@ function moveSoldierToTarget(s,dt){
     ty=FORD_Y;
     const exitRx=riverX(FORD_Y);
     const crossed=targetEast?(s.x>exitRx+RIVER_HALF_W+4):(s.x<exitRx-RIVER_HALF_W-4);
-    if(crossed)s._crossState=3;
+    if(crossed){s._crossState=3;s.sweatTimer=0;}
   }else if(s._crossState===3){
-    // Phase 3: crossed — resume original target, clear state
-    s._crossState=0;s._sweating=false;
+    s._crossState=0;
   }
 
   let ddx=tx-s.x,ddy=ty-s.y;
   let dist=Math.sqrt(ddx*ddx+ddy*ddy);
   s.barkTimer=Math.max(0,s.barkTimer-dt);
   if(s.sweatTimer>0)s.sweatTimer-=dt;
-  if(dist<1.5&&s._crossState===0){s.vx*=0.5;s.vy*=0.5;s._sweating=false;return;}
+  if(dist<1.5&&s._crossState===0){s.vx*=0.5;s.vy*=0.5;return;}
   const ts=terrainSpeed(s.x,s.y);
   let maxSpd,accel;
   if(S.rallying){maxSpd=S.speed*ts*0.95;accel=400*dt;}
@@ -1015,7 +1034,7 @@ function moveSoldierToTarget(s,dt){
     // Hard push to ford center
     const fx=fordCenterX-s.x,fy=FORD_Y-s.y;const fl=Math.sqrt(fx*fx+fy*fy)||1;
     s.vx=fx/fl*s.speed*0.9;s.vy=fy/fl*s.speed*0.9;
-    if(!s._sweating){s._sweating=true;s.sweatTimer=1.5;}
+    if(!s._sweating&&s._crossState===2){s.sweatTimer=1.5;}
     return;
   }
   s.x=Math.max(4,Math.min(MAP.w-4,nx));s.y=Math.max(4,Math.min(MAP.h-4,ny));
@@ -1168,19 +1187,18 @@ function render(){
     if(s.armored){ctx.fillStyle='rgba(200,180,120,0.3)';ctx.fillRect(Math.floor(s.x),Math.floor(s.y-2),1,1);}
     if(s.hp<s.maxHp){ctx.fillStyle='rgba(200,180,60,0.6)';ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-4),Math.ceil(2*(s.hp/s.maxHp)),1);}
     if(s.barkTimer>0){const bA=Math.min(1,s.barkTimer*2);ctx.fillStyle=`rgba(255,220,80,${bA})`;ctx.fillRect(Math.floor(s.x),Math.floor(s.y-7),1,3);ctx.fillRect(Math.floor(s.x),Math.floor(s.y-3),1,1);}
-    // Sweat droplet (ford squeeze) — left side, blinking
-    if(s.sweatTimer>0){
-      const sa=Math.min(1,s.sweatTimer);
-      const blink=Math.sin(S.time*8+s.bobPhase)>0; // blink on/off
+    // Sweat droplet (ford squeeze only) — left side, blinking
+    if(s.sweatTimer>0&&s._crossState===2){
+      const sa=Math.min(1,s.sweatTimer*0.8);
+      const blink=Math.sin(S.time*6+s.bobPhase)>-0.3;
       if(blink){
-        const sy2=s.y-8-Math.abs(Math.sin(S.time*3+s.bobPhase))*2;
-        // Big drop (left of head)
-        ctx.fillStyle=`rgba(100,200,240,${sa*0.9})`;
-        ctx.fillRect(Math.floor(s.x-3),Math.floor(sy2),1,2);
-        ctx.fillRect(Math.floor(s.x-4),Math.floor(sy2+1),1,1);
-        // Small drop
-        ctx.fillStyle=`rgba(100,200,240,${sa*0.6})`;
-        ctx.fillRect(Math.floor(s.x-2),Math.floor(sy2+3),1,1);
+        const drop=Math.abs(Math.sin(S.time*4+s.bobPhase))*1.5;
+        const sx=Math.floor(s.x-3),sy0=Math.floor(s.y-9-drop);
+        // Teardrop shape: narrow top, wider bottom
+        ctx.fillStyle=`rgba(140,210,255,${sa})`;
+        ctx.fillRect(sx,sy0,1,1);     // top point
+        ctx.fillRect(sx-1,sy0+1,2,1); // wider middle
+        ctx.fillRect(sx,sy0+2,1,1);   // bottom
       }
     }
   });
@@ -1199,6 +1217,14 @@ function render(){
       if(sc.returning){ctx.fillStyle='rgba(200,200,100,0.4)';ctx.fillRect(Math.floor(sc.x-1),Math.floor(sc.y-6),1,1);ctx.fillRect(Math.floor(sc.x+1),Math.floor(sc.y-6),1,1);}
     }
     ctx.strokeStyle='rgba(120,160,80,0.04)';ctx.lineWidth=0.3;ctx.beginPath();ctx.arc(sc.x,sc.y,VISION_RANGE*1.8,0,Math.PI*2);ctx.stroke();
+  });
+
+  // Messengers (small gold dots running along column)
+  S.messengers.forEach(m=>{
+    ctx.fillStyle='rgba(200,180,80,0.8)';
+    ctx.fillRect(Math.floor(m.cx),Math.floor(m.cy),1,2);
+    ctx.fillStyle='rgba(255,220,100,0.5)';
+    ctx.fillRect(Math.floor(m.cx),Math.floor(m.cy-1),1,1);
   });
 
   // Commander
