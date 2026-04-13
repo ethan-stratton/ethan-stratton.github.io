@@ -39,8 +39,8 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 .cmd-btn{display:inline-block;padding:3px 8px;margin-right:3px;margin-top:4px;font-size:0.55rem;font-family:'Cinzel',serif;color:#6a6248;letter-spacing:0.04em;background:rgba(10,10,6,0.5);border:1px solid rgba(200,160,64,0.1);border-radius:2px;cursor:pointer;transition:all 0.2s;text-align:left}
 .cmd-btn:hover{border-color:rgba(200,160,64,0.3);color:#a89868}
 .cmd-btn .hotkey{color:#4a4230;font-family:'Inter',sans-serif;font-size:0.5rem}
-.bar-group{display:flex;flex-wrap:wrap;gap:2px;margin:3px 0 2px}
-.bar-opt{padding:2px 6px;font-size:0.5rem;font-family:'Inter',sans-serif;color:#5a5238;background:rgba(10,10,6,0.4);border:1px solid rgba(200,160,64,0.08);border-radius:2px;cursor:pointer;transition:all 0.15s;user-select:none}
+.bar-group{display:flex;flex-direction:column;gap:2px;margin:3px 0 2px}
+.bar-opt{padding:2px 6px;font-size:0.5rem;font-family:'Inter',sans-serif;color:#5a5238;background:rgba(10,10,6,0.4);border:1px solid rgba(200,160,64,0.08);border-radius:2px;cursor:pointer;transition:all 0.15s;user-select:none;width:fit-content}
 .bar-opt:hover{border-color:rgba(200,160,64,0.25);color:#a89868;background:rgba(200,160,64,0.05)}
 .bar-opt.active{border-color:rgba(200,160,64,0.3);color:#c8a040;background:rgba(200,160,64,0.08)}
 .bar-opt.cooldown{opacity:0.35;pointer-events:none}
@@ -170,7 +170,7 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
     "Yea, verily, verily I say unto you, if all men had been, and were, and ever would be, like unto Moroni, behold, the very powers of hell would have been shaken forever."
     <div class="ref">— Alma 48:17</div>
   </div>
-  <div class="controls-hint">WASD move · SPACE rally · 1-5 formations · E scout · H headcount · G/C/V hold/charge/fall back · Z/X/B Lehi orders · F1-F3 faith</div>
+  <div class="controls-hint">WASD move · SPACE rally · 1-5 formations · E scout · H headcount</div>
 </div>
 
 <div id="story-overlay" style="display:none" onclick="advanceStory()">
@@ -487,7 +487,16 @@ function updateParticles(dt){
 // SCREEN SHAKE (trauma system)
 // ══════════════════════════════════════
 let trauma=0;
-function addTrauma(amount){trauma=Math.min(1,trauma+amount);}
+function addTrauma(amount,x,y){
+  // If position given, only shake if on-screen (near commander)
+  if(x!==undefined&&y!==undefined){
+    const dx=x-S.cx,dy=y-S.cy;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist>180)return; // off-screen, no shake
+    amount*=Math.max(0.2,1-dist/180); // attenuate with distance
+  }
+  trauma=Math.min(1,trauma+amount);
+}
 function getShake(){
   const shake=trauma*trauma;
   const ox=Math.sin(S.time*37.1)*shake*3;
@@ -1534,13 +1543,13 @@ function doCombat(atk,def,dt){
       spawnBlood(def.x,def.y,2);
     }
     SND.swordHit();
-    addTrauma(0.05);
+    addTrauma(0.05,def.x,def.y);
     if(def.hp<=0){
       def.dead=true;def._deathFade=0.6;
       addBody(def.x,def.y,def.team);
       spawnDeathParticles(def.x,def.y);
       SND.death();
-      addTrauma(0.12);
+      addTrauma(0.12,def.x,def.y);
       if(def.team==='nephite'&&def._name){S.casualties.push(def._name);}
       const allies=def.team==='nephite'?S.soldiers.concat(S.allies):S.enemies;
       allies.forEach(a=>{if(!a.dead){const d=Math.sqrt((a.x-def.x)*(a.x-def.x)+(a.y-def.y)*(a.y-def.y));if(d<40)a.morale-=10;}});
