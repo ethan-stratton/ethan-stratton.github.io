@@ -511,16 +511,18 @@ function getFormationTarget(soldier,idx,total,formation){
   if(formation==='wedge'){
     const row=Math.floor((-1+Math.sqrt(1+8*idx))/2);
     const col=idx-(row*(row+1)/2);const rc=row+1;
-    return{x:(col-(rc-1)/2)*7,y:-row*7,ws:false};
+    const maxR=Math.floor((-1+Math.sqrt(1+8*(Math.max(1,total)-1)))/2);
+    // y positive = ahead: tip (row 0) furthest ahead, higher rows behind
+    return{x:(col-(rc-1)/2)*7,y:(maxR-row)*7,ws:false};
   }
   if(formation==='column'){
     const half=Math.floor(total/2),rel=idx-half,col=(idx%3)-1;
-    return{x:col*6,y:rel*4,ws:false};
+    return{x:col*6,y:-rel*4,ws:false};
   }
   if(formation==='line'){return{x:(idx-total/2)*5,y:0,ws:false};}
   if(formation==='travel'){
     const col=idx%2,row=Math.floor(idx/2);
-    return{x:(col-0.5)*5,y:row*5,ws:false};
+    return{x:(col-0.5)*5,y:-row*5,ws:false};
   }
   return{x:0,y:0,ws:false};
 }
@@ -528,8 +530,10 @@ function getFormationTarget(soldier,idx,total,formation){
 function fmtToWorld(ft,facing,cx,cy){
   if(ft.ws)return{x:cx+ft.x,y:cy+ft.y};
   const cos=Math.cos(facing),sin=Math.sin(facing);
-  const lx=ft.x,ly=-ft.y;
-  return{x:cx+lx*cos-ly*sin,y:cy+lx*sin+ly*cos};
+  // ft.y positive = AHEAD of commander (in facing direction)
+  // ft.x positive = RIGHT of commander (perpendicular)
+  const fx=ft.x,fy=ft.y;
+  return{x:cx+fy*cos-fx*sin,y:cy+fy*sin+fx*cos};
 }
 
 // ══════════════════════════════════════
