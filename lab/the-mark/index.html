@@ -94,7 +94,13 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 .char-portrait{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;font-size:0.5rem;font-weight:600;color:#1a1610;flex-shrink:0;margin-right:5px}
 @keyframes pulse-dying{0%,100%{opacity:1}50%{opacity:0.3}}
 
-/* Responsive: stack on mobile */
+/* Scene illustration */
+#scene-canvas{width:100%;height:120px;border-radius:4px;margin-bottom:12px;display:block}
+
+/* Dawn tooltips */
+.role-info{font-family:'Inter',sans-serif;font-size:0.6rem;color:#706050;line-height:1.5;margin-top:2px}
+.role-yield{color:#a89878}
+.role-warn{color:#c05040}
 @media(max-width:768px){
   #app{flex-direction:column}
   #sidebar{width:100%;max-height:none;position:relative;border-left:none;border-top:1px solid rgba(200,160,80,0.08);display:flex;flex-wrap:wrap;gap:8px;padding:12px}
@@ -121,6 +127,7 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 </div>
 
 <div id="game-screen" style="display:none">
+<canvas id="scene-canvas" width="640" height="120"></canvas>
 <div id="hud">
 <div id="day-label">Day 1 / 10 — Dawn</div>
 <div class="res-bar"><div class="label"><span>Food</span><span id="rv-food">70</span></div><div class="bar"><div class="fill" id="rf-food" style="width:70%;background:#c8a060"></div></div></div>
@@ -481,9 +488,35 @@ function updateHud(){
 function renderDawn(){
   const area=document.getElementById('phase-area');
   const assigned=()=>Object.values(S.assign).reduce((a,b)=>a+b,0);
-  const roles=[['farm','Farm','Grow food. Weather dependent.'],['build','Build','Repair walls, construct.'],['guard','Guard','Patrol, defend against raids.'],['forage','Forage','Scavenge ruins. Risky.'],['rest','Rest','Recover morale.']];
+  const consumption=Math.floor(S.ppl*0.3)+2;
+  const roles=[
+    ['farm','Farm',`Each farmer produces ~1-3 food.`,`Your people eat ${consumption} food per day.`,S.food<30],
+    ['build','Build',`Each builder produces ~1-2 materials.`,'Materials repair walls and build structures.',S.mat<20],
+    ['guard','Guard','6+ = strong defense. 3+ = thin. 0 = raids steal food.','Unguarded walls invite Ash Walkers.',S.assign.guard===0&&S.day>1],
+    ['forage','Forage','High reward (food + materials) but 30% chance someone dies.','Outside the wall is dangerous.',false],
+    ['rest','Rest','Each resting worker restores ~1 morale.','Low morale = families leave.',S.mor<30]
+  ];
   let h=`<div class="phase-title">Dawn — Assign Workers</div>`;
-  roles.forEach(([k,n,d])=>{h+=`<div class="assign-row"><div class="role">${n}</div><div class="desc">${d}</div><div class="controls"><button onclick="adjustAssign('${k}',-1)">−</button><span class="count" id="ac-${k}">${S.assign[k]}</span><button onclick="adjustAssign('${k}',1)">+</button></div></div>`;});
+  if(S.day===1){
+    h+=`<div style="font-size:0.85rem;color:#887860;font-style:italic;margin-bottom:16px;padding:12px;background:rgba(200,160,80,0.03);border-left:2px solid rgba(200,160,80,0.1);border-radius:0 4px 4px 0;line-height:1.6">
+      You have <strong style="color:#c8b890">${S.ppl} people</strong> to assign. They eat <strong style="color:#c8b890">${consumption} food</strong> each day whether they work or not.<br>
+      Unassigned workers do nothing. There are never enough hands for everything.
+    </div>`;
+  }
+  roles.forEach(([k,n,info,warn,urgent])=>{
+    h+=`<div class="assign-row">
+      <div class="role">${n}</div>
+      <div class="desc">
+        <span class="role-yield">${info}</span>
+        ${urgent?`<br><span class="role-warn">⚠ ${warn}</span>`:''}
+      </div>
+      <div class="controls">
+        <button onclick="adjustAssign('${k}',-1)">−</button>
+        <span class="count" id="ac-${k}">${S.assign[k]}</span>
+        <button onclick="adjustAssign('${k}',1)">+</button>
+      </div>
+    </div>`;
+  });
   h+=`<div id="workers-remaining">${S.ppl-assigned()} unassigned of ${S.ppl}</div>`;
   h+=`<button class="phase-btn" onclick="endDawn()">Proceed to Petitions →</button>`;
   area.innerHTML=h;
@@ -603,11 +636,137 @@ function showEnding(){
 function startGame(){
   document.getElementById('title-screen').style.display='none';
   document.getElementById('game-screen').style.display='block';
-  updateHud();renderDawn();
+  updateHud();renderDawn();animateScene();
 }
 
 // Init roster on load
 renderRoster();
+
+// ══════════════════════════════════════
+// SCENE ILLUSTRATION (pixel landscape)
+// ══════════════════════════════════════
+function paintScene(){
+  const cv=document.getElementById('scene-canvas');
+  if(!cv)return;
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  
+  // Time-of-day colors based on phase
+  const palettes={
+    dawn:{sky1:'#2a2040',sky2:'#c08050',ground:'#2a2818',wall:'#4a4238',river:'#3a4858'},
+    midday:{sky1:'#4a5a70',sky2:'#8a9ab0',ground:'#2a2818',wall:'#5a5248',river:'#4a5868'},
+    dusk:{sky1:'#3a1a20',sky2:'#c06030',ground:'#1a1810',wall:'#3a3228',river:'#2a3040'}
+  };
+  const p=palettes[S.phase]||palettes.dawn;
+  
+  // Sky gradient
+  const grad=ctx.createLinearGradient(0,0,0,H*0.6);
+  grad.addColorStop(0,p.sky1);
+  grad.addColorStop(1,p.sky2);
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H);
+  
+  // Distant mountains
+  ctx.fillStyle='rgba(30,25,20,0.6)';
+  ctx.beginPath();ctx.moveTo(0,55);
+  ctx.lineTo(80,25);ctx.lineTo(160,40);ctx.lineTo(240,15);ctx.lineTo(340,35);ctx.lineTo(440,20);ctx.lineTo(540,38);ctx.lineTo(640,30);
+  ctx.lineTo(640,70);ctx.lineTo(0,70);ctx.fill();
+  
+  // Mid hills
+  ctx.fillStyle='rgba(35,30,22,0.7)';
+  ctx.beginPath();ctx.moveTo(0,65);
+  ctx.lineTo(100,50);ctx.lineTo(200,58);ctx.lineTo(300,45);ctx.lineTo(400,55);ctx.lineTo(500,48);ctx.lineTo(640,52);
+  ctx.lineTo(640,80);ctx.lineTo(0,80);ctx.fill();
+  
+  // Ground
+  ctx.fillStyle=p.ground;
+  ctx.fillRect(0,70,W,H-70);
+  
+  // River
+  ctx.fillStyle=p.river;
+  ctx.beginPath();ctx.moveTo(350,75);
+  ctx.quadraticCurveTo(400,85,420,120);
+  ctx.lineTo(440,120);
+  ctx.quadraticCurveTo(420,82,370,72);ctx.fill();
+  // River shimmer
+  ctx.fillStyle='rgba(140,160,180,0.15)';
+  ctx.fillRect(380,85,8,2);ctx.fillRect(395,95,6,2);ctx.fillRect(410,108,10,2);
+  
+  // Fields (left side) — rows of crops
+  ctx.fillStyle='#3a4a28';
+  for(let i=0;i<5;i++){ctx.fillRect(40,78+i*6,100,3);}
+  // Farmers (tiny dots if assigned)
+  if(S.assign.farm>0){
+    ctx.fillStyle='#a09060';
+    for(let i=0;i<Math.min(S.assign.farm,4);i++){ctx.fillRect(55+i*20,80+i*5,3,5);}
+  }
+  
+  // Wall
+  const wallX=200,wallW=140,wallH=28,wallY=68;
+  ctx.fillStyle=p.wall;
+  ctx.fillRect(wallX,wallY,wallW,wallH);
+  // Wall stones
+  ctx.fillStyle='rgba(0,0,0,0.15)';
+  for(let y=0;y<wallH;y+=6){for(let x=0;x<wallW;x+=12){ctx.fillRect(wallX+x+(y%12?6:0),wallY+y,11,5);}}
+  // Gate
+  ctx.fillStyle='#1a1610';
+  ctx.fillRect(wallX+60,wallY+12,18,16);
+  // Gate arch
+  ctx.fillStyle=p.wall;
+  ctx.beginPath();ctx.arc(wallX+69,wallY+12,9,Math.PI,0);ctx.fill();
+  
+  // Buildings inside wall
+  ctx.fillStyle='#3a3428';
+  ctx.fillRect(wallX+10,wallY+8,16,12);  // granary
+  ctx.fillRect(wallX+30,wallY+6,14,14);  // hearthhouse
+  ctx.fillRect(wallX+100,wallY+10,18,10); // healer's hall
+  // Roofs
+  ctx.fillStyle='#4a3828';
+  ctx.beginPath();ctx.moveTo(wallX+8,wallY+8);ctx.lineTo(wallX+18,wallY+2);ctx.lineTo(wallX+28,wallY+8);ctx.fill();
+  ctx.beginPath();ctx.moveTo(wallX+28,wallY+6);ctx.lineTo(wallX+37,wallY+0);ctx.lineTo(wallX+46,wallY+6);ctx.fill();
+  ctx.beginPath();ctx.moveTo(wallX+98,wallY+10);ctx.lineTo(wallX+109,wallY+4);ctx.lineTo(wallX+120,wallY+10);ctx.fill();
+  
+  // Watchtower
+  ctx.fillStyle=p.wall;
+  ctx.fillRect(wallX-4,wallY-10,10,14);
+  ctx.fillStyle='#5a4a38';
+  ctx.fillRect(wallX-6,wallY-12,14,4);
+  // Guard dots on wall
+  if(S.assign.guard>0){
+    ctx.fillStyle='#8a7a60';
+    for(let i=0;i<Math.min(S.assign.guard,6);i++){ctx.fillRect(wallX+10+i*20,wallY-2,2,4);}
+  }
+  
+  // Trees (right side, beyond wall)
+  ctx.fillStyle='#2a3a1a';
+  [[500,62],[520,58],[540,64],[560,60],[510,70],[545,72]].forEach(([x,y])=>{
+    ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#3a2a18';ctx.fillRect(x-1,y+6,3,8);ctx.fillStyle='#2a3a1a';
+  });
+  
+  // Foragers (tiny figures in the trees)
+  if(S.assign.forage>0){
+    ctx.fillStyle='#a09060';
+    ctx.fillRect(508,72,2,5);ctx.fillRect(530,68,2,5);
+  }
+  
+  // Smoke from hearthhouse
+  ctx.fillStyle='rgba(100,90,80,0.2)';
+  const t=Date.now()*0.001;
+  ctx.beginPath();ctx.arc(wallX+37+Math.sin(t)*3,wallY-6+Math.sin(t*0.7)*2,4,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(wallX+39+Math.sin(t+1)*4,wallY-14+Math.sin(t*0.5)*3,3,0,Math.PI*2);ctx.fill();
+  
+  // Stars (dawn/dusk only)
+  if(S.phase==='dawn'||S.phase==='dusk'){
+    ctx.fillStyle='rgba(200,190,170,0.4)';
+    [[50,12],[120,8],[300,15],[450,10],[580,18],[95,25],[400,5]].forEach(([x,y])=>{ctx.fillRect(x,y,1,1);});
+  }
+}
+
+// Animate scene
+let sceneRAF;
+function animateScene(){paintScene();sceneRAF=requestAnimationFrame(animateScene);}
+
 </script>
 </body>
 </html>
