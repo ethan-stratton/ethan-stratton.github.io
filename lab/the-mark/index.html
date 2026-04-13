@@ -11,13 +11,13 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 
 /* Layout: left panel + main + sidebar */
 #app{display:flex;max-width:1200px;margin:0 auto;min-height:100vh}
-#left-panel{width:200px;flex-shrink:0;padding:12px 8px;border-right:1px solid rgba(200,160,80,0.08);background:rgba(0,0,0,0.1);position:sticky;top:0;max-height:100vh}
+#left-panel{width:260px;flex-shrink:0;padding:12px 8px;border-right:1px solid rgba(200,160,80,0.08);background:rgba(0,0,0,0.1);position:sticky;top:0;max-height:100vh;overflow-y:auto}
 #left-panel canvas{width:100%;border-radius:4px;display:block;image-rendering:pixelated}
 #main-col{flex:1;min-width:0;padding:16px 20px}
 #sidebar{width:220px;flex-shrink:0;padding:16px 12px;border-left:1px solid rgba(200,160,80,0.08);background:rgba(0,0,0,0.15);overflow-y:auto;max-height:100vh;position:sticky;top:0}
 
 /* Event log */
-#event-log{border-top:1px solid rgba(200,160,80,0.08);padding:10px 20px;max-height:140px;overflow-y:auto;font-family:'Inter',sans-serif;font-size:0.65rem;color:#585048;line-height:1.6}
+#event-log{border-top:1px solid rgba(200,160,80,0.08);padding:10px 20px;max-height:160px;overflow-y:auto;font-family:'Inter',sans-serif;font-size:0.75rem;color:#585048;line-height:1.6}
 #event-log:empty{display:none}
 .log-entry{padding:2px 0;border-bottom:1px solid rgba(200,160,80,0.03)}
 .log-day{color:#706050;margin-right:6px}
@@ -35,41 +35,41 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 
 /* HUD */
 #hud{display:flex;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid rgba(200,160,80,0.1);margin-bottom:16px;align-items:center}
-#day-label{font-family:'Inter',sans-serif;font-size:0.75rem;color:#887860;letter-spacing:0.08em;text-transform:uppercase}
+#day-label{font-family:'Inter',sans-serif;font-size:0.85rem;color:#887860;letter-spacing:0.08em;text-transform:uppercase}
 .res-bar{flex:1;min-width:120px}
-.res-bar .label{font-family:'Inter',sans-serif;font-size:0.6rem;color:#706050;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;display:flex;justify-content:space-between}
+.res-bar .label{font-family:'Inter',sans-serif;font-size:0.7rem;color:#706050;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:3px;display:flex;justify-content:space-between}
 .res-bar .bar{height:6px;background:#1e1a14;border-radius:3px;overflow:hidden}
 .res-bar .bar .fill{height:100%;border-radius:3px;transition:width 0.5s ease}
 
 /* Phase display */
 #phase-area{min-height:400px;position:relative}
-.phase-title{font-family:'Inter',sans-serif;font-size:0.65rem;color:#706050;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:16px}
+.phase-title{font-family:'Inter',sans-serif;font-size:0.75rem;color:#706050;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:16px}
 
 /* Dawn - assignment */
 .assign-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(200,160,80,0.06)}
-.assign-row .role{font-size:0.95rem;color:#a89878;width:80px}
-.assign-row .desc{font-size:0.8rem;color:#685848;flex:1;padding:0 12px;font-style:italic}
+.assign-row .role{font-size:1.05rem;color:#a89878;width:80px}
+.assign-row .desc{font-size:0.88rem;color:#685848;flex:1;padding:0 12px;font-style:italic}
 .assign-row .controls{display:flex;align-items:center;gap:8px}
 .assign-row .controls button{width:28px;height:28px;border:1px solid rgba(200,160,80,0.2);background:none;color:#c8b890;font-size:1rem;cursor:pointer;border-radius:4px}
 .assign-row .controls button:hover{border-color:rgba(200,160,80,0.5)}
-.assign-row .count{font-family:'Inter',sans-serif;font-size:0.85rem;color:#c8b890;min-width:20px;text-align:center}
-#workers-remaining{font-family:'Inter',sans-serif;font-size:0.75rem;color:#887860;margin:12px 0;text-align:center}
+.assign-row .count{font-family:'Inter',sans-serif;font-size:0.95rem;color:#c8b890;min-width:20px;text-align:center}
+#workers-remaining{font-family:'Inter',sans-serif;font-size:0.85rem;color:#887860;margin:12px 0;text-align:center}
 .phase-btn{font-family:'Crimson Text',serif;font-size:1rem;color:#c8b890;background:none;border:1px solid rgba(200,160,80,0.25);padding:10px 28px;cursor:pointer;display:block;margin:20px auto 0;letter-spacing:0.04em;transition:all 0.3s}
 .phase-btn:hover{border-color:rgba(200,160,80,0.6);text-shadow:0 0 8px rgba(200,160,80,0.3)}
 
 /* Petition */
-.petition-speaker{font-size:0.8rem;color:#a08860;letter-spacing:0.04em;margin-bottom:4px;text-transform:uppercase;font-family:'Inter',sans-serif}
-.petition-text{font-size:1.05rem;line-height:1.7;color:#c8c0b0;margin-bottom:20px;padding:16px;background:rgba(200,160,80,0.03);border-left:2px solid rgba(200,160,80,0.15);border-radius:0 4px 4px 0}
+.petition-speaker{font-size:0.88rem;color:#a08860;letter-spacing:0.04em;margin-bottom:4px;text-transform:uppercase;font-family:'Inter',sans-serif}
+.petition-text{font-size:1.1rem;line-height:1.7;color:#c8c0b0;margin-bottom:20px;padding:16px;background:rgba(200,160,80,0.03);border-left:2px solid rgba(200,160,80,0.15);border-radius:0 4px 4px 0}
 .advisor-recs{margin-bottom:16px;padding:8px 12px;background:rgba(0,0,0,0.15);border-radius:4px}
-.advisor-rec{font-size:0.8rem;color:#887860;margin:4px 0;font-style:italic}
+.advisor-rec{font-size:0.88rem;color:#887860;margin:4px 0;font-style:italic}
 .advisor-rec .aname{color:#a89878;font-style:normal}
-.choice-btn{display:block;width:100%;text-align:left;font-family:'Crimson Text',serif;font-size:0.95rem;color:#c8c0b0;background:rgba(200,160,80,0.04);border:1px solid rgba(200,160,80,0.12);padding:12px 16px;margin-bottom:8px;cursor:pointer;border-radius:4px;transition:all 0.2s;line-height:1.5}
+.choice-btn{display:block;width:100%;text-align:left;font-family:'Crimson Text',serif;font-size:1.05rem;color:#c8c0b0;background:rgba(200,160,80,0.04);border:1px solid rgba(200,160,80,0.12);padding:12px 16px;margin-bottom:8px;cursor:pointer;border-radius:4px;transition:all 0.2s;line-height:1.5}
 .choice-btn:hover{background:rgba(200,160,80,0.1);border-color:rgba(200,160,80,0.35)}
-.choice-btn .cost{font-family:'Inter',sans-serif;font-size:0.7rem;color:#a08060;display:block;margin-top:4px}
+.choice-btn .cost{font-family:'Inter',sans-serif;font-size:0.78rem;color:#a08060;display:block;margin-top:4px}
 
 /* Dusk events */
-.event-line{font-size:0.95rem;line-height:1.7;color:#a89878;margin-bottom:10px;padding-left:12px;border-left:1px solid rgba(200,160,80,0.1)}
-.wren-line{font-size:0.95rem;color:#c8b0d0;font-style:italic;padding:16px;margin:16px 0;background:rgba(180,140,200,0.05);border-left:2px solid rgba(180,140,200,0.2);border-radius:0 4px 4px 0}
+.event-line{font-size:1.05rem;line-height:1.7;color:#a89878;margin-bottom:10px;padding-left:12px;border-left:1px solid rgba(200,160,80,0.1)}
+.wren-line{font-size:1.05rem;color:#c8b0d0;font-style:italic;padding:16px;margin:16px 0;background:rgba(180,140,200,0.05);border-left:2px solid rgba(180,140,200,0.2);border-radius:0 4px 4px 0}
 .gameover-msg{font-size:1.3rem;color:#c05040;text-align:center;margin:20px 0}
 
 /* End screen */
@@ -80,16 +80,16 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 #end-screen .stats{font-family:'Inter',sans-serif;font-size:0.75rem;color:#685848;margin-bottom:24px}
 
 /* ── SIDEBAR: Character Roster ── */
-#sidebar h3{font-family:'Inter',sans-serif;font-size:0.65rem;color:#706050;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px}
+#sidebar h3{font-family:'Inter',sans-serif;font-size:0.75rem;color:#706050;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px}
 .roster-section{margin-bottom:16px}
-.roster-section-label{font-family:'Inter',sans-serif;font-size:0.55rem;color:#504838;letter-spacing:0.08em;text-transform:uppercase;margin:12px 0 6px;padding-bottom:3px;border-bottom:1px solid rgba(200,160,80,0.06)}
-.char-entry{display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:0.78rem;line-height:1.4;transition:opacity 0.5s,transform 0.5s}
+.roster-section-label{font-family:'Inter',sans-serif;font-size:0.65rem;color:#504838;letter-spacing:0.08em;text-transform:uppercase;margin:12px 0 6px;padding-bottom:3px;border-bottom:1px solid rgba(200,160,80,0.06)}
+.char-entry{display:flex;align-items:center;justify-content:space-between;padding:5px 0;font-size:0.85rem;line-height:1.4;transition:opacity 0.5s,transform 0.5s}
 .char-entry.dead{opacity:0.35}
 .char-entry.dying .char-name{color:#c05040}
 .char-entry.gone{opacity:0.3;font-style:italic}
 .char-name{color:#a89878;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .char-role{font-family:'Inter',sans-serif;font-size:0.55rem;color:#585040;margin-left:4px;flex-shrink:0}
-.char-status{font-family:'Inter',sans-serif;font-size:0.55rem;margin-left:6px;flex-shrink:0;text-align:right;min-width:50px}
+.char-status{font-family:'Inter',sans-serif;font-size:0.65rem;margin-left:6px;flex-shrink:0;text-align:right;min-width:50px}
 .status-well{color:#6a8060}
 .status-hurt{color:#c0a040}
 .status-sick{color:#b08040}
@@ -100,27 +100,27 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 .status-fled{color:#607080}
 .status-unknown{color:#585050}
 .char-icon{margin-right:5px;font-size:0.7rem;flex-shrink:0;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center}
-.char-portrait{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;font-size:0.5rem;font-weight:600;color:#1a1610;flex-shrink:0;margin-right:5px}
+.char-portrait{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;font-size:0.6rem;font-weight:600;color:#1a1610;flex-shrink:0;margin-right:5px}
 @keyframes pulse-dying{0%,100%{opacity:1}50%{opacity:0.3}}
 
 /* Scene illustration */
 #scene-canvas{width:100%;height:120px;border-radius:4px;margin-bottom:12px;display:block}
 
 /* Settlement cross-section (left panel) */
-#settlement-canvas{width:180px;height:360px}
-#left-panel h3{font-family:'Inter',sans-serif;font-size:0.6rem;color:#706050;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px}
+#settlement-canvas{width:240px;height:500px}
+#left-panel h3{font-family:'Inter',sans-serif;font-size:0.75rem;color:#706050;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px}
 
 /* Advisor section in sidebar */
 .advisor-sidebar{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(200,160,80,0.06)}
 .advisor-entry{display:flex;align-items:center;gap:6px;padding:5px 0}
 .advisor-entry .adv-icon{font-size:0.8rem;width:20px;text-align:center}
-.advisor-entry .adv-name{font-size:0.75rem;color:#a89878}
-.advisor-entry .adv-mood{font-family:'Inter',sans-serif;font-size:0.55rem;color:#706050;font-style:italic;margin-left:auto}
+.advisor-entry .adv-name{font-size:0.85rem;color:#a89878}
+.advisor-entry .adv-mood{font-family:'Inter',sans-serif;font-size:0.65rem;color:#706050;font-style:italic;margin-left:auto}
 
 /* Dawn tooltips */
-.role-info{font-family:'Inter',sans-serif;font-size:0.6rem;color:#706050;line-height:1.5;margin-top:2px}
+.role-info{font-family:'Inter',sans-serif;font-size:0.7rem;color:#706050;line-height:1.5;margin-top:2px}
 .role-yield{color:#a89878}
-.role-warn{color:#c05040}
+.role-warn{color:#c05040;font-size:0.75rem}
 
 /* Responsive */
 @media(max-width:900px){
@@ -136,7 +136,7 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 <div id="app">
 <div id="left-panel" style="display:none">
 <h3>Brannhaven</h3>
-<canvas id="settlement-canvas" width="180" height="360"></canvas>
+<canvas id="settlement-canvas" width="240" height="500"></canvas>
 </div>
 <div id="main-col">
 
@@ -739,144 +739,152 @@ function paintSettlement(){
     dawn:['#2a2040','#c08050'],midday:['#4a5a70','#8a9ab0'],dusk:['#3a1a20','#c06030']
   };
   const pal=palettes[S.phase]||palettes.dawn;
-  const grad=ctx.createLinearGradient(0,0,0,80);
+  const grad=ctx.createLinearGradient(0,0,0,100);
   grad.addColorStop(0,pal[0]);grad.addColorStop(1,pal[1]);
-  ctx.fillStyle=grad;ctx.fillRect(0,0,W,80);
+  ctx.fillStyle=grad;ctx.fillRect(0,0,W,100);
+  
+  // Stars (dawn/dusk)
+  if(S.phase==='dawn'||S.phase==='dusk'){
+    ctx.fillStyle='rgba(200,190,170,0.5)';
+    [[30,15],[80,10],[140,20],[200,12],[55,35],[170,8]].forEach(([x,y])=>{ctx.fillRect(x,y,2,2);});
+  }
   
   // Ground
-  ctx.fillStyle='#2a2818';ctx.fillRect(0,80,W,H-80);
+  ctx.fillStyle='#2a2818';ctx.fillRect(0,100,W,H-100);
   
-  // ── WALL (cross-section view) ──
-  const wallY=50,wallH=50;
+  // ── WALL ──
+  const wallY=60,wallH=65;
   ctx.fillStyle='#4a4238';
-  ctx.fillRect(10,wallY,W-20,wallH);
+  ctx.fillRect(15,wallY,W-30,wallH);
   // Stone pattern
   ctx.fillStyle='rgba(0,0,0,0.12)';
-  for(let y=0;y<wallH;y+=7){for(let x=0;x<W-20;x+=14){ctx.fillRect(10+x+(y%14?7:0),wallY+y,13,6);}}
-  // Wall top crenellations
+  for(let y=0;y<wallH;y+=9){for(let x=0;x<W-30;x+=18){ctx.fillRect(15+x+(y%18?9:0),wallY+y,17,8);}}
+  // Crenellations
   ctx.fillStyle='#5a5248';
-  for(let x=10;x<W-20;x+=16){ctx.fillRect(x,wallY-6,10,8);}
+  for(let x=15;x<W-30;x+=20){ctx.fillRect(x,wallY-8,14,10);}
   
-  // Damage based on materials
+  // Wall damage
   if(S.mat<30){
     ctx.fillStyle='rgba(0,0,0,0.3)';
-    ctx.fillRect(60,wallY+15,8,wallH-15); // crack
-    ctx.fillRect(120,wallY+25,6,wallH-25);
+    ctx.fillRect(80,wallY+20,10,wallH-20);
+    ctx.fillRect(160,wallY+30,8,wallH-30);
   }
   if(S.mat<15){
-    ctx.fillStyle='rgba(0,0,0,0.4)';
-    ctx.fillRect(30,wallY+10,12,wallH-10); // big crack
+    ctx.fillStyle='rgba(0,0,0,0.45)';
+    ctx.fillRect(40,wallY+12,14,wallH-12);
   }
   
-  // Guard dots on wall
+  // Guard figures on wall
   const gCount=Math.min(S.assign.guard||0,6);
   ctx.fillStyle='#c8a060';
   for(let i=0;i<gCount;i++){
-    const gx=20+i*24;
-    ctx.fillRect(gx,wallY-10,3,6); // body
-    ctx.fillRect(gx,wallY-12,3,2); // head
+    const gx=25+i*32;
+    ctx.fillRect(gx,wallY-14,4,8);ctx.fillRect(gx,wallY-17,4,3);
+    // Spear
+    ctx.fillStyle='#8a7a60';ctx.fillRect(gx+4,wallY-22,2,16);ctx.fillStyle='#c8a060';
   }
   
   // ── BUILDINGS ──
-  const buildY=105;
+  const buildY=140;
   
   // Granary
   ctx.fillStyle='#3a3428';
-  ctx.fillRect(15,buildY,40,30);
+  ctx.fillRect(20,buildY,52,40);
   ctx.fillStyle='#4a3828';
-  ctx.beginPath();ctx.moveTo(12,buildY);ctx.lineTo(35,buildY-12);ctx.lineTo(58,buildY);ctx.fill();
-  // Grain level (visual food indicator)
-  const grainH=Math.floor((S.food/100)*24);
+  ctx.beginPath();ctx.moveTo(16,buildY);ctx.lineTo(46,buildY-16);ctx.lineTo(76,buildY);ctx.fill();
+  // Grain level
+  const grainH=Math.floor((S.food/100)*32);
   ctx.fillStyle='#c8a060';
-  ctx.fillRect(18,buildY+28-grainH,34,grainH);
-  // Label
-  ctx.fillStyle='#706050';ctx.font='8px Inter,sans-serif';
-  ctx.fillText('Granary',18,buildY+42);
+  ctx.fillRect(24,buildY+36-grainH,44,grainH);
+  // Grain outline
+  ctx.strokeStyle='rgba(200,160,80,0.2)';ctx.lineWidth=1;
+  ctx.strokeRect(24,buildY+4,44,32);
+  ctx.fillStyle='#a89878';ctx.font='bold 10px Inter,sans-serif';
+  ctx.fillText('Granary',22,buildY+56);
   
   // Hearthhouse
   ctx.fillStyle='#3a3428';
-  ctx.fillRect(70,buildY-5,45,35);
+  ctx.fillRect(90,buildY-6,55,46);
   ctx.fillStyle='#4a3828';
-  ctx.beginPath();ctx.moveTo(67,buildY-5);ctx.lineTo(92,buildY-20);ctx.lineTo(118,buildY-5);ctx.fill();
-  // Chimney smoke
+  ctx.beginPath();ctx.moveTo(86,buildY-6);ctx.lineTo(117,buildY-24);ctx.lineTo(149,buildY-6);ctx.fill();
+  // Door
+  ctx.fillStyle='#1a1610';ctx.fillRect(110,buildY+22,14,18);
+  // Smoke
   const t=Date.now()*0.001;
-  ctx.fillStyle='rgba(100,90,80,0.25)';
-  ctx.beginPath();ctx.arc(95+Math.sin(t)*2,buildY-26+Math.sin(t*0.7)*2,4,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(97+Math.sin(t+1)*3,buildY-34+Math.sin(t*0.5)*2,3,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#706050';ctx.fillText('Hearthhouse',62,buildY+42);
+  ctx.fillStyle='rgba(100,90,80,0.3)';
+  ctx.beginPath();ctx.arc(120+Math.sin(t)*3,buildY-30+Math.sin(t*0.7)*3,5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(123+Math.sin(t+1)*4,buildY-40+Math.sin(t*0.5)*3,4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#a89878';ctx.fillText('Hearthhouse',82,buildY+56);
   
   // Healer's Hall
   ctx.fillStyle='#3a3428';
-  ctx.fillRect(130,buildY,35,28);
+  ctx.fillRect(165,buildY,48,36);
   ctx.fillStyle='#4a3828';
-  ctx.beginPath();ctx.moveTo(127,buildY);ctx.lineTo(147,buildY-10);ctx.lineTo(168,buildY);ctx.fill();
-  // Herb symbol
-  ctx.fillStyle='#5B8C5A';ctx.fillText('🌿',140,buildY+14);
-  ctx.fillStyle='#706050';ctx.fillText("Healer's",132,buildY+42);
+  ctx.beginPath();ctx.moveTo(161,buildY);ctx.lineTo(189,buildY-14);ctx.lineTo(217,buildY);ctx.fill();
+  ctx.fillStyle='#5B8C5A';ctx.font='16px sans-serif';ctx.fillText('🌿',180,buildY+22);
+  ctx.fillStyle='#a89878';ctx.font='bold 10px Inter,sans-serif';
+  ctx.fillText("Healer's Hall",160,buildY+56);
   
   // ── FIELDS ──
-  const fieldY=170;
-  ctx.fillStyle='#706050';ctx.fillText('Fields',18,fieldY);
+  const fieldY=220;
+  ctx.fillStyle='#a89878';ctx.font='bold 10px Inter,sans-serif';
+  ctx.fillText('Fields',20,fieldY);
   const farmCount=S.assign.farm||0;
-  // Crop rows
-  for(let i=0;i<6;i++){
+  for(let i=0;i<7;i++){
     ctx.fillStyle=farmCount>i?'#4a6a28':'#2a3a18';
-    ctx.fillRect(15,fieldY+8+i*8,W-30,5);
+    ctx.fillRect(20,fieldY+14+i*10,W-40,7);
   }
   // Farmer figures
   ctx.fillStyle='#c8a060';
-  for(let i=0;i<Math.min(farmCount,5);i++){
-    ctx.fillRect(25+i*28,fieldY+4,3,6);
+  for(let i=0;i<Math.min(farmCount,6);i++){
+    ctx.fillRect(30+i*32,fieldY+8,4,8);
   }
   
   // ── RIVER ──
-  const riverY=230;
+  const riverY=310;
   ctx.fillStyle='#3a4858';
   ctx.beginPath();
   ctx.moveTo(0,riverY);
-  ctx.quadraticCurveTo(50,riverY-8,90,riverY+5);
-  ctx.quadraticCurveTo(140,riverY+15,180,riverY+8);
-  ctx.lineTo(180,riverY+20);
-  ctx.quadraticCurveTo(140,riverY+28,90,riverY+18);
-  ctx.quadraticCurveTo(50,riverY+5,0,riverY+14);
+  ctx.quadraticCurveTo(60,riverY-10,120,riverY+6);
+  ctx.quadraticCurveTo(180,riverY+18,240,riverY+10);
+  ctx.lineTo(240,riverY+26);
+  ctx.quadraticCurveTo(180,riverY+34,120,riverY+22);
+  ctx.quadraticCurveTo(60,riverY+6,0,riverY+18);
   ctx.fill();
-  // Shimmer
-  ctx.fillStyle='rgba(140,160,180,0.15)';
-  ctx.fillRect(40,riverY+4,8,2);ctx.fillRect(100,riverY+10,10,2);
-  ctx.fillStyle='#706050';ctx.fillText('River',75,riverY+32);
+  ctx.fillStyle='rgba(140,160,180,0.2)';
+  ctx.fillRect(50,riverY+5,12,2);ctx.fillRect(130,riverY+12,14,2);ctx.fillRect(90,riverY+8,10,2);
+  ctx.fillStyle='#a89878';ctx.font='bold 10px Inter,sans-serif';
+  ctx.fillText('River',100,riverY+42);
   
-  // ── FOREST (beyond wall) ──
-  const forestY=275;
-  ctx.fillStyle='#706050';ctx.fillText('Beyond the Wall',40,forestY);
+  // ── FOREST ──
+  const forestY=370;
+  ctx.fillStyle='#a89878';ctx.fillText('Beyond the Wall',65,forestY);
   ctx.fillStyle='#2a3a1a';
-  [[30,forestY+10],[55,forestY+8],[80,forestY+12],[110,forestY+9],[140,forestY+11]].forEach(([x,y])=>{
-    ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#3a2a18';ctx.fillRect(x-1,y+7,3,8);ctx.fillStyle='#2a3a1a';
+  [[35,forestY+14],[70,forestY+10],[105,forestY+16],[140,forestY+12],[175,forestY+14],[55,forestY+28],[125,forestY+26]].forEach(([x,y])=>{
+    ctx.beginPath();ctx.arc(x,y,11,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#3a2a18';ctx.fillRect(x-2,y+9,4,10);ctx.fillStyle='#2a3a1a';
   });
-  // Forager figures
   if(S.assign.forage>0){
     ctx.fillStyle='#c8a060';
-    ctx.fillRect(45,forestY+20,3,6);ctx.fillRect(95,forestY+18,3,6);
+    ctx.fillRect(60,forestY+30,4,8);ctx.fillRect(120,forestY+28,4,8);
   }
   
-  // ── MORALE INDICATOR ──
-  const morY=320;
-  ctx.fillStyle='#706050';ctx.fillText('Spirit',75,morY);
-  // Tiny people: happy = standing, low = sitting/leaving
+  // ── SPIRIT ──
+  const morY=430;
+  ctx.fillStyle='#a89878';ctx.font='bold 10px Inter,sans-serif';
+  ctx.fillText('Spirit',100,morY);
   const pplCount=Math.min(Math.floor(S.ppl/5),8);
   for(let i=0;i<pplCount;i++){
-    const px=20+i*18;
+    const px=25+i*24;
     if(S.mor>40){
       ctx.fillStyle='#a09070';
-      ctx.fillRect(px,morY+6,3,7); // standing
-      ctx.fillRect(px,morY+4,3,2); // head
+      ctx.fillRect(px,morY+8,4,9);ctx.fillRect(px,morY+5,4,3);
     }else if(S.mor>20){
       ctx.fillStyle='#807060';
-      ctx.fillRect(px,morY+10,5,3); // sitting
-      ctx.fillRect(px,morY+8,3,2);
+      ctx.fillRect(px,morY+14,6,4);ctx.fillRect(px,morY+11,4,3);
     }else{
       ctx.fillStyle='#605040';
-      ctx.fillRect(px,morY+10,5,3); // hunched
+      ctx.fillRect(px,morY+14,6,4);
     }
   }
 }
