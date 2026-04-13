@@ -239,41 +239,37 @@ window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
 // ══════════════════════════════════════
 const MAP={w:900,h:700};
 const ROADS=[
-  {x1:0,y1:350,x2:500,y2:350,w:12},
-  {x1:500,y1:350,x2:590,y2:395,w:10},
-  {x1:620,y2:400,x2:620,y1:400,w:10}, // ford crossing stub
-  {x1:620,y1:400,x2:750,y2:350,w:10}, // ford east to NE
-  {x1:620,y1:400,x2:900,y2:600,w:10}, // ford SE road
-  {x1:300,y1:0,x2:300,y2:700,w:10},
+  {x1:500,y1:0,x2:500,y2:700,w:10},     // N-S road on east side
+  {x1:500,y1:350,x2:900,y2:350,w:12},    // E-W road from center east
+  {x1:500,y1:350,x2:350,y2:350,w:10},    // road approaching river from east
 ];
-function riverX(y){return 600+Math.sin(y*0.012)*35+Math.sin(y*0.035)*12;}
-const FORD_Y=400,FORD_HALF_W=32,FORD_HALF_H=20,RIVER_HALF_W=18;
-const HILL={x:740,y:500,r:65};
+// River runs vertically at ~x=300
+function riverX(y){return 300+Math.sin(y*0.012)*30+Math.sin(y*0.035)*10;}
+const RIVER_HALF_W=20;
+const HILL={x:680,y:520,r:65};
 
 const TREES=[];
 (function(){
-  // Dense western wilderness
-  for(let i=0;i<130;i++)TREES.push({x:Math.random()*220,y:Math.random()*MAP.h,s:2+Math.random()*2});
-  // Southern wilderness (important for player concealment)
-  for(let i=0;i<80;i++)TREES.push({x:250+Math.random()*300,y:480+Math.random()*220,s:2+Math.random()*2});
-  // Scattered
-  for(let i=0;i<40;i++)TREES.push({x:250+Math.random()*300,y:Math.random()*MAP.h,s:1.5+Math.random()*1.5});
-  // North wilderness (for Lehi)
-  for(let i=0;i<50;i++)TREES.push({x:400+Math.random()*200,y:100+Math.random()*200,s:2+Math.random()*1.5});
+  // Wilderness around Hill Riplah (player concealment)
+  for(let i=0;i<90;i++)TREES.push({x:600+Math.random()*200,y:440+Math.random()*260,s:2+Math.random()*2});
+  // Northern wilderness (Lehi concealment)
+  for(let i=0;i<70;i++)TREES.push({x:520+Math.random()*250,y:50+Math.random()*200,s:2+Math.random()*2});
+  // Eastern scatter
+  for(let i=0;i<30;i++)TREES.push({x:400+Math.random()*400,y:250+Math.random()*200,s:1.5+Math.random()*1.5});
+  // Western (Lamanite side) — sparse
+  for(let i=0;i<20;i++)TREES.push({x:Math.random()*250,y:Math.random()*MAP.h,s:2+Math.random()*1.5});
 })();
 
 // ══════════════════════════════════════
 // TERRAIN
 // ══════════════════════════════════════
 function onRoad(x,y){for(const r of ROADS){const dx=r.x2-r.x1,dy=r.y2-r.y1,l2=dx*dx+dy*dy;let t=l2?((x-r.x1)*dx+(y-r.y1)*dy)/l2:0;t=Math.max(0,Math.min(1,t));const px=r.x1+t*dx,py=r.y1+t*dy;if(Math.sqrt((x-px)*(x-px)+(y-py)*(y-py))<r.w/2)return true;}return false;}
-function atFord(x,y){return Math.abs(x-riverX(FORD_Y))<FORD_HALF_W&&Math.abs(y-FORD_Y)<FORD_HALF_H;}
-function inRiver(x,y){if(atFord(x,y))return false;return Math.abs(x-riverX(y))<RIVER_HALF_W;}
+function inRiver(x,y){return Math.abs(x-riverX(y))<RIVER_HALF_W;}
 function onHill(x,y){return Math.sqrt((x-HILL.x)*(x-HILL.x)+(y-HILL.y)*(y-HILL.y))<HILL.r;}
 function inTrees(x,y){for(const t of TREES){if(Math.abs(x-t.x)<8&&Math.abs(y-t.y)<8)return true;}return false;}
-function terrainSpeed(x,y){if(inRiver(x,y))return 0.15;if(onRoad(x,y))return 1.4;if(onHill(x,y))return 0.7;if(inTrees(x,y))return 0.6;return 1.0;}
+function terrainSpeed(x,y){if(inRiver(x,y))return 0.3;if(onRoad(x,y))return 1.4;if(onHill(x,y))return 0.7;if(inTrees(x,y))return 0.6;return 1.0;}
 function terrainName(x,y){
-  if(inRiver(x,y))return{name:'River',color:'#4a7a9a',icon:'≈≈'};
-  if(atFord(x,y))return{name:'Ford',color:'#8a7a50',icon:'══'};
+  if(inRiver(x,y))return{name:'River Sidon',color:'#4a7a9a',icon:'≈≈'};
   if(onRoad(x,y))return{name:'Road',color:'#a89868',icon:'►'};
   if(onHill(x,y))return{name:'Hill Riplah',color:'#8a7a40',icon:'▲'};
   if(inTrees(x,y))return{name:'Wilderness',color:'#4a7a3a',icon:'♣'};
@@ -282,45 +278,26 @@ function terrainName(x,y){
 function isConcealed(x,y){
   if(inTrees(x,y))return true;
   if(onHill(x,y))return true;
-  // Behind the hill (south/west side) — concealed from east approach
+  // Behind (east of) the hill — concealed from western approach
   const dh=Math.sqrt((x-HILL.x)*(x-HILL.x)+(y-HILL.y)*(y-HILL.y));
-  if(dh<HILL.r+30&&x<HILL.x+10)return true;
+  if(dh<HILL.r+30&&x>HILL.x-10)return true;
   return false;
 }
-// Move a unit toward tx,ty with river avoidance. Returns new x,y.
+// Move a unit toward tx,ty. River is crossable (slow) so no ford redirect needed.
 function moveToward(u,tx,ty,spd,dt){
   const ddx=tx-u.x,ddy=ty-u.y;const d=Math.sqrt(ddx*ddx+ddy*ddy);
   if(d<2)return;
   const ts=terrainSpeed(u.x,u.y);
-  let nx=u.x+ddx/d*spd*ts*dt,ny=u.y+ddy/d*spd*ts*dt;
-  if(inRiver(nx,ny)){
-    // Try ford redirect
-    if(atFord(u.x,u.y)||Math.abs(u.y-FORD_Y)<FORD_HALF_H+10){
-      // Near ford — push through
-      const fx=riverX(FORD_Y)-u.x,fy=FORD_Y-u.y;const fl=Math.sqrt(fx*fx+fy*fy)||1;
-      nx=u.x+fx/fl*spd*ts*dt;ny=u.y+fy/fl*spd*ts*dt;
-      if(!inRiver(nx,ny)){u.x=Math.max(4,Math.min(MAP.w-4,nx));u.y=Math.max(4,Math.min(MAP.h-4,ny));}
-    }else{
-      // Redirect toward ford first
-      const fx=riverX(FORD_Y)-u.x,fy=FORD_Y-u.y;const fl=Math.sqrt(fx*fx+fy*fy)||1;
-      u.x+=fx/fl*spd*ts*dt;u.y+=fy/fl*spd*ts*dt;
-    }
-    return;
-  }
+  const nx=u.x+ddx/d*spd*ts*dt,ny=u.y+ddy/d*spd*ts*dt;
   u.x=Math.max(4,Math.min(MAP.w-4,nx));u.y=Math.max(4,Math.min(MAP.h-4,ny));
 }
-function nudgeAroundRiver(x,y,tx,ty){
-  // If target is in the river, redirect to ford
-  if(inRiver(tx,ty))return{tx:riverX(FORD_Y),ty:FORD_Y};
-  const rx=riverX(y);const cross=(x<rx-RIVER_HALF_W&&tx>rx+RIVER_HALF_W)||(x>rx+RIVER_HALF_W&&tx<rx-RIVER_HALF_W);
-  if(!cross)return{tx,ty};return{tx:riverX(FORD_Y),ty:FORD_Y};
-}
+// No ford needed — river is crossable but slow
 
 // ══════════════════════════════════════
 // STATE
 // ══════════════════════════════════════
 const S={
-  cx:300,cy:350,speed:55,facing:0,moving:false,
+  cx:600,cy:350,speed:55,facing:Math.PI,moving:false,
   soldiers:[],soldierCount:40,
   formation:'circle',faith:70,
   rallying:false,rallyTimer:0,
@@ -356,8 +333,8 @@ const BRIEFING=[
   {speaker:'Captain Moroni',text:'The Zoramite dissenters have joined with the Lamanites. Zerahemnah leads a great host against us — far outnumbering our own forces.',ref:'Alma 43:5–6'},
   {speaker:'Captain Moroni',text:'I have sent to Alma to inquire of the Lord. The Lamanites will cross the river Sidon near the hill Riplah, marching toward Manti.',ref:'Alma 43:23–24'},
   {speaker:'Captain Moroni',text:'We have what they do not — breastplates, arm-shields, and thick clothing. They come nearly naked, armed only with swords and cimeters.',ref:'Alma 43:19–21'},
-  {speaker:'Captain Moroni',text:'Here is our plan. Take your company south of the ford and hide behind the hill Riplah. Captain Lehi will wait in the northern wilderness.',ref:'Alma 43:31–34'},
-  {speaker:'Captain Moroni',text:'When the Lamanites cross the ford, Lehi strikes their rear. You close from the south. Caught between two forces, they will have nowhere to run.',ref:''},
+  {speaker:'Captain Moroni',text:'Here is our plan. Take your company south and hide behind Hill Riplah. Captain Lehi will wait in the northern wilderness.',ref:'Alma 43:31–34'},
+  {speaker:'Captain Moroni',text:'When the Lamanites cross the river, Lehi strikes from the north. You close from the south. Caught between two forces with the river at their backs, they will have nowhere to run.',ref:''},
   {speaker:'Captain Moroni',text:'First — send scouts east to find their army and track their approach. Then move to the hill and STAY HIDDEN. Do not engage until they have crossed.',ref:''},
   {speaker:'',text:'Your orders:\n\n① Scout east — find the Lamanite army\n② Move to Hill Riplah — conceal your forces\n③ Wait for the crossing\n④ Spring the trap',ref:''},
 ];
@@ -396,9 +373,9 @@ function advanceStory(){
 function onStoryEnd(){
   if(S.phase==='briefing'){
     S.phase='scout';S.phaseTimer=0;
-    setObjective('Send a scout east toward the river to find the Lamanite army.');
+    setObjective('Send a scout west toward the river to find the Lamanite army.');
     setPhaseLabel('Phase 1 of 4 — Scouting');
-    showCallout('Face east (press D) and press E to send a scout.',6);
+    showCallout('Face west (press A) and press E to send a scout.',6);
   }
 }
 
@@ -448,11 +425,11 @@ function initSoldiers(){
 // LAMANITE ARMY
 // ══════════════════════════════════════
 const MARCH_PATH=[
-  {x:880,y:680},{x:820,y:620},{x:760,y:560},{x:700,y:500},{x:660,y:460},
-  {x:630,y:430},{x:615,y:410}, // approach ford
-  {x:605,y:400},{x:590,y:395},{x:570,y:385}, // crossing
-  {x:540,y:370},{x:500,y:355}, // west side
-  {x:440,y:350},{x:360,y:350},{x:280,y:350},{x:200,y:350}, // march west
+  {x:60,y:350},{x:120,y:350},{x:180,y:350},{x:230,y:350}, // march east on west side
+  {x:270,y:350},{x:300,y:350},{x:330,y:350},               // enter & cross river
+  {x:360,y:350},{x:400,y:350},{x:450,y:350},               // east bank, continue east
+  {x:500,y:370},{x:550,y:400},{x:600,y:430},               // heading toward hill area
+  {x:640,y:460},{x:680,y:500},                             // approaching hill
 ];
 
 function spawnLamaniteArmy(){
@@ -461,10 +438,10 @@ function spawnLamaniteArmy(){
     const a=Math.random()*Math.PI*2,r=Math.random()*35;
     const sp=MARCH_PATH[0];
     const e=makeUnit(sp.x+Math.cos(a)*r,sp.y+Math.sin(a)*r,'lamanite');
-    e.state='idle'; // idle until march starts
+    e.state='idle';
     e.waypointIdx=0;
-    e.speed=22+Math.random()*8; // SLOWER march
-    e.aggroRange=45; // SHORT aggro while marching — not expecting attack
+    e.speed=22+Math.random()*8;
+    e.aggroRange=45;
     S.enemies.push(e);
   }
   S._enemiesSpawned=true;
@@ -481,7 +458,7 @@ function startLamaniteMarch(){
 // LEHI
 // ══════════════════════════════════════
 function spawnLehi(){
-  const lx=480,ly=180;
+  const lx=620,ly=150;
   for(let i=0;i<30;i++){
     const a=Math.random()*Math.PI*2,r=Math.random()*20;
     const s=makeUnit(lx+Math.cos(a)*r,ly+Math.sin(a)*r,'nephite');
@@ -495,8 +472,8 @@ function triggerLehiAttack(){
   S.lehiAttacking=true;
   S.allies.forEach(a=>{
     a.state='charge';
-    a.tx=riverX(FORD_Y)-40+Math.random()*30;
-    a.ty=FORD_Y-20+Math.random()*40;
+    a.tx=450+Math.random()*50;
+    a.ty=350-20+Math.random()*40;
   });
 }
 
@@ -603,9 +580,9 @@ function updateMission(dt){
     if(spottedCount>=3&&!S._scoutedEnemy){
       S._scoutedEnemy=true;
       S.phase='position';S.phaseTimer=0;
-      setObjective('Move your forces to Hill Riplah (southeast). Hide in the trees or behind the hill!');
+      setObjective('Move your forces behind Hill Riplah (south). Hide in the trees or behind the hill!');
       setPhaseLabel('Phase 2 of 4 — Get into position');
-      showCallout('Lamanite army spotted to the east! ~'+S.totalLamanites+' warriors! Get to the hill!',6);
+      showCallout('Lamanite army spotted to the west! ~'+S.totalLamanites+' warriors! Get behind the hill!',6);
     }
 
     // Reminder at 15s if no scout sent
@@ -625,7 +602,7 @@ function updateMission(dt){
     if((nearHill||inSouthernWild)&&S.playerConcealed&&!S._inPosition){
       S._inPosition=true;
       S.phase='wait';S.phaseTimer=0;
-      setObjective('Hold position. The Lamanites are approaching the ford. Do NOT break cover!');
+      setObjective('Hold position. The Lamanites are approaching the river. Do NOT break cover!');
       setPhaseLabel('Phase 3 of 4 — Wait for crossing');
       showCallout('Good position! Hold here. Lehi is ready in the north. The Lamanites are marching...',6);
       // NOW start the march
@@ -639,8 +616,7 @@ function updateMission(dt){
       if(!S.playerConcealed){
         showCallout('You are EXPOSED! Move into the wilderness or behind Hill Riplah!',4);
       }else if(!nearHill&&!inSouthernWild){
-        const dir=S.cx<HILL.x?'east':'';
-        showCallout('Move toward Hill Riplah (southeast corner of the map).',4);
+        showCallout('Move toward Hill Riplah (south of your position).',4);
       }
     }
   }
@@ -649,9 +625,9 @@ function updateMission(dt){
   if(S.phase==='wait'){
     checkConcealment();
 
-    // Count Lamanites west of the river
+    // Count Lamanites east of the river (they crossed from west)
     let crossed=0;
-    S.enemies.forEach(e=>{if(!e.dead&&e.x<riverX(e.y)-RIVER_HALF_W)crossed++;});
+    S.enemies.forEach(e=>{if(!e.dead&&e.x>riverX(e.y)+RIVER_HALF_W)crossed++;});
 
     // Concealment break warning
     if(!S.playerConcealed){
@@ -663,7 +639,7 @@ function updateMission(dt){
     }
 
     // Progress callouts
-    if(crossed>5&&!S._crossNote1){S._crossNote1=true;showCallout('The Lamanites are beginning to cross the ford...',4);}
+    if(crossed>5&&!S._crossNote1){S._crossNote1=true;showCallout('The Lamanites are beginning to cross the river...',4);}
     if(crossed>30&&!S._crossNote2){S._crossNote2=true;showCallout('Most of their force is across. Almost time...',4);}
 
     // Trigger battle when enough have crossed
@@ -802,9 +778,9 @@ function update(dt){
     let nx=S.cx+dx*spd*dt,ny=S.cy+dy*spd*dt;
     if(!inRiver(nx,ny)){S.cx=Math.max(8,Math.min(MAP.w-8,nx));S.cy=Math.max(8,Math.min(MAP.h-8,ny));}
     else{
-      // Nudge toward ford
-      const fy=FORD_Y-S.cy,fx=riverX(FORD_Y)-S.cx;const fl=Math.sqrt(fx*fx+fy*fy)||1;
-      S.cx+=fx/fl*spd*dt*0.5;S.cy+=fy/fl*spd*dt*0.5;
+      // Slow through river — you CAN cross
+      const ts=terrainSpeed(nx,ny);
+      S.cx=Math.max(8,Math.min(MAP.w-8,S.cx+dx*spd*ts*dt));S.cy=Math.max(8,Math.min(MAP.h-8,S.cy+dy*spd*ts*dt));
     }
   }
 
@@ -976,49 +952,14 @@ function update(dt){
 // SOLDIER MOVEMENT
 // ══════════════════════════════════════
 function moveSoldierToTarget(s,dt){
-  let tx=s.tx,ty=s.ty;
-  const fordCenterX=riverX(FORD_Y);
-  
-  // Persistent crossing state: 0=none, 1=approaching ford, 2=crossing ford, 3=exiting ford
-  if(!s._crossState)s._crossState=0;
-  
-  // Check if target is across the river
-  const rx=riverX(s.y),trx=riverX(ty);
-  const onWest=s.x<rx-RIVER_HALF_W,targetEast=s.tx>trx+RIVER_HALF_W;
-  const onEast=s.x>rx+RIVER_HALF_W,targetWest=s.tx<trx-RIVER_HALF_W;
-  const needsCrossing=(onWest&&targetEast)||(onEast&&targetWest);
-  
-  if(needsCrossing&&s._crossState===0)s._crossState=1;
-  // If we've crossed (same side as target), clear state
-  const nowRx=riverX(s.y),nowTrx=riverX(s.ty);
-  const sameSide=(s.x<nowRx-RIVER_HALF_W&&s.tx<nowTrx-RIVER_HALF_W)||(s.x>nowRx+RIVER_HALF_W&&s.tx>nowTrx+RIVER_HALF_W);
-  if(sameSide)s._crossState=0;
-  
-  if(s._crossState===1){
-    // Phase 1: approach ford Y, stay on our side
-    tx=onWest?fordCenterX-FORD_HALF_W+4:fordCenterX+FORD_HALF_W-4;
-    ty=FORD_Y;
-    if(Math.abs(s.y-FORD_Y)<FORD_HALF_H+4&&Math.abs(s.x-tx)<10){
-      s._crossState=2;
-      s.sweatTimer=2.5;
-    }
-  }else if(s._crossState===2){
-    // Phase 2: move through ford to other side
-    tx=targetEast?fordCenterX+FORD_HALF_W+8:fordCenterX-FORD_HALF_W-8;
-    ty=FORD_Y;
-    const exitRx=riverX(FORD_Y);
-    const crossed=targetEast?(s.x>exitRx+RIVER_HALF_W+4):(s.x<exitRx-RIVER_HALF_W-4);
-    if(crossed){s._crossState=3;s.sweatTimer=0;}
-  }else if(s._crossState===3){
-    s._crossState=0;
-  }
-
-  let ddx=tx-s.x,ddy=ty-s.y;
+  let ddx=s.tx-s.x,ddy=s.ty-s.y;
   let dist=Math.sqrt(ddx*ddx+ddy*ddy);
   s.barkTimer=Math.max(0,s.barkTimer-dt);
   if(s.sweatTimer>0)s.sweatTimer-=dt;
-  if(dist<1.5&&s._crossState===0){s.vx*=0.5;s.vy*=0.5;return;}
+  if(dist<1.5){s.vx*=0.5;s.vy*=0.5;return;}
   const ts=terrainSpeed(s.x,s.y);
+  // Sweat when wading through river
+  if(inRiver(s.x,s.y)&&s.sweatTimer<=0)s.sweatTimer=1.5;
   let maxSpd,accel;
   if(S.rallying){maxSpd=S.speed*ts*0.95;accel=400*dt;}
   else if(S.formation==='circle'){maxSpd=s.speed*ts*0.6*Math.min(1.5,1+dist*0.01);accel=120*dt;}
@@ -1029,14 +970,7 @@ function moveSoldierToTarget(s,dt){
   s.vy+=(dvy-s.vy)*Math.min(1,accel/(maxSpd||1));
   const v=Math.sqrt(s.vx*s.vx+s.vy*s.vy);
   if(v>maxSpd){s.vx*=maxSpd/v;s.vy*=maxSpd/v;}
-  let nx=s.x+s.vx*dt,ny=s.y+s.vy*dt;
-  if(inRiver(nx,ny)){
-    // Hard push to ford center
-    const fx=fordCenterX-s.x,fy=FORD_Y-s.y;const fl=Math.sqrt(fx*fx+fy*fy)||1;
-    s.vx=fx/fl*s.speed*0.9;s.vy=fy/fl*s.speed*0.9;
-    if(!s._sweating&&s._crossState===2){s.sweatTimer=1.5;}
-    return;
-  }
+  const nx=s.x+s.vx*dt,ny=s.y+s.vy*dt;
   s.x=Math.max(4,Math.min(MAP.w-4,nx));s.y=Math.max(4,Math.min(MAP.h-4,ny));
   if(v>15){s.x+=Math.sin(S.time*10+s.bobPhase)*0.12;s.y+=Math.cos(S.time*10+s.bobPhase+1)*0.08;}
 }
@@ -1187,8 +1121,8 @@ function render(){
     if(s.armored){ctx.fillStyle='rgba(200,180,120,0.3)';ctx.fillRect(Math.floor(s.x),Math.floor(s.y-2),1,1);}
     if(s.hp<s.maxHp){ctx.fillStyle='rgba(200,180,60,0.6)';ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-4),Math.ceil(2*(s.hp/s.maxHp)),1);}
     if(s.barkTimer>0){const bA=Math.min(1,s.barkTimer*2);ctx.fillStyle=`rgba(255,220,80,${bA})`;ctx.fillRect(Math.floor(s.x),Math.floor(s.y-7),1,3);ctx.fillRect(Math.floor(s.x),Math.floor(s.y-3),1,1);}
-    // Sweat droplet (ford squeeze only) — left side, blinking
-    if(s.sweatTimer>0&&s._crossState===2){
+    // Sweat droplet — only when wading through river
+    if(s.sweatTimer>0&&inRiver(s.x,s.y)){
       const sa=Math.min(1,s.sweatTimer*0.8);
       const blink=Math.sin(S.time*6+s.bobPhase)>-0.3;
       if(blink){
@@ -1297,12 +1231,7 @@ function drawTerrain(){
   for(let y=MAP.h;y>=0;y-=4){ctx.lineTo(riverX(y)+RIVER_HALF_W,y);}ctx.fill();
   ctx.fillStyle='rgba(40,80,120,0.12)';
   for(let y=0;y<MAP.h;y+=10){const rx=riverX(y);ctx.fillRect(rx-8+Math.sin(S.time*2+y*0.1)*3,y,5,2);}
-  // Ford
-  const fRx=riverX(FORD_Y);
-  ctx.fillStyle='#3a3828';ctx.fillRect(fRx-FORD_HALF_W,FORD_Y-FORD_HALF_H,FORD_HALF_W*2,FORD_HALF_H*2);
-  ctx.fillStyle='rgba(80,70,40,0.35)';ctx.fillRect(fRx-FORD_HALF_W+3,FORD_Y-FORD_HALF_H+3,FORD_HALF_W*2-6,FORD_HALF_H*2-6);
-  for(let i=0;i<6;i++){ctx.fillStyle='rgba(120,110,80,0.2)';ctx.fillRect(fRx-FORD_HALF_W+4+i*8,FORD_Y-2+((i%2)*3),3,2);}
-  ctx.fillStyle='rgba(100,90,60,0.35)';ctx.font='4px Inter';ctx.fillText('Ford',fRx-6,FORD_Y-FORD_HALF_H-3);
+  // River
   // Hill
   ctx.fillStyle='rgba(80,70,40,0.18)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='rgba(90,80,45,0.12)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*0.65,0,Math.PI*2);ctx.fill();
@@ -1349,19 +1278,11 @@ function handleKey(k){
   if(!running)return;
   if(k===' '){
     S.rallying=true;S.rallyTimer=3;
-    // Unstick: ALL soldiers in river get teleported to nearest bank
-    // On-screen soldiers get velocity zeroed and retargeted
+    // Hard pull far soldiers toward commander
     S.soldiers.forEach(s=>{
       if(s.dead)return;
-      if(inRiver(s.x,s.y)){
-        const rx=riverX(s.y);
-        s.x=s.x<rx?rx-RIVER_HALF_W-5:rx+RIVER_HALF_W+5;
-        s.vx=0;s.vy=0;
-      }
-      // Hard pull toward commander
       const dist=Math.sqrt((s.x-S.cx)**2+(s.y-S.cy)**2);
       if(dist>100){
-        // Teleport partway toward commander
         const pull=Math.min(0.3,dist/1000);
         s.x+=(S.cx-s.x)*pull;
         s.y+=(S.cy-s.y)*pull;
@@ -1376,13 +1297,11 @@ function handleKey(k){
       const sc=alive[alive.length-1];
       S.soldiers=S.soldiers.filter(s=>s!==sc);
       sc.scoutFacing=S.facing;sc.speed=60;sc.armored=false;sc.returning=false;sc.scoutImmunity=3;
-      // Mission 1: smart path — go east toward ford, cross, then scout south along east bank
-      // Waypoints are absolute; scout picks the nearest one to start from
+      // Mission 1: smart path — go west toward the river to find Lamanites
       sc.scoutWaypoints=[
-        {x:500,y:355},{x:560,y:380},{x:riverX(FORD_Y),y:FORD_Y}, // approach ford
-        {x:riverX(FORD_Y)+30,y:FORD_Y}, // cross ford
-        {x:680,y:440},{x:720,y:500},{x:760,y:560}, // scout south along east bank
-        {x:800,y:620},{x:850,y:670},
+        {x:500,y:350},{x:440,y:350},{x:380,y:350},{x:340,y:350}, // approach river
+        {x:310,y:350},{x:280,y:350},                               // cross river
+        {x:240,y:350},{x:180,y:340},{x:120,y:330},{x:80,y:320},   // scout west bank
       ];
       // Skip waypoints that are behind the scout
       let bestWp=0,bestD=Infinity;
