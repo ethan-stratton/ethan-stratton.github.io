@@ -9,10 +9,19 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-x:hidden;min-height:100vh}
 
-/* Layout: main + sidebar */
-#app{display:flex;max-width:1060px;margin:0 auto;min-height:100vh}
+/* Layout: left panel + main + sidebar */
+#app{display:flex;max-width:1200px;margin:0 auto;min-height:100vh}
+#left-panel{width:200px;flex-shrink:0;padding:12px 8px;border-right:1px solid rgba(200,160,80,0.08);background:rgba(0,0,0,0.1);position:sticky;top:0;max-height:100vh}
+#left-panel canvas{width:100%;border-radius:4px;display:block;image-rendering:pixelated}
 #main-col{flex:1;min-width:0;padding:16px 20px}
-#sidebar{width:240px;flex-shrink:0;padding:16px 12px;border-left:1px solid rgba(200,160,80,0.08);background:rgba(0,0,0,0.15);overflow-y:auto;max-height:100vh;position:sticky;top:0}
+#sidebar{width:220px;flex-shrink:0;padding:16px 12px;border-left:1px solid rgba(200,160,80,0.08);background:rgba(0,0,0,0.15);overflow-y:auto;max-height:100vh;position:sticky;top:0}
+
+/* Event log */
+#event-log{border-top:1px solid rgba(200,160,80,0.08);padding:10px 20px;max-height:140px;overflow-y:auto;font-family:'Inter',sans-serif;font-size:0.65rem;color:#585048;line-height:1.6}
+#event-log:empty{display:none}
+.log-entry{padding:2px 0;border-bottom:1px solid rgba(200,160,80,0.03)}
+.log-day{color:#706050;margin-right:6px}
+.log-wren{color:#c8b0d0;font-style:italic}
 
 /* Title screen */
 #title-screen{text-align:center;padding:80px 20px 60px}
@@ -97,12 +106,27 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 /* Scene illustration */
 #scene-canvas{width:100%;height:120px;border-radius:4px;margin-bottom:12px;display:block}
 
+/* Settlement cross-section (left panel) */
+#settlement-canvas{width:180px;height:360px}
+#left-panel h3{font-family:'Inter',sans-serif;font-size:0.6rem;color:#706050;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px}
+
+/* Advisor section in sidebar */
+.advisor-sidebar{margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(200,160,80,0.06)}
+.advisor-entry{display:flex;align-items:center;gap:6px;padding:5px 0}
+.advisor-entry .adv-icon{font-size:0.8rem;width:20px;text-align:center}
+.advisor-entry .adv-name{font-size:0.75rem;color:#a89878}
+.advisor-entry .adv-mood{font-family:'Inter',sans-serif;font-size:0.55rem;color:#706050;font-style:italic;margin-left:auto}
+
 /* Dawn tooltips */
 .role-info{font-family:'Inter',sans-serif;font-size:0.6rem;color:#706050;line-height:1.5;margin-top:2px}
 .role-yield{color:#a89878}
 .role-warn{color:#c05040}
-@media(max-width:768px){
+
+/* Responsive */
+@media(max-width:900px){
   #app{flex-direction:column}
+  #left-panel{width:100%;max-height:none;position:relative;border-right:none;border-bottom:1px solid rgba(200,160,80,0.08);display:flex;gap:8px;padding:12px;flex-direction:row;align-items:flex-start}
+  #left-panel canvas{width:180px;height:200px}
   #sidebar{width:100%;max-height:none;position:relative;border-left:none;border-top:1px solid rgba(200,160,80,0.08);display:flex;flex-wrap:wrap;gap:8px;padding:12px}
   .roster-section{flex:1;min-width:140px}
 }
@@ -110,6 +134,10 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 </head>
 <body>
 <div id="app">
+<div id="left-panel" style="display:none">
+<h3>Brannhaven</h3>
+<canvas id="settlement-canvas" width="180" height="360"></canvas>
+</div>
 <div id="main-col">
 
 <div id="title-screen">
@@ -127,7 +155,6 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 </div>
 
 <div id="game-screen" style="display:none">
-<canvas id="scene-canvas" width="640" height="120"></canvas>
 <div id="hud">
 <div id="day-label">Day 1 / 10 — Dawn</div>
 <div class="res-bar"><div class="label"><span>Food</span><span id="rv-food">70</span></div><div class="bar"><div class="fill" id="rf-food" style="width:70%;background:#c8a060"></div></div></div>
@@ -141,11 +168,13 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 <div id="end-screen" style="display:none"></div>
 </div>
 
-<div id="sidebar">
-<h3>Brannhaven</h3>
+<div id="sidebar" style="display:none">
+<div id="advisor-panel"></div>
+<h3>People</h3>
 <div id="roster"></div>
 </div>
 </div>
+<div id="event-log"></div>
 
 <script>
 // ══════════════════════════════════════
@@ -482,6 +511,7 @@ function updateHud(){
   if(m>2)document.body.style.background=`rgb(${Math.min(40,26+m*3)},${Math.max(14,22-m)},${Math.max(10,16-m)})`;
   else if(m<-2)document.body.style.background=`rgb(${Math.max(16,26+m)},${Math.max(16,22+m)},${Math.min(24,16-m*0.5)})`;
   else document.body.style.background='#1a1610';
+  renderAdvisors();
   renderRoster();
 }
 
@@ -497,12 +527,9 @@ function renderDawn(){
     ['rest','Rest','Each resting worker restores ~1 morale.','Low morale = families leave.',S.mor<30]
   ];
   let h=`<div class="phase-title">Dawn — Assign Workers</div>`;
-  if(S.day===1){
-    h+=`<div style="font-size:0.85rem;color:#887860;font-style:italic;margin-bottom:16px;padding:12px;background:rgba(200,160,80,0.03);border-left:2px solid rgba(200,160,80,0.1);border-radius:0 4px 4px 0;line-height:1.6">
-      You have <strong style="color:#c8b890">${S.ppl} people</strong> to assign. They eat <strong style="color:#c8b890">${consumption} food</strong> each day whether they work or not.<br>
-      Unassigned workers do nothing. There are never enough hands for everything.
-    </div>`;
-  }
+  h+=`<div style="font-size:0.85rem;color:#887860;font-style:italic;margin-bottom:16px;padding:12px;background:rgba(200,160,80,0.03);border-left:2px solid rgba(200,160,80,0.1);border-radius:0 4px 4px 0;line-height:1.6">
+    <strong style="color:#c8b890">${S.ppl} people</strong> available. They eat <strong style="color:#c8b890">${consumption} food</strong> per day whether they work or not.
+  </div>`;
   roles.forEach(([k,n,info,warn,urgent])=>{
     h+=`<div class="assign-row">
       <div class="role">${n}</div>
@@ -574,6 +601,7 @@ function choosePetition(idx){
   if(ef.trustEdric)S.trustEdric=clamp(S.trustEdric+ef.trustEdric);
   if(ch.flag)S.flags[ch.flag]=true;
   if(ch.roster)setMultiStatus(ch.roster);
+  logEvent(ch.text);
   updateHud();endMidday();
 }
 
@@ -584,8 +612,12 @@ function renderDusk(){
   const area=document.getElementById('phase-area');
   let h=`<div class="phase-title">Dusk — The Day's End</div>`;
   events.forEach(ev=>{
-    if(ev==='__wren__')h+=`<div class="wren-line">${getWrenLine()}</div>`;
-    else h+=`<div class="event-line">${ev}</div>`;
+    if(ev==='__wren__'){
+      const wl=getWrenLine();
+      h+=`<div class="wren-line">${wl}</div>`;
+      logEvent(wl,'wren');
+    }
+    else{h+=`<div class="event-line">${ev}</div>`;logEvent(ev);}
   });
   updateHud();
   if(S.food<=0){h+=`<div class="gameover-msg">The granary is empty. Brannhaven starves.</div><button class="phase-btn" onclick="showEnding()">...</button>`;S.gameOver=true;}
@@ -601,6 +633,8 @@ function nextDay(){S.day++;S.phase='dawn';S.assign={farm:0,build:0,guard:0,forag
 function showEnding(){
   document.getElementById('game-screen').style.display='none';
   document.getElementById('sidebar').style.display='none';
+  document.getElementById('left-panel').style.display='none';
+  if(settlementRAF)cancelAnimationFrame(settlementRAF);
   const end=document.getElementById('end-screen');end.style.display='block';
   const m=S.mark;let title,name,wren;
   if(S.gameOver&&S.food<=0){title='Brannhaven fell.';name='THE FAMINE';wren='Wren isn\'t here. You don\'t know where she went.';}
@@ -636,136 +670,219 @@ function showEnding(){
 function startGame(){
   document.getElementById('title-screen').style.display='none';
   document.getElementById('game-screen').style.display='block';
-  updateHud();renderDawn();animateScene();
+  document.getElementById('left-panel').style.display='block';
+  document.getElementById('sidebar').style.display='block';
+  updateHud();renderDawn();animateSettlement();
 }
 
 // Init roster on load
 renderRoster();
 
 // ══════════════════════════════════════
-// SCENE ILLUSTRATION (pixel landscape)
+// ADVISOR MOODS (sidebar)
 // ══════════════════════════════════════
-function paintScene(){
-  const cv=document.getElementById('scene-canvas');
+function getAdvisorMood(trust){
+  if(trust>=80)return 'loyal';
+  if(trust>=60)return 'steady';
+  if(trust>=40)return 'watchful';
+  if(trust>=25)return 'terse';
+  if(trust>=10)return 'cold';
+  return 'silent';
+}
+function renderAdvisors(){
+  const panel=document.getElementById('advisor-panel');
+  if(!panel)return;
+  const advisors=[
+    {icon:'⚔️',name:'Rowan',trust:S.trustRowan},
+    {icon:'🌿',name:'Lira',trust:S.trustLira},
+    {icon:'📜',name:'Edric',trust:S.trustEdric}
+  ];
+  let h='<div class="advisor-sidebar">';
+  advisors.forEach(a=>{
+    h+=`<div class="advisor-entry"><span class="adv-icon">${a.icon}</span><span class="adv-name">${a.name}</span><span class="adv-mood">${getAdvisorMood(a.trust)}</span></div>`;
+  });
+  h+='</div>';
+  panel.innerHTML=h;
+}
+
+// ══════════════════════════════════════
+// EVENT LOG
+// ══════════════════════════════════════
+const eventHistory=[];
+function logEvent(text,type){
+  eventHistory.push({day:S.day,phase:S.phase,text,type:type||'normal'});
+  renderEventLog();
+}
+function renderEventLog(){
+  const el=document.getElementById('event-log');
+  if(!el)return;
+  const recent=eventHistory.slice(-30);
+  el.innerHTML=recent.map(e=>{
+    const cls=e.type==='wren'?'log-entry log-wren':'log-entry';
+    return `<div class="${cls}"><span class="log-day">Day ${e.day}</span>${e.text}</div>`;
+  }).join('');
+  el.scrollTop=el.scrollHeight;
+}
+
+// ══════════════════════════════════════
+// SETTLEMENT CROSS-SECTION (left panel)
+// ══════════════════════════════════════
+function paintSettlement(){
+  const cv=document.getElementById('settlement-canvas');
   if(!cv)return;
   const ctx=cv.getContext('2d');
   const W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
   
-  // Time-of-day colors based on phase
+  // Sky
   const palettes={
-    dawn:{sky1:'#2a2040',sky2:'#c08050',ground:'#2a2818',wall:'#4a4238',river:'#3a4858'},
-    midday:{sky1:'#4a5a70',sky2:'#8a9ab0',ground:'#2a2818',wall:'#5a5248',river:'#4a5868'},
-    dusk:{sky1:'#3a1a20',sky2:'#c06030',ground:'#1a1810',wall:'#3a3228',river:'#2a3040'}
+    dawn:['#2a2040','#c08050'],midday:['#4a5a70','#8a9ab0'],dusk:['#3a1a20','#c06030']
   };
-  const p=palettes[S.phase]||palettes.dawn;
-  
-  // Sky gradient
-  const grad=ctx.createLinearGradient(0,0,0,H*0.6);
-  grad.addColorStop(0,p.sky1);
-  grad.addColorStop(1,p.sky2);
-  ctx.fillStyle=grad;
-  ctx.fillRect(0,0,W,H);
-  
-  // Distant mountains
-  ctx.fillStyle='rgba(30,25,20,0.6)';
-  ctx.beginPath();ctx.moveTo(0,55);
-  ctx.lineTo(80,25);ctx.lineTo(160,40);ctx.lineTo(240,15);ctx.lineTo(340,35);ctx.lineTo(440,20);ctx.lineTo(540,38);ctx.lineTo(640,30);
-  ctx.lineTo(640,70);ctx.lineTo(0,70);ctx.fill();
-  
-  // Mid hills
-  ctx.fillStyle='rgba(35,30,22,0.7)';
-  ctx.beginPath();ctx.moveTo(0,65);
-  ctx.lineTo(100,50);ctx.lineTo(200,58);ctx.lineTo(300,45);ctx.lineTo(400,55);ctx.lineTo(500,48);ctx.lineTo(640,52);
-  ctx.lineTo(640,80);ctx.lineTo(0,80);ctx.fill();
+  const pal=palettes[S.phase]||palettes.dawn;
+  const grad=ctx.createLinearGradient(0,0,0,80);
+  grad.addColorStop(0,pal[0]);grad.addColorStop(1,pal[1]);
+  ctx.fillStyle=grad;ctx.fillRect(0,0,W,80);
   
   // Ground
-  ctx.fillStyle=p.ground;
-  ctx.fillRect(0,70,W,H-70);
+  ctx.fillStyle='#2a2818';ctx.fillRect(0,80,W,H-80);
   
-  // River
-  ctx.fillStyle=p.river;
-  ctx.beginPath();ctx.moveTo(350,75);
-  ctx.quadraticCurveTo(400,85,420,120);
-  ctx.lineTo(440,120);
-  ctx.quadraticCurveTo(420,82,370,72);ctx.fill();
-  // River shimmer
-  ctx.fillStyle='rgba(140,160,180,0.15)';
-  ctx.fillRect(380,85,8,2);ctx.fillRect(395,95,6,2);ctx.fillRect(410,108,10,2);
+  // ── WALL (cross-section view) ──
+  const wallY=50,wallH=50;
+  ctx.fillStyle='#4a4238';
+  ctx.fillRect(10,wallY,W-20,wallH);
+  // Stone pattern
+  ctx.fillStyle='rgba(0,0,0,0.12)';
+  for(let y=0;y<wallH;y+=7){for(let x=0;x<W-20;x+=14){ctx.fillRect(10+x+(y%14?7:0),wallY+y,13,6);}}
+  // Wall top crenellations
+  ctx.fillStyle='#5a5248';
+  for(let x=10;x<W-20;x+=16){ctx.fillRect(x,wallY-6,10,8);}
   
-  // Fields (left side) — rows of crops
-  ctx.fillStyle='#3a4a28';
-  for(let i=0;i<5;i++){ctx.fillRect(40,78+i*6,100,3);}
-  // Farmers (tiny dots if assigned)
-  if(S.assign.farm>0){
-    ctx.fillStyle='#a09060';
-    for(let i=0;i<Math.min(S.assign.farm,4);i++){ctx.fillRect(55+i*20,80+i*5,3,5);}
+  // Damage based on materials
+  if(S.mat<30){
+    ctx.fillStyle='rgba(0,0,0,0.3)';
+    ctx.fillRect(60,wallY+15,8,wallH-15); // crack
+    ctx.fillRect(120,wallY+25,6,wallH-25);
+  }
+  if(S.mat<15){
+    ctx.fillStyle='rgba(0,0,0,0.4)';
+    ctx.fillRect(30,wallY+10,12,wallH-10); // big crack
   }
   
-  // Wall
-  const wallX=200,wallW=140,wallH=28,wallY=68;
-  ctx.fillStyle=p.wall;
-  ctx.fillRect(wallX,wallY,wallW,wallH);
-  // Wall stones
-  ctx.fillStyle='rgba(0,0,0,0.15)';
-  for(let y=0;y<wallH;y+=6){for(let x=0;x<wallW;x+=12){ctx.fillRect(wallX+x+(y%12?6:0),wallY+y,11,5);}}
-  // Gate
-  ctx.fillStyle='#1a1610';
-  ctx.fillRect(wallX+60,wallY+12,18,16);
-  // Gate arch
-  ctx.fillStyle=p.wall;
-  ctx.beginPath();ctx.arc(wallX+69,wallY+12,9,Math.PI,0);ctx.fill();
-  
-  // Buildings inside wall
-  ctx.fillStyle='#3a3428';
-  ctx.fillRect(wallX+10,wallY+8,16,12);  // granary
-  ctx.fillRect(wallX+30,wallY+6,14,14);  // hearthhouse
-  ctx.fillRect(wallX+100,wallY+10,18,10); // healer's hall
-  // Roofs
-  ctx.fillStyle='#4a3828';
-  ctx.beginPath();ctx.moveTo(wallX+8,wallY+8);ctx.lineTo(wallX+18,wallY+2);ctx.lineTo(wallX+28,wallY+8);ctx.fill();
-  ctx.beginPath();ctx.moveTo(wallX+28,wallY+6);ctx.lineTo(wallX+37,wallY+0);ctx.lineTo(wallX+46,wallY+6);ctx.fill();
-  ctx.beginPath();ctx.moveTo(wallX+98,wallY+10);ctx.lineTo(wallX+109,wallY+4);ctx.lineTo(wallX+120,wallY+10);ctx.fill();
-  
-  // Watchtower
-  ctx.fillStyle=p.wall;
-  ctx.fillRect(wallX-4,wallY-10,10,14);
-  ctx.fillStyle='#5a4a38';
-  ctx.fillRect(wallX-6,wallY-12,14,4);
   // Guard dots on wall
-  if(S.assign.guard>0){
-    ctx.fillStyle='#8a7a60';
-    for(let i=0;i<Math.min(S.assign.guard,6);i++){ctx.fillRect(wallX+10+i*20,wallY-2,2,4);}
+  const gCount=Math.min(S.assign.guard||0,6);
+  ctx.fillStyle='#c8a060';
+  for(let i=0;i<gCount;i++){
+    const gx=20+i*24;
+    ctx.fillRect(gx,wallY-10,3,6); // body
+    ctx.fillRect(gx,wallY-12,3,2); // head
   }
   
-  // Trees (right side, beyond wall)
-  ctx.fillStyle='#2a3a1a';
-  [[500,62],[520,58],[540,64],[560,60],[510,70],[545,72]].forEach(([x,y])=>{
-    ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#3a2a18';ctx.fillRect(x-1,y+6,3,8);ctx.fillStyle='#2a3a1a';
-  });
+  // ── BUILDINGS ──
+  const buildY=105;
   
-  // Foragers (tiny figures in the trees)
-  if(S.assign.forage>0){
-    ctx.fillStyle='#a09060';
-    ctx.fillRect(508,72,2,5);ctx.fillRect(530,68,2,5);
-  }
+  // Granary
+  ctx.fillStyle='#3a3428';
+  ctx.fillRect(15,buildY,40,30);
+  ctx.fillStyle='#4a3828';
+  ctx.beginPath();ctx.moveTo(12,buildY);ctx.lineTo(35,buildY-12);ctx.lineTo(58,buildY);ctx.fill();
+  // Grain level (visual food indicator)
+  const grainH=Math.floor((S.food/100)*24);
+  ctx.fillStyle='#c8a060';
+  ctx.fillRect(18,buildY+28-grainH,34,grainH);
+  // Label
+  ctx.fillStyle='#706050';ctx.font='8px Inter,sans-serif';
+  ctx.fillText('Granary',18,buildY+42);
   
-  // Smoke from hearthhouse
-  ctx.fillStyle='rgba(100,90,80,0.2)';
+  // Hearthhouse
+  ctx.fillStyle='#3a3428';
+  ctx.fillRect(70,buildY-5,45,35);
+  ctx.fillStyle='#4a3828';
+  ctx.beginPath();ctx.moveTo(67,buildY-5);ctx.lineTo(92,buildY-20);ctx.lineTo(118,buildY-5);ctx.fill();
+  // Chimney smoke
   const t=Date.now()*0.001;
-  ctx.beginPath();ctx.arc(wallX+37+Math.sin(t)*3,wallY-6+Math.sin(t*0.7)*2,4,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(wallX+39+Math.sin(t+1)*4,wallY-14+Math.sin(t*0.5)*3,3,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(100,90,80,0.25)';
+  ctx.beginPath();ctx.arc(95+Math.sin(t)*2,buildY-26+Math.sin(t*0.7)*2,4,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(97+Math.sin(t+1)*3,buildY-34+Math.sin(t*0.5)*2,3,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#706050';ctx.fillText('Hearthhouse',62,buildY+42);
   
-  // Stars (dawn/dusk only)
-  if(S.phase==='dawn'||S.phase==='dusk'){
-    ctx.fillStyle='rgba(200,190,170,0.4)';
-    [[50,12],[120,8],[300,15],[450,10],[580,18],[95,25],[400,5]].forEach(([x,y])=>{ctx.fillRect(x,y,1,1);});
+  // Healer's Hall
+  ctx.fillStyle='#3a3428';
+  ctx.fillRect(130,buildY,35,28);
+  ctx.fillStyle='#4a3828';
+  ctx.beginPath();ctx.moveTo(127,buildY);ctx.lineTo(147,buildY-10);ctx.lineTo(168,buildY);ctx.fill();
+  // Herb symbol
+  ctx.fillStyle='#5B8C5A';ctx.fillText('🌿',140,buildY+14);
+  ctx.fillStyle='#706050';ctx.fillText("Healer's",132,buildY+42);
+  
+  // ── FIELDS ──
+  const fieldY=170;
+  ctx.fillStyle='#706050';ctx.fillText('Fields',18,fieldY);
+  const farmCount=S.assign.farm||0;
+  // Crop rows
+  for(let i=0;i<6;i++){
+    ctx.fillStyle=farmCount>i?'#4a6a28':'#2a3a18';
+    ctx.fillRect(15,fieldY+8+i*8,W-30,5);
+  }
+  // Farmer figures
+  ctx.fillStyle='#c8a060';
+  for(let i=0;i<Math.min(farmCount,5);i++){
+    ctx.fillRect(25+i*28,fieldY+4,3,6);
+  }
+  
+  // ── RIVER ──
+  const riverY=230;
+  ctx.fillStyle='#3a4858';
+  ctx.beginPath();
+  ctx.moveTo(0,riverY);
+  ctx.quadraticCurveTo(50,riverY-8,90,riverY+5);
+  ctx.quadraticCurveTo(140,riverY+15,180,riverY+8);
+  ctx.lineTo(180,riverY+20);
+  ctx.quadraticCurveTo(140,riverY+28,90,riverY+18);
+  ctx.quadraticCurveTo(50,riverY+5,0,riverY+14);
+  ctx.fill();
+  // Shimmer
+  ctx.fillStyle='rgba(140,160,180,0.15)';
+  ctx.fillRect(40,riverY+4,8,2);ctx.fillRect(100,riverY+10,10,2);
+  ctx.fillStyle='#706050';ctx.fillText('River',75,riverY+32);
+  
+  // ── FOREST (beyond wall) ──
+  const forestY=275;
+  ctx.fillStyle='#706050';ctx.fillText('Beyond the Wall',40,forestY);
+  ctx.fillStyle='#2a3a1a';
+  [[30,forestY+10],[55,forestY+8],[80,forestY+12],[110,forestY+9],[140,forestY+11]].forEach(([x,y])=>{
+    ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='#3a2a18';ctx.fillRect(x-1,y+7,3,8);ctx.fillStyle='#2a3a1a';
+  });
+  // Forager figures
+  if(S.assign.forage>0){
+    ctx.fillStyle='#c8a060';
+    ctx.fillRect(45,forestY+20,3,6);ctx.fillRect(95,forestY+18,3,6);
+  }
+  
+  // ── MORALE INDICATOR ──
+  const morY=320;
+  ctx.fillStyle='#706050';ctx.fillText('Spirit',75,morY);
+  // Tiny people: happy = standing, low = sitting/leaving
+  const pplCount=Math.min(Math.floor(S.ppl/5),8);
+  for(let i=0;i<pplCount;i++){
+    const px=20+i*18;
+    if(S.mor>40){
+      ctx.fillStyle='#a09070';
+      ctx.fillRect(px,morY+6,3,7); // standing
+      ctx.fillRect(px,morY+4,3,2); // head
+    }else if(S.mor>20){
+      ctx.fillStyle='#807060';
+      ctx.fillRect(px,morY+10,5,3); // sitting
+      ctx.fillRect(px,morY+8,3,2);
+    }else{
+      ctx.fillStyle='#605040';
+      ctx.fillRect(px,morY+10,5,3); // hunched
+    }
   }
 }
 
-// Animate scene
-let sceneRAF;
-function animateScene(){paintScene();sceneRAF=requestAnimationFrame(animateScene);}
+let settlementRAF;
+function animateSettlement(){paintSettlement();settlementRAF=requestAnimationFrame(animateSettlement);}
 
 </script>
 </body>
