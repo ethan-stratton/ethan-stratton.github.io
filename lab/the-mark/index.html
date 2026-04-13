@@ -70,6 +70,8 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 /* Dusk events */
 .event-line{font-size:1.05rem;line-height:1.7;color:#a89878;margin-bottom:10px;padding-left:12px;border-left:1px solid rgba(200,160,80,0.1)}
 .wren-line{font-size:1.05rem;color:#c8b0d0;font-style:italic;padding:16px;margin:16px 0;background:rgba(180,140,200,0.05);border-left:2px solid rgba(180,140,200,0.2);border-radius:0 4px 4px 0}
+.ambient-moment{font-size:1rem;color:#887860;font-style:italic;padding:20px;margin:16px 0;background:rgba(200,160,80,0.02);border-left:2px solid rgba(200,160,80,0.08);border-radius:0 4px 4px 0;line-height:1.8}
+.ambient-label{font-family:'Inter',sans-serif;font-size:0.6rem;color:#504838;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px}
 .gameover-msg{font-size:1.3rem;color:#c05040;text-align:center;margin:20px 0}
 
 /* End screen */
@@ -242,10 +244,13 @@ const S={
   day:1, maxDays:10, phase:'dawn',
   food:70, mat:60, ppl:40, mor:65,
   mark:0,
+  trustRowan:60, trustLira:60, trustEdric:60,
   assign:{farm:0,build:0,guard:0,forage:0,rest:0},
   usedPetitions:new Set(),
   flags:{},
-  gameOver:false
+  gameOver:false,
+  pendingEvents:[], // {day, text, effects, roster, flag, wrenLine}
+  ambientsSeen:new Set()
 };
 function clamp(v,lo=0,hi=100){return Math.max(lo,Math.min(hi,v))}
 
@@ -447,6 +452,119 @@ const PETITIONS=[
 ];
 
 // ══════════════════════════════════════
+// AMBIENT MOMENTS (non-interactive vignettes)
+// ══════════════════════════════════════
+const AMBIENTS=[
+  // Early days — establishing normalcy
+  {id:'morning_fog',minDay:1,maxDay:2,
+   text:'The fog sits heavy on the river this morning. For a moment, everything is still. A woman hangs laundry from a line between two houses. Somewhere, a child laughs.',
+   mood:'peace'},
+  {id:'edric_wife',minDay:2,maxDay:4,
+   text:'You find Edric alone in the council room before dawn. He\'s holding a small wooden comb. He puts it away when he sees you. "My wife\'s," he says, and changes the subject.',
+   mood:'quiet'},
+  {id:'rowan_wall',minDay:1,maxDay:3,
+   text:'Rowan is already on the wall when you wake. He\'s been there since before light. He doesn\'t turn around. Just says: "Fourteen years I\'ve watched this horizon. Some mornings I forget what I\'m watching for."',
+   mood:'quiet'},
+  {id:'kids_playing',minDay:2,maxDay:5,
+   text:'Children are playing siege in the square. One stands on a barrel — "I\'m the Warden!" Another throws a pinecone at her. "Brannhaven never falls!" They collapse laughing. A mother watches from a doorway, not smiling.',
+   mood:'peace'},
+  {id:'lira_garden',minDay:3,maxDay:5,
+   text:'Lira is in the herb garden behind the healer\'s hall. She talks to her plants. You catch a fragment: "...just need a few more weeks. Hold on." She notices you. "The feverfew. Not you." Almost smiles.',
+   mood:'peace'},
+
+  // Relationship-dependent (the soup mechanic)
+  {id:'senna_soup',minDay:2,maxDay:6,requires:()=>!S.flags._senna_dead&&getChar('corwin_wife')?.visible,
+   text:'Senna leaves a bowl of broth outside the Hearthhouse door. No note. She\'s already gone by the time you find it. The broth is still warm.',
+   mood:'warmth'},
+  {id:'senna_soup_2',minDay:4,maxDay:7,requires:()=>S.ambientsSeen.has('senna_soup')&&!S.flags._senna_dead,
+   text:'The broth is there again this morning. Same bowl. Same place. You realize she\'s been doing this every day.',
+   mood:'warmth'},
+  {id:'senna_soup_gone',minDay:7,maxDay:10,requires:()=>S.ambientsSeen.has('senna_soup_2')&&(S.flags._senna_dead||S.flags._senna_collapsed),
+   text:'No bowl this morning. The step is bare. You stand there longer than makes sense.',
+   mood:'loss'},
+  {id:'elif_daughter_drawing',minDay:6,maxDay:9,requires:()=>S.flags.elif_in,
+   text:'Elif\'s daughter is drawing on a flat stone with charcoal. A house with a triangle roof. Flowers taller than the door. A sun with a face. She holds it up to show you and says a word you don\'t understand. Elif translates: "Home."',
+   mood:'warmth'},
+  {id:'elif_girl_wall',minDay:8,maxDay:10,requires:()=>S.flags.elif_in&&S.ambientsSeen.has('elif_daughter_drawing'),
+   text:'Elif\'s daughter drew another picture. This one has walls around the house. And tiny stick figures on the walls. Guards. She\'s learning what home means here.',
+   mood:'quiet'},
+  {id:'nath_whittling',minDay:9,maxDay:10,requires:()=>S.flags.nath_citizen||S.flags.nath_treat,
+   text:'Nath sits by the river, whittling. He\'s making a small bird. His hands shake — they always shake now. But the bird is careful. Detailed. He sets it on the wall by the east gate, facing outward. Toward where he came from.',
+   mood:'quiet'},
+  {id:'kael_quiet',minDay:7,maxDay:9,requires:()=>S.flags.kael_council,
+   text:'Kael is in the square, but he\'s not speaking. He\'s listening to an old woman talk about her cellar flooding. Takes notes on a scrap of hide. He sees you watching. Nods once. Goes back to listening.',
+   mood:'peace'},
+  {id:'avi_praying',minDay:6,maxDay:10,requires:()=>S.flags.elif_in,
+   text:'Old Avi kneels by the river at dawn. His prayer is in a language that predates Brannhaven, maybe predates the collapse. A few people have started pausing to listen, even though they don\'t understand a word.',
+   mood:'peace'},
+  {id:'rowan_elif_girl',minDay:7,maxDay:10,requires:()=>S.flags.elif_in&&S.ambientsSeen.has('elif_daughter_drawing'),
+   text:'You see Rowan standing near Elif\'s daughter. She\'s drawing again. He watches for a long time. Then walks away without a word. That evening, he comes to you: "I watched the girl drawing today. I hate that I wanted to turn her away."',
+   mood:'growth'},
+
+  // Crisis-dependent
+  {id:'empty_chair',requires:()=>CHARACTERS.some(c=>c.status==='dead'&&c.visible),minDay:3,maxDay:10,
+   text:'At the evening meal, there\'s an empty seat. No one sits in it. No one moves it. It stays there, untouched, like a held breath.',
+   mood:'loss'},
+  {id:'tools_wall',requires:()=>S.flags._senna_collapsed||S.flags._senna_dead,minDay:8,maxDay:10,
+   text:'Senna\'s trowel is still leaning against the east wall. Where she left it. No one has moved it. Rain is starting to rust the blade.',
+   mood:'loss'},
+  {id:'pacifist_garden',minDay:10,maxDay:10,requires:()=>S.flags.pacifist_accept,
+   text:'The Thornfield families planted something by the south wall. Too early to tell what. "It won\'t bloom for a year," one of them says. "That\'s the point." They tend it every morning anyway.',
+   mood:'hope'},
+  {id:'hunger_morning',requires:()=>S.food<15,minDay:3,maxDay:10,
+   text:'A boy stands at the granary door, watching the lock. He doesn\'t try to open it. Just stands there. His ribs show through his shirt.',
+   mood:'dread'},
+  {id:'morale_low',requires:()=>S.mor<25,minDay:4,maxDay:10,
+   text:'Nobody talks at breakfast. The sound of spoons scraping bowls is the loudest thing in Brannhaven.',
+   mood:'dread'},
+];
+
+function getAmbient(){
+  const available=AMBIENTS.filter(a=>{
+    if(S.ambientsSeen.has(a.id))return false;
+    if(a.minDay&&S.day<a.minDay)return false;
+    if(a.maxDay&&S.day>a.maxDay)return false;
+    if(a.requires&&!a.requires())return false;
+    return true;
+  });
+  if(!available.length)return null;
+  // Prioritize: loss/dread > growth > warmth > quiet > peace
+  const priority={loss:5,dread:4,growth:3,warmth:2,quiet:1,peace:0,hope:3};
+  available.sort((a,b)=>(priority[b.mood]||0)-(priority[a.mood]||0));
+  const pick=available[Math.floor(Math.random()*Math.min(3,available.length))];
+  return pick;
+}
+
+// ══════════════════════════════════════
+// DELAYED CONSEQUENCES
+// ══════════════════════════════════════
+function queueDelayed(day,text,effects,roster,flag,wrenLine){
+  S.pendingEvents.push({day,text,effects:effects||{},roster:roster||[],flag:flag||null,wrenLine:wrenLine||null});
+}
+
+function processDelayed(events){
+  const due=S.pendingEvents.filter(e=>e.day<=S.day);
+  S.pendingEvents=S.pendingEvents.filter(e=>e.day>S.day);
+  due.forEach(e=>{
+    events.push(e.text);
+    if(e.effects){
+      if(e.effects.food)S.food=clamp(S.food+e.effects.food);
+      if(e.effects.mat)S.mat=clamp(S.mat+e.effects.mat);
+      if(e.effects.ppl)S.ppl=clamp(S.ppl+e.effects.ppl);
+      if(e.effects.mor)S.mor=clamp(S.mor+e.effects.mor);
+      if(e.effects.mark!==undefined)S.mark+=e.effects.mark;
+      if(e.effects.trustRowan)S.trustRowan=clamp(S.trustRowan+e.effects.trustRowan);
+      if(e.effects.trustLira)S.trustLira=clamp(S.trustLira+e.effects.trustLira);
+      if(e.effects.trustEdric)S.trustEdric=clamp(S.trustEdric+e.effects.trustEdric);
+    }
+    if(e.roster.length)setMultiStatus(e.roster);
+    if(e.flag)S.flags[e.flag]=true;
+    if(e.wrenLine)events.push('__wren_custom__'+e.wrenLine);
+  });
+  return events;
+}
+
+// ══════════════════════════════════════
 // WREN
 // ══════════════════════════════════════
 function getWrenLine(){
@@ -488,19 +606,61 @@ function generateDuskEvents(){
   if(S.food<10){S.mor=clamp(S.mor-5);ev.push('Hunger setting in. Children cry at night.');}
   if(S.mor<20)ev.push('Morale dangerously low. A family is packing to leave.');
   if(S.mor<10){S.ppl=clamp(S.ppl-2);ev.push('Two families left in the night.');}
-  // Delayed effects
+
+  // ── Senna arc (the soup mechanic payoff) ──
+  if(S.day>=7&&S.ambientsSeen.has('senna_soup_2')&&!S.flags._senna_collapsed&&!S.flags._senna_dead){
+    if(S.food<25||S.mor<30){
+      S.flags._senna_collapsed=true;
+      ev.push('Senna collapsed in the east field. Lira says exhaustion. She\'s been giving away half her rations.');
+      setStatus('corwin_wife','sick');
+      queueDelayed(S.day+2,'Senna did not wake this morning. Lira found her still, the bowl beside her bed — the one she used to leave at your door.',
+        {mor:-5,ppl:-1},
+        [['corwin_wife','dead']],
+        '_senna_dead',
+        '"She made soup every day. Did you know? Every single day."');
+    }
+  }
+
+  // Delayed effects (old system, kept for compatibility)
   if(S.flags.sick_ignore&&S.day>=6&&!S.flags._plague_hit){
     S.flags._plague_hit=true;S.ppl=clamp(S.ppl-12);S.mor=clamp(S.mor-15);
     ev.push('The sickness spread. Twelve people are bedridden. Three may not recover.');
     setStatus('declan_daughter','dying');
+    // Mira's fate resolves 2 days later
+    queueDelayed(S.day+2,'Lira emerges from the healer\'s hall. She doesn\'t speak. Just shakes her head.',
+      {ppl:-3,mor:-5},
+      [['declan_daughter','dead']],
+      '_mira_dead_plague',
+      '"I brought her flowers yesterday. She said they smelled like outside."');
   }
   if(S.flags.thief_exile&&S.day>=7&&!S.flags._mira_dead){
     S.flags._mira_dead=true;
     ev.push('Word from outside the wall. Declan\'s daughter didn\'t survive the road.');
     setStatus('declan_daughter','dead');
   }
+
+  // Sickness herbs — delayed good outcome
+  if(S.flags.sick_herbs&&S.day>=5&&!S.flags._herbs_arrived){
+    S.flags._herbs_arrived=true;
+    ev.push('Lira\'s foragers returned with the herbs. She works through the night.');
+    queueDelayed(S.day+1,'The east quarter stirs. Mira is sitting up. Drinking broth. Lira hasn\'t slept in two days but she\'s smiling.',
+      {mor:5,ppl:6},
+      [['declan_daughter','well']],
+      '_sickness_cured');
+  }
+
+  // Nath — delayed trust payoff
+  if(S.flags.nath_citizen&&S.day>=10&&!S.flags._nath_payoff){
+    S.flags._nath_payoff=true;
+    queueDelayed(S.day+1,'Nath wakes you before dawn. "Reach patrol, south ridge, two hours." His intel is exact. The guards are ready when they come.',
+      {mor:3,trustRowan:5},null,'_nath_proved');
+  }
+
+  // Process delayed consequences
+  processDelayed(ev);
+
   // Wren
-  if(S.day%3===0||S.day===1){ev.push('__wren__');revealChars(['wren']);}
+  if(S.day%2===0||S.day===1||S.day>=S.maxDays-1){ev.push('__wren__');revealChars(['wren']);}
   return ev;
 }
 
@@ -569,7 +729,22 @@ function adjustAssign(role,d){
   document.getElementById('workers-remaining').textContent=`${S.ppl-Object.values(S.assign).reduce((a,b)=>a+b,0)} unassigned of ${S.ppl}`;
 }
 
-function endDawn(){S.phase='midday';updateHud();renderPetitions();}
+function endDawn(){
+  S.phase='midday';updateHud();
+  // Show ambient moment before petitions (if available)
+  const ambient=getAmbient();
+  if(ambient){
+    S.ambientsSeen.add(ambient.id);
+    const area=document.getElementById('phase-area');
+    let h=`<div class="ambient-label">— a moment —</div>`;
+    h+=`<div class="ambient-moment">${ambient.text}</div>`;
+    h+=`<button class="phase-btn" onclick="renderPetitions()">Continue →</button>`;
+    area.innerHTML=h;
+    logEvent(ambient.text,'ambient');
+  }else{
+    renderPetitions();
+  }
+}
 
 function renderPetitions(){
   const avail=PETITIONS.filter(p=>{
@@ -625,6 +800,11 @@ function renderDusk(){
   events.forEach(ev=>{
     if(ev==='__wren__'){
       const wl=getWrenLine();
+      h+=`<div class="wren-line">${wl}</div>`;
+      logEvent(wl,'wren');
+    }
+    else if(ev.startsWith('__wren_custom__')){
+      const wl=ev.slice(15);
       h+=`<div class="wren-line">${wl}</div>`;
       logEvent(wl,'wren');
     }
