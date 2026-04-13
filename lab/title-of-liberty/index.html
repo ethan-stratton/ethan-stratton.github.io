@@ -957,36 +957,54 @@ function update(dt){
 // ══════════════════════════════════════
 function moveSoldierToTarget(s,dt){
   let tx=s.tx,ty=s.ty;
-  // If target is across the river, funnel through ford
-  const rx=riverX(s.y),trx=riverX(ty);
-  const onWest=s.x<rx-RIVER_HALF_W,targetEast=tx>trx+RIVER_HALF_W;
-  const onEast=s.x>rx+RIVER_HALF_W,targetWest=tx<trx-RIVER_HALF_W;
-  const needsCrossing=(onWest&&targetEast)||(onEast&&targetWest);
   const fordCenterX=riverX(FORD_Y);
-
-  if(needsCrossing){
-    const distToFord=Math.abs(s.y-FORD_Y);
-    if(distToFord>FORD_HALF_H){
-      // Phase 1: Move toward ford Y first (stay on our side of river)
-      tx=s.x;ty=FORD_Y;
-    }else{
-      // Phase 2: At ford Y — squeeze through the ford
-      tx=fordCenterX+(targetEast?FORD_HALF_W:-FORD_HALF_W);ty=FORD_Y;
-      // Sweat!
-      if(!s._sweating){s._sweating=true;s.sweatTimer=2.0;}
+  
+  // Persistent crossing state: 0=none, 1=approaching ford, 2=crossing ford, 3=exiting ford
+  if(!s._crossState)s._crossState=0;
+  
+  // Check if target is across the river
+  const rx=riverX(s.y),trx=riverX(ty);
+  const onWest=s.x<rx-RIVER_HALF_W,targetEast=s.tx>trx+RIVER_HALF_W;
+  const onEast=s.x>rx+RIVER_HALF_W,targetWest=s.tx<trx-RIVER_HALF_W;
+  const needsCrossing=(onWest&&targetEast)||(onEast&&targetWest);
+  
+  if(needsCrossing&&s._crossState===0)s._crossState=1;
+  // If we've crossed (same side as target), clear state
+  const nowRx=riverX(s.y),nowTrx=riverX(s.ty);
+  const sameSide=(s.x<nowRx-RIVER_HALF_W&&s.tx<nowTrx-RIVER_HALF_W)||(s.x>nowRx+RIVER_HALF_W&&s.tx>nowTrx+RIVER_HALF_W);
+  if(sameSide)s._crossState=0;
+  
+  if(s._crossState===1){
+    // Phase 1: approach ford Y, stay on our side
+    tx=onWest?fordCenterX-FORD_HALF_W+4:fordCenterX+FORD_HALF_W-4;
+    ty=FORD_Y;
+    if(Math.abs(s.y-FORD_Y)<FORD_HALF_H+4&&Math.abs(s.x-tx)<10){
+      s._crossState=2;
+      s._sweating=true;s.sweatTimer=2.5;
     }
+  }else if(s._crossState===2){
+    // Phase 2: move through ford to other side
+    tx=targetEast?fordCenterX+FORD_HALF_W+8:fordCenterX-FORD_HALF_W-8;
+    ty=FORD_Y;
+    const exitRx=riverX(FORD_Y);
+    const crossed=targetEast?(s.x>exitRx+RIVER_HALF_W+4):(s.x<exitRx-RIVER_HALF_W-4);
+    if(crossed)s._crossState=3;
+  }else if(s._crossState===3){
+    // Phase 3: crossed — resume original target, clear state
+    s._crossState=0;s._sweating=false;
   }
 
   let ddx=tx-s.x,ddy=ty-s.y;
   let dist=Math.sqrt(ddx*ddx+ddy*ddy);
   s.barkTimer=Math.max(0,s.barkTimer-dt);
   if(s.sweatTimer>0)s.sweatTimer-=dt;
-  if(dist<1.5){s.vx*=0.5;s.vy*=0.5;if(needsCrossing&&Math.abs(s.y-FORD_Y)<=FORD_HALF_H){/* still crossing, don't stop */}else{s._sweating=false;return;}}
+  if(dist<1.5&&s._crossState===0){s.vx*=0.5;s.vy*=0.5;s._sweating=false;return;}
   const ts=terrainSpeed(s.x,s.y);
   let maxSpd,accel;
   if(S.rallying){maxSpd=S.speed*ts*0.95;accel=400*dt;}
   else if(S.formation==='circle'){maxSpd=s.speed*ts*0.6*Math.min(1.5,1+dist*0.01);accel=120*dt;}
   else{const urg=Math.min(2.5,1+dist*0.03);maxSpd=s.speed*ts*urg;accel=180*dt;}
+  if(dist<0.5)dist=0.5;
   const dvx=(ddx/dist)*maxSpd,dvy=(ddy/dist)*maxSpd;
   s.vx+=(dvx-s.vx)*Math.min(1,accel/(maxSpd||1));
   s.vy+=(dvy-s.vy)*Math.min(1,accel/(maxSpd||1));
@@ -994,7 +1012,7 @@ function moveSoldierToTarget(s,dt){
   if(v>maxSpd){s.vx*=maxSpd/v;s.vy*=maxSpd/v;}
   let nx=s.x+s.vx*dt,ny=s.y+s.vy*dt;
   if(inRiver(nx,ny)){
-    // Stuck — hard push to ford center
+    // Hard push to ford center
     const fx=fordCenterX-s.x,fy=FORD_Y-s.y;const fl=Math.sqrt(fx*fx+fy*fy)||1;
     s.vx=fx/fl*s.speed*0.9;s.vy=fy/fl*s.speed*0.9;
     if(!s._sweating){s._sweating=true;s.sweatTimer=1.5;}
@@ -1150,17 +1168,20 @@ function render(){
     if(s.armored){ctx.fillStyle='rgba(200,180,120,0.3)';ctx.fillRect(Math.floor(s.x),Math.floor(s.y-2),1,1);}
     if(s.hp<s.maxHp){ctx.fillStyle='rgba(200,180,60,0.6)';ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-4),Math.ceil(2*(s.hp/s.maxHp)),1);}
     if(s.barkTimer>0){const bA=Math.min(1,s.barkTimer*2);ctx.fillStyle=`rgba(255,220,80,${bA})`;ctx.fillRect(Math.floor(s.x),Math.floor(s.y-7),1,3);ctx.fillRect(Math.floor(s.x),Math.floor(s.y-3),1,1);}
-    // Sweat droplet (ford squeeze)
+    // Sweat droplet (ford squeeze) — left side, blinking
     if(s.sweatTimer>0){
       const sa=Math.min(1,s.sweatTimer);
-      const sy2=s.y-8-Math.sin(S.time*4+s.bobPhase)*1.5;
-      // Big drop
-      ctx.fillStyle=`rgba(100,200,240,${sa*0.8})`;
-      ctx.fillRect(Math.floor(s.x+2),Math.floor(sy2),1,2);
-      ctx.fillRect(Math.floor(s.x+1),Math.floor(sy2+1),1,1);
-      // Small drop
-      ctx.fillStyle=`rgba(100,200,240,${sa*0.5})`;
-      ctx.fillRect(Math.floor(s.x+3),Math.floor(sy2+3),1,1);
+      const blink=Math.sin(S.time*8+s.bobPhase)>0; // blink on/off
+      if(blink){
+        const sy2=s.y-8-Math.abs(Math.sin(S.time*3+s.bobPhase))*2;
+        // Big drop (left of head)
+        ctx.fillStyle=`rgba(100,200,240,${sa*0.9})`;
+        ctx.fillRect(Math.floor(s.x-3),Math.floor(sy2),1,2);
+        ctx.fillRect(Math.floor(s.x-4),Math.floor(sy2+1),1,1);
+        // Small drop
+        ctx.fillStyle=`rgba(100,200,240,${sa*0.6})`;
+        ctx.fillRect(Math.floor(s.x-2),Math.floor(sy2+3),1,1);
+      }
     }
   });
 
