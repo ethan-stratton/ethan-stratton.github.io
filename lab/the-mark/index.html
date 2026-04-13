@@ -639,7 +639,21 @@ function renderDusk(){
   area.innerHTML=h;
 }
 
-function nextDay(){S.day++;S.phase='dawn';S.assign={farm:0,build:0,guard:0,forage:0,rest:0};updateHud();renderDawn();}
+function nextDay(){
+  S.day++;S.phase='dawn';
+  // Keep previous assignments, but cap to current population
+  const total=Object.values(S.assign).reduce((a,b)=>a+b,0);
+  if(total>S.ppl){
+    // Trim excess proportionally, starting from rest/forage
+    let excess=total-S.ppl;
+    for(const k of ['rest','forage','build','guard','farm']){
+      const trim=Math.min(S.assign[k],excess);
+      S.assign[k]-=trim;excess-=trim;
+      if(excess<=0)break;
+    }
+  }
+  updateHud();renderDawn();
+}
 
 function showEnding(){
   document.getElementById('game-screen').style.display='none';
