@@ -334,6 +334,120 @@ function moveToward(u,tx,ty,spd,dt){
 // ══════════════════════════════════════
 // STATE
 // ══════════════════════════════════════
+// SOUND SYSTEM (Web Audio API)
+// ══════════════════════════════════════
+const AC=new(window.AudioContext||window.webkitAudioContext)();
+const SND={
+  masterVol:AC.createGain(),
+  init(){this.masterVol.connect(AC.destination);this.masterVol.gain.value=0.3;},
+  noise(dur,vol=0.1){
+    const n=AC.createBufferSource(),buf=AC.createBuffer(1,AC.sampleRate*dur,AC.sampleRate),d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*vol;
+    n.buffer=buf;const g=AC.createGain();g.gain.setValueAtTime(vol,AC.currentTime);g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+dur);
+    n.connect(g);g.connect(this.masterVol);n.start();
+  },
+  tone(freq,dur,type='square',vol=0.15){
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(vol,AC.currentTime);g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+dur);
+    o.connect(g);g.connect(this.masterVol);o.start();o.stop(AC.currentTime+dur);
+  },
+  swordHit(){const f=200+Math.random()*300;this.tone(f,0.08,'sawtooth',0.12);this.noise(0.05,0.15);},
+  swordBlock(){this.tone(800,0.04,'square',0.08);this.tone(600,0.06,'square',0.06);},
+  death(){this.tone(80,0.3,'sine',0.2);this.noise(0.15,0.1);},
+  rallyHorn(){
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.type='sawtooth';o.frequency.setValueAtTime(220,AC.currentTime);o.frequency.linearRampToValueAtTime(440,AC.currentTime+0.15);o.frequency.setValueAtTime(440,AC.currentTime+0.15);
+    g.gain.setValueAtTime(0.15,AC.currentTime);g.gain.setValueAtTime(0.15,AC.currentTime+0.3);g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+0.6);
+    o.connect(g);g.connect(this.masterVol);o.start();o.stop(AC.currentTime+0.6);
+  },
+  ambush(){
+    this.tone(150,0.5,'sawtooth',0.2);setTimeout(()=>this.tone(200,0.4,'sawtooth',0.15),200);setTimeout(()=>this.tone(300,0.3,'square',0.1),400);
+  },
+  victory(){[440,554,659,880].forEach((f,i)=>setTimeout(()=>this.tone(f,0.4,'triangle',0.12),i*150));},
+  defeat(){[220,185,165,110].forEach((f,i)=>setTimeout(()=>this.tone(f,0.5,'sine',0.15),i*300));},
+  march(){this.noise(0.06,0.04);},
+  _ambientId:null,_ambientGain:null,
+  startAmbient(mood){
+    if(this._ambientId)return;
+    this._ambientGain=AC.createGain();this._ambientGain.gain.value=0.03;this._ambientGain.connect(this.masterVol);
+    const play=()=>{
+      if(!this._ambientGain)return;
+      const buf=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate),d=buf.getChannelData(0);
+      // Brown noise
+      let last=0;for(let i=0;i<d.length;i++){const w=Math.random()*2-1;last=(last+0.02*w)/1.02;d[i]=last*3.5;}
+      const n=AC.createBufferSource();n.buffer=buf;n.connect(this._ambientGain);n.start();
+      n.onended=()=>{this._ambientId=setTimeout(play,100);};
+    };
+    play();
+  },
+  stopAmbient(){if(this._ambientId){clearTimeout(this._ambientId);this._ambientId=null;}if(this._ambientGain){this._ambientGain.disconnect();this._ambientGain=null;}},
+  setAmbientVol(v){if(this._ambientGain)this._ambientGain.gain.value=Math.max(0,Math.min(0.08,v));}
+};
+SND.init();
+
+// ══════════════════════════════════════
+// PARTICLES & BLOOD
+// ══════════════════════════════════════
+const PARTICLES=[];
+const BLOODSTAINS=[];
+const BODIES=[];
+
+function spawnBlood(x,y,count=3){
+  for(let i=0;i<count;i++){
+    PARTICLES.push({x,y,vx:(Math.random()-0.5)*30,vy:(Math.random()-0.5)*30-10,life:0.4+Math.random()*0.3,maxLife:0.7,color:'blood'});
+  }
+  // Ground stain
+  BLOODSTAINS.push({x:x+Math.random()*4-2,y:y+Math.random()*2,size:1+Math.random(),alpha:0.5+Math.random()*0.3});
+  if(BLOODSTAINS.length>200)BLOODSTAINS.shift();
+}
+
+function spawnDeathParticles(x,y){
+  for(let i=0;i<6;i++){
+    PARTICLES.push({x,y,vx:(Math.random()-0.5)*40,vy:(Math.random()-0.5)*40-15,life:0.5+Math.random()*0.4,maxLife:0.9,color:'blood'});
+  }
+  for(let i=0;i<3;i++){
+    BLOODSTAINS.push({x:x+Math.random()*6-3,y:y+Math.random()*4-2,size:1+Math.random()*1.5,alpha:0.4+Math.random()*0.3});
+  }
+}
+
+function addBody(x,y,team){
+  BODIES.push({x,y,team,alpha:0.6,timer:0});
+  if(BODIES.length>150)BODIES.shift();
+}
+
+function updateParticles(dt){
+  for(let i=PARTICLES.length-1;i>=0;i--){
+    const p=PARTICLES[i];
+    p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=60*dt;p.life-=dt;
+    if(p.life<=0)PARTICLES.splice(i,1);
+  }
+  // Stains slowly fade over 60 seconds
+  for(let i=BLOODSTAINS.length-1;i>=0;i--){
+    BLOODSTAINS[i].alpha-=dt*0.008;
+    if(BLOODSTAINS[i].alpha<=0)BLOODSTAINS.splice(i,1);
+  }
+}
+
+// ══════════════════════════════════════
+// SCREEN SHAKE (trauma system)
+// ══════════════════════════════════════
+let trauma=0;
+function addTrauma(amount){trauma=Math.min(1,trauma+amount);}
+function getShake(){
+  const shake=trauma*trauma;
+  const ox=Math.sin(S.time*37.1)*shake*3;
+  const oy=Math.cos(S.time*43.7)*shake*2;
+  trauma=Math.max(0,trauma-0.02);
+  return{ox,oy};
+}
+
+// ══════════════════════════════════════
+// CASUALTY NAMES
+// ══════════════════════════════════════
+const NEPHITE_NAMES=['Helam','Ammon','Nephi','Gideon','Teancum','Shiblon','Helorum','Pahoram','Lehi','Mathoni','Ether','Moronihah','Corianton','Zenock','Zenos','Limhi','Himni','Omner','Jonas','Aaron','Amulek','Zeezrom','Alma','Gid','Timothy','Lachoneus','Hagoth','Cumeni','Antipus'];
+function assignName(s){if(!s._name)s._name=NEPHITE_NAMES[Math.floor(Math.random()*NEPHITE_NAMES.length)];}
+
+// ══════════════════════════════════════
 const S={
   cx:600,cy:350,speed:55,facing:Math.PI,moving:false,
   soldiers:[],soldierCount:40,
@@ -367,6 +481,8 @@ const S={
   campArmor:false,
   _travelScatter:false,
   _travelScatterTimer:0,
+  casualties:[],
+  _marchSndTimer:0,
 };
 
 // ══════════════════════════════════════
@@ -452,16 +568,19 @@ function makeUnit(x,y,team){
     waypointIdx:0,isLehi:false,facing:0,
     // Scout state
     scoutFacing:0,returning:false,scoutImmunity:0,scoutWaypoints:null,scoutWpIdx:0,
+    // Juice
+    _hitFlash:0,_deathFade:0,_dead2:false,_name:'',facing:0,
   };
 }
 
 function initSoldiers(){
-  S.soldiers=[];
+  S.soldiers=[];S.casualties=[];
   for(let i=0;i<S.soldierCount;i++){
     const ring=Math.floor(i/10),pos=i%10,inRing=Math.min(10,S.soldierCount-ring*10);
     const angle=(pos/inRing)*Math.PI*2,r=12+ring*8;
     const s=makeUnit(S.cx+Math.cos(angle)*r,S.cy+Math.sin(angle)*r,'nephite');
     s.circleAngle=angle;s.circleRing=ring;
+    assignName(s);
     S.soldiers.push(s);
   }
 }
@@ -704,7 +823,7 @@ function updateMission(dt){
       S.phase='battle';S.phaseTimer=0;
 
       if(S.playerConcealed){
-        S.ambushReady=true;
+        S.ambushReady=true;SND.ambush();addTrauma(0.2);
         setObjective('ATTACK NOW! Close the pincer from the south!');
         setPhaseLabel('Phase 4 of 4 — THE AMBUSH');
         showCallout('They have crossed! Lehi strikes from the north — CHARGE!',6);
@@ -816,7 +935,11 @@ function doSendRetriever(){
 // ══════════════════════════════════════
 function update(dt){
   S.time+=dt;
+  updateParticles(dt);
   updateMission(dt);
+
+  // March footstep sounds
+  if(S.moving){S._marchSndTimer-=dt;if(S._marchSndTimer<=0){S._marchSndTimer=0.4;SND.march();}}
 
   // Commander movement
   let dx=0,dy=0;
@@ -1030,6 +1153,10 @@ function update(dt){
   S.allies=S.allies.filter(a=>!a.dead);
   S.enemies.forEach(e=>{if(e.dead){const kn=S.knownEnemies.get(e.id);if(kn)kn.alive=false;}});
 
+  // Ambient volume: louder during combat
+  const inCombat=S.phase==='battle'||S.phase==='surround';
+  SND.setAmbientVol(inCombat?0.06:0.03);
+
   updateHtmlHud();
 }
 
@@ -1157,11 +1284,22 @@ function doCombat(atk,def,dt){
   const blocked=def.armored&&Math.random()<0.3;
   if(!blocked){
     def.hp-=dmg*defMult;def.morale-=8;
+    def._hitFlash=0.1;
+    spawnBlood(def.x,def.y,2);
+    SND.swordHit();
+    addTrauma(0.05);
     if(def.hp<=0){
-      def.dead=true;
+      def.dead=true;def._deathFade=0.6;
+      addBody(def.x,def.y,def.team);
+      spawnDeathParticles(def.x,def.y);
+      SND.death();
+      addTrauma(0.12);
+      if(def.team==='nephite'&&def._name){S.casualties.push(def._name);}
       const allies=def.team==='nephite'?S.soldiers.concat(S.allies):S.enemies;
       allies.forEach(a=>{if(!a.dead){const d=Math.sqrt((a.x-def.x)*(a.x-def.x)+(a.y-def.y)*(a.y-def.y));if(d<40)a.morale-=10;}});
     }
+  }else{
+    SND.swordBlock();
   }
   atk.morale=Math.min(100,atk.morale+2);
   if(def.team==='lamanite'){
@@ -1219,12 +1357,18 @@ function updateHtmlHud(){
 // RESULTS
 // ══════════════════════════════════════
 function showResults(){
-  running=false;
+  running=false;SND.stopAmbient();SND.victory();
   const r=document.getElementById('results');r.style.display='flex';
   const nephiteLost=S.deadSoldiers;
   const enemyDead=S.enemies.filter(e=>e.dead).length;
   const enemyRouted=S.enemies.filter(e=>!e.dead&&e.state==='rout').length;
   const ambushText=S.ambushReady?'The ambush was perfect — they never saw you coming.':'They spotted your forces. The element of surprise was lost.';
+
+  let casualtyText='';
+  if(S.casualties.length>0){
+    const unique=[...new Set(S.casualties)];
+    casualtyText=`<div class="stat" style="color:#8a5a3a;margin-top:6px">Fallen: ${unique.join(', ')}</div>`;
+  }
 
   document.getElementById('results-title').textContent='The Lamanites Are Surrounded';
   document.getElementById('results-stats').innerHTML=
@@ -1232,7 +1376,8 @@ function showResults(){
     `<div class="stat">Nephite fallen: ${nephiteLost} of ${S.soldierCount}</div>`+
     `<div class="stat">Lehi's losses: ${S.deadAllies} of 30</div>`+
     `<div class="stat">Lamanite dead: ${enemyDead} of ${S.totalLamanites}</div>`+
-    `<div class="stat">Lamanite routed: ${enemyRouted}</div>`;
+    `<div class="stat">Lamanite routed: ${enemyRouted}</div>`+
+    casualtyText;
   document.getElementById('mercy-choice').style.display='flex';
 }
 
@@ -1311,7 +1456,7 @@ function advanceCutscene(){
 document.addEventListener('click',()=>{if(S._cutscenes&&S._cutsceneIdx<S._cutscenes.length)advanceCutscene();});
 
 function showDefeat(){
-  running=false;
+  running=false;SND.stopAmbient();SND.defeat();
   const r=document.getElementById('results');r.style.display='flex';
   document.getElementById('results-title').textContent='Defeat';
   document.getElementById('results-stats').innerHTML=
@@ -1350,16 +1495,31 @@ function returnToTimeline(){
 function render(){
   ctx.save();ctx.scale(SCALE,SCALE);
   ctx.fillStyle='#2a2818';ctx.fillRect(0,0,W,H);
-  ctx.save();ctx.translate(-S.camX,-S.camY);
+  const shake=getShake();
+  ctx.save();ctx.translate(-S.camX+shake.ox,-S.camY+shake.oy);
 
   drawTerrain();
+
+  // Blood stains on ground
+  BLOODSTAINS.forEach(b=>{
+    ctx.fillStyle=`rgba(80,15,10,${b.alpha})`;
+    ctx.fillRect(Math.floor(b.x),Math.floor(b.y),Math.ceil(b.size),1);
+  });
+
+  // Dead bodies
+  BODIES.forEach(b=>{
+    const c=b.team==='nephite'?'80,70,50':'70,30,20';
+    ctx.fillStyle=`rgba(${c},${Math.min(0.5,b.alpha)})`;
+    ctx.fillRect(Math.floor(b.x-1),Math.floor(b.y),3,1);
+  });
 
   // Enemies
   S.enemies.forEach(e=>{
     if(e.dead)return;
     const d=getEnemyDisp(e);if(!d)return;
     const a=e.state==='rout'?0.3:d.a;
-    ctx.fillStyle=`rgba(140,60,40,${a})`;
+    const eFlash=e._hitFlash>0?(e._hitFlash-=1/60,'rgba(255,255,255,0.9)'):`rgba(140,60,40,${a})`;
+    ctx.fillStyle=eFlash;
     ctx.fillRect(Math.floor(d.x-1),Math.floor(d.y-1),2,3);
     if(d.a>0.7&&e.hp<e.maxHp){ctx.fillStyle=`rgba(200,50,30,${a})`;ctx.fillRect(Math.floor(d.x-1),Math.floor(d.y-4),Math.ceil(2*(e.hp/e.maxHp)),1);}
     if(d.a<0.5&&d.a>0.05){ctx.fillStyle=`rgba(200,100,60,${d.a})`;ctx.fillRect(Math.floor(d.x),Math.floor(d.y-6),1,2);ctx.fillRect(Math.floor(d.x),Math.floor(d.y-3),1,1);}
@@ -1377,7 +1537,8 @@ function render(){
   S.soldiers.forEach(s=>{
     if(s.dead)return;
     const b=Math.floor(130*s.shade),g=Math.floor(115*s.shade),bl=Math.floor(75*s.shade);
-    ctx.fillStyle=`rgb(${b},${g},${bl})`;
+    const sFlash=s._hitFlash>0?(s._hitFlash-=1/60,'rgba(255,255,255,0.9)'):`rgb(${b},${g},${bl})`;
+    ctx.fillStyle=sFlash;
     ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-1),s.size|0,(s.size+0.5)|0);
     if(s.armored){ctx.fillStyle='rgba(200,180,120,0.3)';ctx.fillRect(Math.floor(s.x),Math.floor(s.y-2),1,1);}
     if(s.hp<s.maxHp){ctx.fillStyle='rgba(200,180,60,0.6)';ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-4),Math.ceil(2*(s.hp/s.maxHp)),1);}
@@ -1461,6 +1622,14 @@ function render(){
   }
 
   drawTerrainZoneHints();
+
+  // Blood particles
+  PARTICLES.forEach(p=>{
+    const a=p.life/p.maxLife;
+    ctx.fillStyle=`rgba(160,20,10,${a})`;
+    ctx.fillRect(Math.floor(p.x),Math.floor(p.y),1,1);
+  });
+
   ctx.restore();
   drawMinimap();
 
@@ -1546,7 +1715,7 @@ function drawMinimap(){
 function handleKey(k){
   if(!running)return;
   if(k===' '){
-    S.rallying=true;S.rallyTimer=3;
+    S.rallying=true;S.rallyTimer=3;SND.rallyHorn();
     // Hard pull far soldiers toward commander
     S.soldiers.forEach(s=>{
       if(s.dead)return;
@@ -1631,6 +1800,7 @@ function campCouncil(){
 }
 function campBegin(){
   document.getElementById('camp-overlay').style.display='none';
+  SND.startAmbient();
   // Now start scout phase
   S.phase='scout';S.phaseTimer=0;
   setObjective('Send scouts west toward the river. We need to find their army. (Press A then E)');
