@@ -72,6 +72,8 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 .wren-line{font-size:1.05rem;color:#c8b0d0;font-style:italic;padding:16px;margin:16px 0;background:rgba(180,140,200,0.05);border-left:2px solid rgba(180,140,200,0.2);border-radius:0 4px 4px 0}
 .ambient-moment{font-size:1rem;color:#887860;font-style:italic;padding:20px;margin:16px 0;background:rgba(200,160,80,0.02);border-left:2px solid rgba(200,160,80,0.08);border-radius:0 4px 4px 0;line-height:1.8}
 .ambient-label{font-family:'Inter',sans-serif;font-size:0.6rem;color:#504838;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px}
+.advisor-dusk{font-size:0.95rem;color:#a89878;padding:12px 16px;margin:8px 0;background:rgba(200,160,80,0.03);border-left:2px solid rgba(200,160,80,0.12);border-radius:0 4px 4px 0;line-height:1.7}
+.advisor-dusk .adv-dusk-name{font-family:'Inter',sans-serif;font-size:0.6rem;color:#706050;letter-spacing:0.08em;text-transform:uppercase;display:block;margin-bottom:4px}
 .gameover-msg{font-size:1.3rem;color:#c05040;text-align:center;margin:20px 0}
 
 /* End screen */
@@ -517,6 +519,44 @@ const AMBIENTS=[
   {id:'morale_low',requires:()=>S.mor<25,minDay:4,maxDay:10,
    text:'Nobody talks at breakfast. The sound of spoons scraping bowls is the loudest thing in Brannhaven.',
    mood:'dread'},
+
+  // Quiet/normalcy — the world just existing
+  {id:'river_evening',minDay:1,maxDay:4,
+   text:'The river is silver in the last light. Two women wash clothes on the bank, talking low. One laughs — a real laugh, not the careful kind. A dog naps beside them. For a moment, nothing is wrong.',
+   mood:'peace'},
+  {id:'bread_smell',minDay:2,maxDay:5,
+   text:'Someone is baking. The smell reaches you halfway across the square. You can\'t remember the last time you noticed a smell that wasn\'t sweat or smoke.',
+   mood:'peace'},
+  {id:'old_man_bench',minDay:3,maxDay:6,
+   text:'An old man sits on the bench by the hearthhouse every morning. Same bench. Same time. He doesn\'t speak to anyone, just watches the square fill up. When you pass, he nods. That\'s it. That\'s enough.',
+   mood:'peace'},
+  {id:'sunset_wall',minDay:2,maxDay:7,
+   text:'The sunset catches the west wall and turns the stone to copper. A guard leans on his spear and watches. "Beautiful, isn\'t it?" he says to no one. No one answers. But three people are looking.',
+   mood:'peace'},
+  {id:'night_singing',minDay:3,maxDay:6,
+   text:'You hear singing after dark. A woman\'s voice, coming from one of the houses near the east wall. An old lullaby. You don\'t know the words. You stand outside and listen until it ends.',
+   mood:'peace'},
+  {id:'garden_morning',minDay:4,maxDay:8,
+   text:'A patch of wildflowers has come up between the hearthhouse and the granary. Nobody planted them. Nobody weeds them. They just grew. People walk around them now instead of through.',
+   mood:'peace'},
+  {id:'rowan_laughing',minDay:5,maxDay:8,requires:()=>S.trustRowan>=50,
+   text:'You hear something impossible. Rowan. Laughing. A young guard told a joke — something about a goat and a watchtower. Rowan covers his mouth. Catches himself. Goes back to being Rowan. But for a second, he wasn\'t.',
+   mood:'peace'},
+  {id:'lira_humming',minDay:3,maxDay:7,requires:()=>S.trustLira>=50,
+   text:'Lira is humming while she works. She doesn\'t notice you. Her hands move through the herbs — crushing, sorting, tying bundles. The humming is off-key but certain. This is the only time she looks at peace.',
+   mood:'peace'},
+  {id:'children_river',minDay:4,maxDay:8,
+   text:'Three children are skipping stones on the river. They\'re arguing about whose stone went furthest. The argument is fierce and absolutely pointless and you find yourself smiling.',
+   mood:'peace'},
+  {id:'rain_afternoon',minDay:3,maxDay:9,
+   text:'Rain in the afternoon. Everyone crowds under the hearthhouse eaves. For twenty minutes, nobody has anywhere to be. A man shares dried fish. A woman lends her shawl. The rain stops. People drift apart. But something stays.',
+   mood:'peace'},
+  {id:'edric_reading',minDay:4,maxDay:8,requires:()=>S.trustEdric>=40,
+   text:'You find Edric reading something that isn\'t a ledger. A slim book, hand-copied, fragile. He sees you and holds it up: "Poetry. From before. My wife\'s favorite." He reads a line aloud: "We are not given the world; we are given each other." Then closes it, carefully, and goes back to his numbers.',
+   mood:'quiet'},
+  {id:'stars',minDay:2,maxDay:10,
+   text:'The stars are impossibly clear tonight. No light for miles except Brannhaven\'s fires. A guard on the wall is pointing out constellations to someone. "That one\'s the Shepherd," she says. "He watches the flock all night." You stand in the dark and look up.',
+   mood:'peace'},
 ];
 
 function getAmbient(){
@@ -576,6 +616,79 @@ function getWrenLine(){
   if(m<-0.5) return '"I like that you listen to people. Grandma always said listening is the hardest work."';
   if(m<1) return '"I drew the settlement today. I drew the gate open. Is that okay?"';
   return '"Are we going to be alright?" She asks it the way children do — expecting you to say yes.';
+}
+
+// ══════════════════════════════════════
+// ADVISOR DUSK LINES (personal, not tactical)
+// ══════════════════════════════════════
+const ADVISOR_LINES={
+  rowan:{
+    // Trust tiers × context
+    high:[ // trust >= 60
+      {requires:()=>S.day<=3, text:'"I don\'t sleep much. Haven\'t for years. The wall doesn\'t watch itself." He pauses. "That\'s not true. I just don\'t like what I dream about."'},
+      {requires:()=>S.flags.burial_both, text:'"I was angry about the burial. Still am, maybe. But his mother stopped crying today. First time since we opened the gate." He doesn\'t look at you. "I noticed that."'},
+      {requires:()=>S.flags.elif_in&&S.day>=7, text:'"The Elif girl waved at me from the wall today. I waved back." Long pause. "My daughter would\'ve been her age."'},
+      {requires:()=>S.assign.guard>=6, text:'"Good watch tonight. Full rotation. The men are sharp." He almost smiles. "Nights like this, I remember why I do this."'},
+      {requires:()=>true, text:'"My wife used to say I loved the wall more than her. She wasn\'t wrong." He runs his hand along the stone. "But the wall never left."'},
+      {requires:()=>true, text:'"I taught Corwin everything. How to scout, how to read tracks, how to come home." Silence. "Didn\'t teach him the last part well enough."'},
+    ],
+    mid:[ // trust 30-59
+      {requires:()=>true, text:'Rowan is cleaning his blade by the fire. He doesn\'t speak. The silence says enough.'},
+      {requires:()=>S.flags.kael_council, text:'"You gave a stage to a man who wants to tear down everything I\'ve built." He sheathes his sword. "I hope you\'re right about him."'},
+      {requires:()=>true, text:'"I don\'t agree with you. But I\'m still here." He says it like that should mean something. It does.'},
+    ],
+    low:[ // trust < 30
+      {requires:()=>true, text:'Rowan passes you on the wall. Nods. Doesn\'t stop.'},
+      {requires:()=>true, text:'You hear Rowan talking to the night watch: "...doesn\'t matter what we think. Just hold the wall." He sees you listening. Goes quiet.'},
+      {requires:()=>S.trustRowan<15, text:'Rowan is at the gate. Alone. Staring out. You approach and he walks away. Not angry. Just... done talking.'},
+    ]
+  },
+  lira:{
+    high:[
+      {requires:()=>S.day<=3, text:'"Do you know what foxglove looks like? Beautiful. Purple. Kills you in a day." She trims a leaf. "Everything useful is dangerous. That\'s what my mother said about people, too."'},
+      {requires:()=>S.flags.sick_herbs, text:'"The feverfew is working. I can feel it." She holds a dried sprig to the lamplight. "We don\'t deserve plants. They just help us anyway."'},
+      {requires:()=>S.flags.elif_in, text:'"Elif asked me to teach her about herbs. She already knows more than I do — different plants, from the east. We\'re trading knowledge." She laughs quietly. "First good trade Brannhaven\'s made."'},
+      {requires:()=>true, text:'"I became a healer because I couldn\'t watch people die and do nothing." She washes her hands for the third time. "Some days it\'s the same thing."'},
+      {requires:()=>true, text:'"My hands shake sometimes. Not from fear. From the ones I couldn\'t save. My body remembers them even when I try not to."'},
+    ],
+    mid:[
+      {requires:()=>true, text:'Lira is in the healer\'s hall. Candle burning low. She doesn\'t look up when you pass.'},
+      {requires:()=>S.flags.thief_punish, text:'"His daughter is eating less now. You know that, right?" She says it to the wall, not to you.'},
+      {requires:()=>true, text:'"I trust your intentions. I\'m less sure about your judgment." She says it gently. That almost makes it worse.'},
+    ],
+    low:[
+      {requires:()=>true, text:'Lira\'s light is on. Her door is closed. It used to be open.'},
+      {requires:()=>true, text:'You find a note from Lira: "Three more sick in the east quarter. Treating them. Don\'t need anything from you." The last sentence is underlined.'},
+    ]
+  },
+  edric:{
+    high:[
+      {requires:()=>S.day<=3, text:'"I\'ve kept records of every leader since the founding. Forty-three years of decisions. You know what I\'ve learned?" He adjusts his spectacles. "The good ones all looked tired."'},
+      {requires:()=>S.flags.kael_records, text:'"Opening the records was the right call. I didn\'t think so at first. But sunlight is a disinfectant." He taps the ledger. "Even for us."'},
+      {requires:()=>true, text:'"My wife used to read to me in the evenings. History. The old world, before the collapse. She believed it would come back." He closes the ledger. "I keep the records in case she was right."'},
+      {requires:()=>true, text:'"People think I\'m cold. I understand why. But someone has to remember that rules exist so the next leader can\'t just... do whatever they want." He looks at you carefully. "Including you."'},
+    ],
+    mid:[
+      {requires:()=>true, text:'Edric is writing by candlelight. Row after row of tiny numbers. He records everything. Even the things you\'d rather forget.'},
+      {requires:()=>S.flags.burial_both, text:'"Precedent matters. You buried a traitor with honors. The next time someone defects, they\'ll expect the same mercy." He writes something in the ledger. "I\'m recording your reasoning. For the record."'},
+      {requires:()=>true, text:'"I don\'t need you to like me. I need you to be consistent." He dips his quill. "Consistency is the only thing that outlives us."'},
+    ],
+    low:[
+      {requires:()=>true, text:'Edric\'s candle is out early tonight. The ledger is closed. That\'s never happened before.'},
+      {requires:()=>true, text:'You find the ledger open on the table. Today\'s entry is one line: "The leader did not consult the council." Below it, in smaller script: "Again."'},
+    ]
+  }
+};
+
+function getAdvisorDuskLine(advisor){
+  const trust=advisor==='rowan'?S.trustRowan:advisor==='lira'?S.trustLira:S.trustEdric;
+  const lines=ADVISOR_LINES[advisor];
+  const tier=trust>=60?lines.high:trust>=30?lines.mid:lines.low;
+  const available=tier.filter(l=>l.requires());
+  if(!available.length)return null;
+  // Pick randomly from available, but use day as seed for consistency
+  const pick=available[(S.day*7+advisor.charCodeAt(0))%available.length];
+  return pick.text;
 }
 
 // ══════════════════════════════════════
@@ -661,6 +774,13 @@ function generateDuskEvents(){
 
   // Wren
   if(S.day%2===0||S.day===1||S.day>=S.maxDays-1){ev.push('__wren__');revealChars(['wren']);}
+  
+  // One advisor personal line per dusk (rotating)
+  const advisorOrder=['rowan','lira','edric'];
+  const todayAdvisor=advisorOrder[(S.day-1)%3];
+  const advLine=getAdvisorDuskLine(todayAdvisor);
+  if(advLine)ev.push('__advisor__'+todayAdvisor+'__'+advLine);
+
   return ev;
 }
 
@@ -807,6 +927,14 @@ function renderDusk(){
       const wl=ev.slice(15);
       h+=`<div class="wren-line">${wl}</div>`;
       logEvent(wl,'wren');
+    }
+    else if(ev.startsWith('__advisor__')){
+      const parts=ev.slice(11).split('__');
+      const name=parts[0].charAt(0).toUpperCase()+parts[0].slice(1);
+      const line=parts.slice(1).join('__');
+      const icons={rowan:'⚔️',lira:'🌿',edric:'📜'};
+      h+=`<div class="advisor-dusk"><span class="adv-dusk-name">${icons[parts[0]]||''} ${name}</span>${line}</div>`;
+      logEvent(`${name}: ${line}`);
     }
     else{h+=`<div class="event-line">${ev}</div>`;logEvent(ev);}
   });
