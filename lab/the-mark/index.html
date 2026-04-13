@@ -991,6 +991,13 @@ function generateDuskEvents(){
   if(S.mor<20)ev.push('Morale dangerously low. A family is packing to leave.');
   if(S.mor<10){S.ppl=clamp(S.ppl-2);ev.push('Two families left in the night.');}
 
+  // ── Maren's last loaf — famine warning ──
+  if(S.food<=15&&S.food>0&&!S.flags._maren_loaf&&getChar('maren')?.status!=='dead'){
+    S.flags._maren_loaf=true;
+    soundMaren();
+    ev.push('__maren__Maren appears in the doorway with a half-loaf wrapped in cloth. "This is the last one I had hidden." She sets it on the table. "There is no more after this. You understand? No more."');
+  }
+
   // ── Maren collapse arc (#6 payoff) ──
   // She's been giving away rations. This isn't a choice. It just happens.
   if(S.day>=12&&S.food<20&&!S.flags._maren_collapsed&&!S.flags._maren_dead){
