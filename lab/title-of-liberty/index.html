@@ -62,6 +62,10 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 #story-overlay .story-ref{font-size:0.7rem;color:#5a5238;margin-top:12px;font-family:'Inter',sans-serif;font-style:italic}
 #story-overlay .story-hint{font-size:0.6rem;color:#3a3220;margin-top:24px;font-family:'Inter',sans-serif;letter-spacing:0.05em}
 #story-overlay .story-speaker{font-size:0.7rem;color:#c8a040;margin-bottom:10px;font-family:'Cinzel',serif;letter-spacing:0.08em}
+#story-overlay .story-inner{display:flex;align-items:flex-start;gap:24px;max-width:620px}
+#story-overlay .story-portrait{width:140px;min-width:140px;height:auto;image-rendering:pixelated;opacity:0.9;filter:drop-shadow(0 2px 12px rgba(200,160,64,0.15))}
+#story-overlay .story-right{display:flex;flex-direction:column;align-items:center;text-align:center}
+#story-overlay .no-portrait .story-inner{justify-content:center}
 
 /* ── Callout ── */
 #callout{position:fixed;top:45px;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;text-align:center;opacity:0;transition:opacity 0.4s;max-width:400px}
@@ -144,14 +148,19 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
     "Yea, verily, verily I say unto you, if all men had been, and were, and ever would be, like unto Moroni, behold, the very powers of hell would have been shaken forever."
     <div class="ref">— Alma 48:17</div>
   </div>
-  <div class="controls-hint">WASD move · SPACE rally · 1-5 formations · E scout · Q recall · H headcount</div>
+  <div class="controls-hint">WASD move · SPACE rally · 1-5 formations · E scout · Q send retriever · H headcount</div>
 </div>
 
 <div id="story-overlay" style="display:none" onclick="advanceStory()">
-  <div class="story-speaker" id="story-speaker"></div>
-  <div class="story-text" id="story-text"></div>
-  <div class="story-ref" id="story-ref"></div>
-  <div class="story-hint">click to continue</div>
+  <div class="story-inner">
+    <img id="story-portrait" class="story-portrait" src="moroni.png" style="display:none">
+    <div class="story-right">
+      <div class="story-speaker" id="story-speaker"></div>
+      <div class="story-text" id="story-text"></div>
+      <div class="story-ref" id="story-ref"></div>
+      <div class="story-hint">click to continue</div>
+    </div>
+  </div>
 </div>
 
 <canvas id="c"></canvas>
@@ -171,7 +180,7 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 
 <div id="sidebar-cmds" style="display:none">
   <button class="cmd-btn" onclick="doHeadcount()">📋 Headcount <span class="hotkey">[H]</span></button>
-  <button class="cmd-btn" onclick="doRecallAll()">📯 Recall Scouts <span class="hotkey">[Q]</span></button>
+  <button class="cmd-btn" onclick="doSendRetriever()">📯 Send Retriever <span class="hotkey">[Q]</span></button>
 </div>
 
 <div id="formation-bar">
@@ -333,6 +342,15 @@ function renderStoryPage(){
   document.getElementById('story-speaker').textContent=p.speaker||'';
   document.getElementById('story-text').textContent=p.text;
   document.getElementById('story-ref').textContent=p.ref||'';
+  const portrait=document.getElementById('story-portrait');
+  const overlay=document.getElementById('story-overlay');
+  if(p.speaker==='Captain Moroni'){
+    portrait.style.display='block';
+    overlay.classList.remove('no-portrait');
+  }else{
+    portrait.style.display='none';
+    overlay.classList.add('no-portrait');
+  }
 }
 function advanceStory(){
   storyIdx++;
@@ -691,15 +709,29 @@ function doHeadcount(){
 document.getElementById('headcount-overlay').addEventListener('click',()=>{doHeadcount();});
 
 // ══════════════════════════════════════
-// SCOUT RECALL
+// SCOUT RETRIEVAL (realistic)
 // ══════════════════════════════════════
-function recallScout(sc){
-  sc.returning=true;
-}
+// Scouts don't know they've been recalled. You must:
+// 1) Walk near them (25px) to pick them up, OR
+// 2) Press Q to send a retriever soldier who runs to the nearest scout and brings them back
 
-function doRecallAll(){
-  S.scouts.forEach(sc=>{if(!sc.dead)sc.returning=true;});
-  if(S.scouts.length>0)showCallout('Scouts recalled!',2);
+function doSendRetriever(){
+  const alive=S.soldiers.filter(s=>!s.dead);
+  const activeScouts=S.scouts.filter(s=>!s.dead&&!s.returning);
+  if(alive.length<=5){showCallout('Not enough soldiers to send a retriever.',2);return;}
+  if(activeScouts.length===0){showCallout('No scouts to retrieve.',2);return;}
+  // Detach a soldier as retriever — finds nearest scout
+  const ret=alive[alive.length-1];
+  S.soldiers=S.soldiers.filter(s=>s!==ret);
+  ret.isRetriever=true;
+  ret.speed=65; // faster than normal — running a message
+  // Find nearest active scout
+  let bestSc=null,bestD=Infinity;
+  activeScouts.forEach(sc=>{const d=Math.sqrt((sc.x-ret.x)*(sc.x-ret.x)+(sc.y-ret.y)*(sc.y-ret.y));if(d<bestD){bestD=d;bestSc=sc;}});
+  ret.retrieveTarget=bestSc;
+  ret.retrievePhase='outbound'; // outbound → reached scout → both return
+  S.scouts.push(ret); // track with scouts for vision
+  showCallout('Retriever sent to find the nearest scout.',3);
 }
 
 // ══════════════════════════════════════
@@ -797,18 +829,42 @@ function update(dt){
     if(a.morale<=0){a.dead=true;S.deadAllies++;}
   });
 
-  // ── Scouts ──
+  // ── Scouts & Retrievers ──
   S.scouts.forEach(sc=>{
     if(sc.dead)return;
 
-    // Returning?
+    // RETRIEVER behavior
+    if(sc.isRetriever){
+      const target=sc.retrieveTarget;
+      if(sc.retrievePhase==='outbound'){
+        if(!target||target.dead){
+          // Target died — retriever returns alone
+          sc.returning=true;sc.isRetriever=false;return;
+        }
+        const ddx=target.x-sc.x,ddy=target.y-sc.y;
+        const d=Math.sqrt(ddx*ddx+ddy*ddy);
+        if(d<20){
+          // Reached the scout — both return
+          sc.retrievePhase='returning';
+          target.returning=true;
+          sc.returning=true;
+          sc.isRetriever=false;
+          showCallout('Retriever found the scout! Both returning.',3);
+        }else{
+          const ts=terrainSpeed(sc.x,sc.y);
+          sc.x+=ddx/d*sc.speed*ts*dt;sc.y+=ddy/d*sc.speed*ts*dt;
+        }
+      }
+      return;
+    }
+
+    // Returning to commander
     if(sc.returning){
       const ddx=S.cx-sc.x,ddy=S.cy-sc.y;
       const d=Math.sqrt(ddx*ddx+ddy*ddy);
       if(d<20){
-        // Rejoin army
-        sc.returning=false;
         S.scouts=S.scouts.filter(s=>s!==sc);
+        sc.returning=false;
         sc.circleAngle=Math.random()*Math.PI*2;
         sc.circleRing=Math.floor(S.soldiers.length/10);
         sc.armored=true;
@@ -821,17 +877,15 @@ function update(dt){
       return;
     }
 
-    // Normal scout behavior
+    // Normal scout behavior — advance in facing direction, flee from enemies
     let nearE=null,nearD=Infinity;
     S.enemies.forEach(e=>{if(!e.dead){const d=Math.sqrt((e.x-sc.x)*(e.x-sc.x)+(e.y-sc.y)*(e.y-sc.y));if(d<nearD){nearD=d;nearE=e;}}});
 
     if(nearE&&nearD<80){
-      // Flee from nearby enemy
       const ax=sc.x-nearE.x,ay=sc.y-nearE.y;const al=Math.sqrt(ax*ax+ay*ay)||1;
       const ts=terrainSpeed(sc.x,sc.y);
       sc.x+=ax/al*sc.speed*ts*1.1*dt;sc.y+=ay/al*sc.speed*ts*1.1*dt;
     }else{
-      // Advance in scout direction
       const ts=terrainSpeed(sc.x,sc.y);
       sc.x+=Math.cos(sc.scoutFacing)*sc.speed*ts*0.6*dt;
       sc.y+=Math.sin(sc.scoutFacing)*sc.speed*ts*0.6*dt;
@@ -840,9 +894,9 @@ function update(dt){
     sc.y=Math.max(4,Math.min(MAP.h-4,sc.y));
   });
 
-  // Auto-recall: walk near a scout to pick them up
+  // Walk near a scout to pick them up (no instant recall)
   S.scouts.forEach(sc=>{
-    if(sc.dead||sc.returning)return;
+    if(sc.dead||sc.returning||sc.isRetriever)return;
     const d=Math.sqrt((sc.x-S.cx)*(sc.x-S.cx)+(sc.y-S.cy)*(sc.y-S.cy));
     if(d<25)sc.returning=true;
   });
@@ -1036,13 +1090,19 @@ function render(){
     if(s.barkTimer>0){const bA=Math.min(1,s.barkTimer*2);ctx.fillStyle=`rgba(255,220,80,${bA})`;ctx.fillRect(Math.floor(s.x),Math.floor(s.y-7),1,3);ctx.fillRect(Math.floor(s.x),Math.floor(s.y-3),1,1);}
   });
 
-  // Scouts
+  // Scouts & Retrievers
   S.scouts.forEach(sc=>{
     if(sc.dead)return;
-    ctx.fillStyle=sc.returning?'rgba(160,180,80,0.8)':'rgba(120,160,80,0.8)';
-    ctx.fillRect(Math.floor(sc.x-1),Math.floor(sc.y-1),2,3);
-    ctx.fillStyle='rgba(180,200,120,0.5)';ctx.fillRect(Math.floor(sc.x),Math.floor(sc.y-4),1,1);
-    if(sc.returning){ctx.fillStyle='rgba(200,200,100,0.4)';ctx.fillRect(Math.floor(sc.x-1),Math.floor(sc.y-6),1,1);ctx.fillRect(Math.floor(sc.x+1),Math.floor(sc.y-6),1,1);}
+    if(sc.isRetriever){
+      // Retriever = gold-green, running fast
+      ctx.fillStyle='rgba(180,160,60,0.85)';ctx.fillRect(Math.floor(sc.x-1),Math.floor(sc.y-1),2,3);
+      ctx.fillStyle='rgba(220,200,80,0.5)';ctx.fillRect(Math.floor(sc.x),Math.floor(sc.y-4),1,1);
+    }else{
+      ctx.fillStyle=sc.returning?'rgba(160,180,80,0.8)':'rgba(120,160,80,0.8)';
+      ctx.fillRect(Math.floor(sc.x-1),Math.floor(sc.y-1),2,3);
+      ctx.fillStyle='rgba(180,200,120,0.5)';ctx.fillRect(Math.floor(sc.x),Math.floor(sc.y-4),1,1);
+      if(sc.returning){ctx.fillStyle='rgba(200,200,100,0.4)';ctx.fillRect(Math.floor(sc.x-1),Math.floor(sc.y-6),1,1);ctx.fillRect(Math.floor(sc.x+1),Math.floor(sc.y-6),1,1);}
+    }
     ctx.strokeStyle='rgba(120,160,80,0.04)';ctx.lineWidth=0.3;ctx.beginPath();ctx.arc(sc.x,sc.y,VISION_RANGE*1.8,0,Math.PI*2);ctx.stroke();
   });
 
@@ -1167,7 +1227,7 @@ function drawMinimap(){
 function handleKey(k){
   if(!running)return;
   if(k===' '){S.rallying=true;S.rallyTimer=3;}
-  if(k==='q'){doRecallAll();}
+  if(k==='q'){doSendRetriever();}
   if(k==='h'){doHeadcount();}
   if(k==='e'){
     const alive=S.soldiers.filter(s=>!s.dead);
