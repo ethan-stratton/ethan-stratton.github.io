@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Title of Liberty</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a10;color:#c8c0a8;overflow:hidden;font-family:'Inter',sans-serif}
+canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
+
+/* Title Screen */
+#title-screen{position:fixed;top:0;left:0;right:0;bottom:0;background:#0e0e08;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10}
+#title-screen h1{font-family:'Cinzel',serif;font-size:3.2rem;color:#c8a040;letter-spacing:0.12em;text-align:center;margin-bottom:8px;text-shadow:0 2px 20px rgba(200,160,64,0.2)}
+#title-screen .subtitle{font-family:'Cinzel',serif;font-size:1.1rem;color:#8a7a50;letter-spacing:0.15em;margin-bottom:40px}
+#title-screen .verse{max-width:560px;font-size:0.9rem;color:#6a6248;line-height:1.7;text-align:center;font-style:italic;margin-bottom:40px}
+#title-screen .ref{font-size:0.75rem;color:#4a4230;margin-top:6px;font-style:normal;letter-spacing:0.05em}
+.start-btn{padding:14px 48px;border:1px solid rgba(200,160,64,0.3);background:none;color:#c8a040;font-family:'Cinzel',serif;font-size:1.1rem;letter-spacing:0.1em;cursor:pointer;transition:all 0.3s;border-radius:2px}
+.start-btn:hover{background:rgba(200,160,64,0.08);border-color:rgba(200,160,64,0.6)}
+.controls-hint{margin-top:24px;font-size:0.7rem;color:#4a4230;letter-spacing:0.08em}
+
+/* HUD */
+#hud{position:fixed;top:12px;left:12px;z-index:5;pointer-events:none}
+#hud div{font-size:0.75rem;color:#a89868;margin-bottom:4px;font-family:'Inter',sans-serif}
+#hud .label{color:#6a6248;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase}
+#mission-text{position:fixed;top:12px;right:12px;z-index:5;pointer-events:none;text-align:right;font-size:0.7rem;color:#8a7a50;font-family:'Cinzel',serif;letter-spacing:0.06em}
+</style>
+</head><body>
+
+<div id="title-screen">
+  <h1>TITLE OF LIBERTY</h1>
+  <div class="subtitle">THE WAR CHAPTERS</div>
+  <div class="verse">
+    "Yea, verily, verily I say unto you, if all men had been, and were, and ever would be, like unto Moroni, behold, the very powers of hell would have been shaken forever."
+    <div class="ref">— Alma 48:17</div>
+  </div>
+  <button class="start-btn" onclick="startGame()">BEGIN</button>
+  <div class="controls-hint">WASD to move · SPACE to rally · 1-4 formation orders</div>
+</div>
+
+<canvas id="c"></canvas>
+
+<div id="hud" style="display:none">
+  <div class="label">Faith</div>
+  <div id="faith-bar" style="width:120px;height:6px;background:#2a2a1a;border:1px solid #4a4230;border-radius:2px;margin-bottom:8px">
+    <div id="faith-fill" style="width:70%;height:100%;background:#c8a040;border-radius:1px;transition:width 0.5s"></div>
+  </div>
+  <div class="label">Army</div>
+  <div id="army-count">40 soldiers</div>
+  <div class="label" style="margin-top:6px">Formation</div>
+  <div id="formation-name">Circle</div>
+</div>
+
+<div id="mission-text" style="display:none">
+  <div>Mission 1: Riplah</div>
+  <div style="font-family:'Inter',sans-serif;font-size:0.6rem;color:#6a6248;margin-top:4px">Scout the Lamanite approach</div>
+</div>
+
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+
+// ══════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════
+const SCALE=3;
+const W=320,H=240;
+canvas.width=W*SCALE;canvas.height=H*SCALE;
+ctx.imageSmoothingEnabled=false;
+
+// ══════════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════════
+let running=false;
+let lastTime=0;
+
+const keys={};
+window.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;handleKey(e.key.toLowerCase());});
+window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+
+const S={
+  // Commander
+  cx:160,cy:180, // center of map, lowish
+  speed:60, // pixels per second
+  facing:0, // radians
+  
+  // Army
+  soldiers:[],
+  soldierCount:40,
+  formation:'circle', // circle, wedge, column, line
+  formationTight:1, // 0-1 spread
+  
+  // Camera
+  camX:0,camY:0,
+  
+  // Map (simple for now — will be Mission 1: Riplah)
+  mapW:800,mapH:600,
+  
+  // Faith
+  faith:70,
+  
+  // Rally
+  rallying:false,
+  rallyTimer:0,
+  
+  // Basic state
+  time:0,
+};
+
+// ══════════════════════════════════════
+// SOLDIER INITIALIZATION
+// ══════════════════════════════════════
+function initSoldiers(){
+  S.soldiers=[];
+  for(let i=0;i<S.soldierCount;i++){
+    const angle=(i/S.soldierCount)*Math.PI*2;
+    const r=18+Math.random()*8;
+    S.soldiers.push({
+      x:S.cx+Math.cos(angle)*r,
+      y:S.cy+Math.sin(angle)*r,
+      tx:0,ty:0, // target position
+      vx:0,vy:0,
+      hp:3,
+      morale:80+Math.random()*20,
+      // Visual variation
+      shade:0.85+Math.random()*0.3,
+      size:2+Math.random()*0.5,
+      bobOffset:Math.random()*Math.PI*2,
+    });
+  }
+}
+
+// ══════════════════════════════════════
+// FORMATION MATH
+// ══════════════════════════════════════
+function getFormationTarget(idx,total){
+  const f=S.formation;
+  if(f==='circle'){
+    const angle=(idx/total)*Math.PI*2;
+    const r=16+Math.floor(idx/12)*8;
+    return{x:Math.cos(angle)*r, y:Math.sin(angle)*r};
+  }
+  if(f==='wedge'){
+    const row=Math.floor(Math.sqrt(idx*2));
+    const col=idx-Math.floor(row*(row-1)/2);
+    const spread=6;
+    return{x:(col-row/2)*spread, y:-row*spread+4};
+  }
+  if(f==='column'){
+    const col=idx%4;
+    const row=Math.floor(idx/4);
+    return{x:(col-1.5)*6, y:-row*6};
+  }
+  if(f==='line'){
+    const halfW=total/2;
+    return{x:(idx-halfW)*5, y:0};
+  }
+  return{x:0,y:0};
+}
+
+// ══════════════════════════════════════
+// UPDATE
+// ══════════════════════════════════════
+function update(dt){
+  S.time+=dt;
+  
+  // Commander movement
+  let dx=0,dy=0;
+  if(keys['w']||keys['arrowup'])dy=-1;
+  if(keys['s']||keys['arrowdown'])dy=1;
+  if(keys['a']||keys['arrowleft'])dx=-1;
+  if(keys['d']||keys['arrowright'])dx=1;
+  
+  if(dx||dy){
+    const len=Math.sqrt(dx*dx+dy*dy);
+    dx/=len;dy/=len;
+    S.facing=Math.atan2(dy,dx);
+    S.cx+=dx*S.speed*dt;
+    S.cy+=dy*S.speed*dt;
+    // Clamp to map
+    S.cx=Math.max(8,Math.min(S.mapW-8,S.cx));
+    S.cy=Math.max(8,Math.min(S.mapH-8,S.cy));
+  }
+  
+  // Rally
+  if(S.rallying){
+    S.rallyTimer-=dt;
+    if(S.rallyTimer<=0){S.rallying=false;}
+    // Boost morale while rallying
+    S.soldiers.forEach(s=>{s.morale=Math.min(100,s.morale+dt*15);});
+    S.faith=Math.min(100,S.faith+dt*2);
+  }
+  
+  // Soldier formation following
+  const cos=Math.cos(S.facing),sin=Math.sin(S.facing);
+  S.soldiers.forEach((s,i)=>{
+    const ft=getFormationTarget(i,S.soldiers.length);
+    // Rotate formation target by facing direction
+    const rotX=ft.x*cos-ft.y*sin;
+    const rotY=ft.x*sin+ft.y*cos;
+    s.tx=S.cx+rotX;
+    s.ty=S.cy+rotY;
+    
+    // Smooth follow with slight stagger
+    const followSpeed=2.5+Math.random()*0.5;
+    const ddx=s.tx-s.x;
+    const ddy=s.ty-s.y;
+    const dist=Math.sqrt(ddx*ddx+ddy*ddy);
+    
+    if(dist>1){
+      // Asymptotic approach — faster when far, gentle when close
+      const factor=Math.min(1,followSpeed*dt*(1+dist*0.02));
+      s.x+=ddx*factor;
+      s.y+=ddy*factor;
+    }
+    
+    // Slight bob while moving
+    if(dist>3){
+      s.x+=Math.sin(S.time*8+s.bobOffset)*0.15;
+      s.y+=Math.cos(S.time*8+s.bobOffset+1)*0.1;
+    }
+    
+    // Clamp to map
+    s.x=Math.max(4,Math.min(S.mapW-4,s.x));
+    s.y=Math.max(4,Math.min(S.mapH-4,s.y));
+  });
+  
+  // Camera follows commander
+  S.camX=S.cx-W/2;
+  S.camY=S.cy-H/2;
+  S.camX=Math.max(0,Math.min(S.mapW-W,S.camX));
+  S.camY=Math.max(0,Math.min(S.mapH-H,S.camY));
+}
+
+// ══════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════
+function render(){
+  ctx.save();
+  ctx.scale(SCALE,SCALE);
+  
+  // Clear
+  ctx.fillStyle='#2a2818';
+  ctx.fillRect(0,0,W,H);
+  
+  // Camera transform
+  ctx.save();
+  ctx.translate(-S.camX,-S.camY);
+  
+  // ── TERRAIN ──
+  drawTerrain();
+  
+  // ── SOLDIERS ──
+  S.soldiers.forEach(s=>{
+    const brightness=Math.floor(140*s.shade);
+    const g=Math.floor(120*s.shade);
+    const b=Math.floor(80*s.shade);
+    ctx.fillStyle=`rgb(${brightness},${g},${b})`;
+    // Body
+    ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-1),s.size|0,s.size|0);
+    // Tiny shield glint (armor — Moroni's innovation)
+    ctx.fillStyle='rgba(200,180,120,0.3)';
+    ctx.fillRect(Math.floor(s.x),Math.floor(s.y-2),1,1);
+  });
+  
+  // ── COMMANDER ──
+  const cx=Math.floor(S.cx),cy=Math.floor(S.cy);
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.2)';
+  ctx.fillRect(cx-2,cy+1,5,2);
+  // Body
+  ctx.fillStyle='#c8a040';
+  ctx.fillRect(cx-2,cy-3,4,5);
+  // Head
+  ctx.fillStyle='#d4b060';
+  ctx.fillRect(cx-1,cy-5,3,3);
+  // Facing indicator (small line in facing direction)
+  const fx=Math.cos(S.facing)*4,fy=Math.sin(S.facing)*4;
+  ctx.strokeStyle='#c8a040';
+  ctx.lineWidth=0.5;
+  ctx.beginPath();
+  ctx.moveTo(S.cx,S.cy-1);
+  ctx.lineTo(S.cx+fx,S.cy-1+fy);
+  ctx.stroke();
+  
+  // Rally effect
+  if(S.rallying){
+    const pulse=0.3+Math.sin(S.time*6)*0.15;
+    ctx.strokeStyle=`rgba(200,160,64,${pulse})`;
+    ctx.lineWidth=0.5;
+    const r=20+Math.sin(S.time*3)*5;
+    ctx.beginPath();ctx.arc(S.cx,S.cy,r,0,Math.PI*2);ctx.stroke();
+    // Title of Liberty banner
+    ctx.fillStyle=`rgba(200,160,64,${pulse+0.2})`;
+    ctx.fillRect(cx-1,cy-10,2,7);
+    ctx.fillStyle=`rgba(180,140,50,${pulse+0.2})`;
+    ctx.fillRect(cx+1,cy-10,4,3);
+  }
+  
+  ctx.restore(); // camera
+  
+  // ── MINIMAP ──
+  drawMinimap();
+  
+  ctx.restore(); // scale
+}
+
+// ══════════════════════════════════════
+// TERRAIN — Mission 1: Riplah area
+// ══════════════════════════════════════
+function drawTerrain(){
+  // Ground base — earthy brown
+  ctx.fillStyle='#2a2818';
+  ctx.fillRect(0,0,S.mapW,S.mapH);
+  
+  // Grass patches
+  for(let x=0;x<S.mapW;x+=8){
+    for(let y=0;y<S.mapH;y+=8){
+      const n=Math.sin(x*0.1+y*0.13)*0.5+Math.sin(x*0.07-y*0.11)*0.5;
+      if(n>0.3){
+        ctx.fillStyle='rgba(60,70,30,0.15)';
+        ctx.fillRect(x,y,6,6);
+      }
+    }
+  }
+  
+  // River Sidon — runs roughly north-south through center-right
+  ctx.fillStyle='#1a2a3a';
+  ctx.beginPath();
+  for(let y=0;y<=S.mapH;y+=4){
+    const rx=520+Math.sin(y*0.015)*30+Math.sin(y*0.04)*10;
+    if(y===0)ctx.moveTo(rx-15,y);
+    ctx.lineTo(rx-15,y);
+  }
+  for(let y=S.mapH;y>=0;y-=4){
+    const rx=520+Math.sin(y*0.015)*30+Math.sin(y*0.04)*10;
+    ctx.lineTo(rx+15,y);
+  }
+  ctx.fill();
+  
+  // River shimmer
+  ctx.fillStyle='rgba(40,80,120,0.15)';
+  for(let y=0;y<S.mapH;y+=12){
+    const rx=520+Math.sin(y*0.015)*30+Math.sin(y*0.04)*10;
+    ctx.fillRect(rx-8+Math.sin(S.time*2+y*0.1)*3,y,6,2);
+  }
+  
+  // Ford (crossing point)
+  ctx.fillStyle='#3a3828';
+  const fordY=350;
+  const fordX=520+Math.sin(fordY*0.015)*30;
+  ctx.fillRect(fordX-18,fordY-4,36,8);
+  ctx.fillStyle='rgba(80,70,40,0.3)';
+  ctx.fillRect(fordX-16,fordY-2,32,4);
+  
+  // Hill Riplah — east side, south of river
+  ctx.fillStyle='rgba(80,70,40,0.2)';
+  ctx.beginPath();ctx.arc(650,420,60,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(90,80,45,0.15)';
+  ctx.beginPath();ctx.arc(650,420,40,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(100,90,50,0.1)';
+  ctx.beginPath();ctx.arc(650,420,20,0,Math.PI*2);ctx.fill();
+  // Hill label
+  ctx.fillStyle='rgba(140,130,90,0.4)';
+  ctx.font='5px Inter,sans-serif';
+  ctx.fillText('Hill Riplah',630,400);
+  
+  // Trees / wilderness — west side and scattered
+  for(let i=0;i<80;i++){
+    const tx=Math.random()*200;
+    const ty=Math.random()*S.mapH;
+    ctx.fillStyle='rgba(30,50,20,0.4)';
+    ctx.fillRect(tx,ty,3,3);
+    ctx.fillStyle='rgba(40,60,25,0.3)';
+    ctx.fillRect(tx-1,ty-2,5,2);
+  }
+  // More trees south
+  for(let i=0;i<40;i++){
+    const tx=200+Math.random()*200;
+    const ty=450+Math.random()*150;
+    ctx.fillStyle='rgba(30,50,20,0.35)';
+    ctx.fillRect(tx,ty,3,3);
+    ctx.fillStyle='rgba(40,60,25,0.25)';
+    ctx.fillRect(tx-1,ty-2,5,2);
+  }
+  
+  // Map border indicator
+  ctx.strokeStyle='rgba(100,90,60,0.1)';
+  ctx.lineWidth=1;
+  ctx.strokeRect(1,1,S.mapW-2,S.mapH-2);
+}
+
+// ══════════════════════════════════════
+// MINIMAP
+// ══════════════════════════════════════
+function drawMinimap(){
+  const mw=60,mh=45;
+  const mx=W-mw-6,my=H-mh-6;
+  const sx=mw/S.mapW,sy=mh/S.mapH;
+  
+  // Background
+  ctx.fillStyle='rgba(10,10,6,0.7)';
+  ctx.fillRect(mx-1,my-1,mw+2,mh+2);
+  ctx.fillStyle='#1a1a10';
+  ctx.fillRect(mx,my,mw,mh);
+  
+  // River on minimap
+  ctx.fillStyle='rgba(30,60,90,0.5)';
+  ctx.fillRect(mx+520*sx-1,my,3,mh);
+  
+  // Hill
+  ctx.fillStyle='rgba(80,70,40,0.3)';
+  ctx.beginPath();ctx.arc(mx+650*sx,my+420*sy,4,0,Math.PI*2);ctx.fill();
+  
+  // Soldiers
+  ctx.fillStyle='rgba(160,140,80,0.6)';
+  S.soldiers.forEach(s=>{
+    ctx.fillRect(mx+s.x*sx,my+s.y*sy,1,1);
+  });
+  
+  // Commander
+  ctx.fillStyle='#c8a040';
+  ctx.fillRect(mx+S.cx*sx-1,my+S.cy*sy-1,2,2);
+  
+  // Viewport box
+  ctx.strokeStyle='rgba(200,160,64,0.3)';
+  ctx.lineWidth=0.5;
+  ctx.strokeRect(mx+S.camX*sx,my+S.camY*sy,W*sx,H*sy);
+}
+
+// ══════════════════════════════════════
+// INPUT HANDLING
+// ══════════════════════════════════════
+function handleKey(k){
+  if(!running)return;
+  if(k===' '){
+    // Rally — raise the standard
+    S.rallying=true;
+    S.rallyTimer=2;
+  }
+  if(k==='1'){S.formation='circle';updateFormationHud();}
+  if(k==='2'){S.formation='wedge';updateFormationHud();}
+  if(k==='3'){S.formation='column';updateFormationHud();}
+  if(k==='4'){S.formation='line';updateFormationHud();}
+}
+
+function updateFormationHud(){
+  const names={circle:'Circle',wedge:'Wedge',column:'Column',line:'Line'};
+  document.getElementById('formation-name').textContent=names[S.formation]||'Circle';
+}
+
+// ══════════════════════════════════════
+// GAME LOOP
+// ══════════════════════════════════════
+function gameLoop(t){
+  if(!running){requestAnimationFrame(gameLoop);return;}
+  const dt=Math.min((t-lastTime)/1000,0.05);
+  lastTime=t;
+  update(dt);
+  render();
+  
+  // Update HUD
+  document.getElementById('faith-fill').style.width=S.faith+'%';
+  document.getElementById('army-count').textContent=S.soldiers.length+' soldiers';
+  
+  requestAnimationFrame(gameLoop);
+}
+
+// ══════════════════════════════════════
+// START
+// ══════════════════════════════════════
+function startGame(){
+  document.getElementById('title-screen').style.display='none';
+  document.getElementById('hud').style.display='block';
+  document.getElementById('mission-text').style.display='block';
+  initSoldiers();
+  running=true;
+  lastTime=performance.now();
+}
+
+// Resize
+function resize(){
+  const maxW=window.innerWidth,maxH=window.innerHeight;
+  const scale=Math.min(maxW/(W*SCALE),maxH/(H*SCALE));
+  canvas.style.width=(W*SCALE*scale)+'px';
+  canvas.style.height=(H*SCALE*scale)+'px';
+  canvas.style.marginTop=Math.max(0,(maxH-H*SCALE*scale)/2)+'px';
+}
+window.addEventListener('resize',resize);
+resize();
+
+requestAnimationFrame(gameLoop);
+</script>
+</body></html>
