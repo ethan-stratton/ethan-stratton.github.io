@@ -5,8 +5,6 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#1a1a10;color:#c8c0a8;overflow:hidden;font-family:'Inter',sans-serif}
 canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
-
-/* Title Screen */
 #title-screen{position:fixed;top:0;left:0;right:0;bottom:0;background:#0e0e08;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10}
 #title-screen h1{font-family:'Cinzel',serif;font-size:3.2rem;color:#c8a040;letter-spacing:0.12em;text-align:center;margin-bottom:8px;text-shadow:0 2px 20px rgba(200,160,64,0.2)}
 #title-screen .subtitle{font-family:'Cinzel',serif;font-size:1.1rem;color:#8a7a50;letter-spacing:0.15em;margin-bottom:40px}
@@ -15,8 +13,6 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 .start-btn{padding:14px 48px;border:1px solid rgba(200,160,64,0.3);background:none;color:#c8a040;font-family:'Cinzel',serif;font-size:1.1rem;letter-spacing:0.1em;cursor:pointer;transition:all 0.3s;border-radius:2px}
 .start-btn:hover{background:rgba(200,160,64,0.08);border-color:rgba(200,160,64,0.6)}
 .controls-hint{margin-top:24px;font-size:0.7rem;color:#4a4230;letter-spacing:0.08em}
-
-/* HUD */
 #hud{position:fixed;top:12px;left:12px;z-index:5;pointer-events:none}
 #hud div{font-size:0.75rem;color:#a89868;margin-bottom:4px;font-family:'Inter',sans-serif}
 #hud .label{color:#6a6248;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase}
@@ -32,7 +28,7 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
     <div class="ref">— Alma 48:17</div>
   </div>
   <button class="start-btn" onclick="startGame()">BEGIN</button>
-  <div class="controls-hint">WASD to move · SPACE to rally · 1-4 formation orders</div>
+  <div class="controls-hint">WASD to move · SPACE to rally · 1-5 formations</div>
 </div>
 
 <canvas id="c"></canvas>
@@ -57,100 +53,195 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 const canvas=document.getElementById('c');
 const ctx=canvas.getContext('2d');
 
-// ══════════════════════════════════════
-// CONSTANTS
-// ══════════════════════════════════════
 const SCALE=3;
 const W=320,H=240;
 canvas.width=W*SCALE;canvas.height=H*SCALE;
 ctx.imageSmoothingEnabled=false;
 
+let running=false,lastTime=0;
+const keys={};
+window.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;handleKey(e.key.toLowerCase());e.preventDefault();});
+window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+
+// ══════════════════════════════════════
+// MAP DATA — Mission 1: Riplah
+// ══════════════════════════════════════
+const MAP={w:800,h:600};
+
+// Roads — array of line segments, each {x1,y1,x2,y2,width}
+const ROADS=[
+  {x1:0,y1:300,x2:480,y2:300,w:12}, // east-west road
+  {x1:480,y1:300,x2:580,y2:350,w:10}, // road to ford
+  {x1:250,y1:0,x2:250,y2:600,w:10}, // north-south road
+];
+
+// River — center x at each y (sinuous)
+function riverX(y){return 540+Math.sin(y*0.015)*30+Math.sin(y*0.04)*10;}
+const FORD_Y=350;
+
+// Hill Riplah
+const HILL={x:660,y:420,r:55};
+
+// Trees — pre-generated
+const TREES=[];
+function genTrees(){
+  // West wilderness
+  for(let i=0;i<100;i++)TREES.push({x:Math.random()*180,y:Math.random()*MAP.h,s:2+Math.random()*2});
+  // South wilderness
+  for(let i=0;i<50;i++)TREES.push({x:200+Math.random()*250,y:440+Math.random()*160,s:2+Math.random()*2});
+  // Scattered
+  for(let i=0;i<30;i++)TREES.push({x:200+Math.random()*300,y:Math.random()*MAP.h,s:1.5+Math.random()*1.5});
+}
+genTrees();
+
+// ══════════════════════════════════════
+// TERRAIN QUERIES
+// ══════════════════════════════════════
+function onRoad(x,y){
+  for(const r of ROADS){
+    // Distance from point to line segment
+    const dx=r.x2-r.x1,dy=r.y2-r.y1;
+    const len2=dx*dx+dy*dy;
+    let t=len2?((x-r.x1)*dx+(y-r.y1)*dy)/len2:0;
+    t=Math.max(0,Math.min(1,t));
+    const px=r.x1+t*dx,py=r.y1+t*dy;
+    const d=Math.sqrt((x-px)*(x-px)+(y-py)*(y-py));
+    if(d<r.w/2)return true;
+  }
+  return false;
+}
+
+function inRiver(x,y){
+  const rx=riverX(y);
+  return Math.abs(x-rx)<16&&!(Math.abs(y-FORD_Y)<10);
+}
+
+function atFord(x,y){
+  const rx=riverX(FORD_Y);
+  return Math.abs(x-rx)<18&&Math.abs(y-FORD_Y)<10;
+}
+
+function onHill(x,y){
+  const dx=x-HILL.x,dy=y-HILL.y;
+  return Math.sqrt(dx*dx+dy*dy)<HILL.r;
+}
+
+function inTrees(x,y){
+  for(const t of TREES){
+    if(Math.abs(x-t.x)<6&&Math.abs(y-t.y)<6)return true;
+  }
+  return false;
+}
+
+function terrainSpeed(x,y){
+  if(inRiver(x,y))return 0.2;
+  if(onRoad(x,y))return 1.4;
+  if(onHill(x,y))return 0.7;
+  if(inTrees(x,y))return 0.6;
+  return 1.0;
+}
+
+function isHidden(x,y){return inTrees(x,y);}
+
 // ══════════════════════════════════════
 // GAME STATE
 // ══════════════════════════════════════
-let running=false;
-let lastTime=0;
-
-const keys={};
-window.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;handleKey(e.key.toLowerCase());});
-window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
-
 const S={
-  // Commander
-  cx:160,cy:180, // center of map, lowish
-  speed:60, // pixels per second
-  facing:0, // radians
-  
-  // Army
-  soldiers:[],
-  soldierCount:40,
-  formation:'circle', // circle, wedge, column, line
-  formationTight:1, // 0-1 spread
-  
-  // Camera
-  camX:0,camY:0,
-  
-  // Map (simple for now — will be Mission 1: Riplah)
-  mapW:800,mapH:600,
-  
-  // Faith
+  cx:250,cy:300,speed:55,facing:0,moving:false,
+  soldiers:[],soldierCount:40,
+  formation:'circle',
   faith:70,
-  
-  // Rally
-  rallying:false,
-  rallyTimer:0,
-  
-  // Basic state
+  rallying:false,rallyTimer:0,
   time:0,
+  camX:0,camY:0,
+  enemies:[],
 };
 
 // ══════════════════════════════════════
-// SOLDIER INITIALIZATION
+// UNIT FACTORY
 // ══════════════════════════════════════
+function makeSoldier(x,y,team){
+  return{
+    x,y,tx:x,ty:y,
+    vx:0,vy:0,
+    hp:3,maxHp:3,
+    morale:70+Math.random()*30,
+    team,
+    speed:40+Math.random()*15, // individual speed variance
+    shade:0.8+Math.random()*0.4,
+    size:2+Math.random()*0.5,
+    bobPhase:Math.random()*Math.PI*2,
+    attackCd:0,
+    fleeing:false,
+    dead:false,
+    slot:-1, // formation slot index
+  };
+}
+
 function initSoldiers(){
   S.soldiers=[];
   for(let i=0;i<S.soldierCount;i++){
-    const angle=(i/S.soldierCount)*Math.PI*2;
-    const r=18+Math.random()*8;
-    S.soldiers.push({
-      x:S.cx+Math.cos(angle)*r,
-      y:S.cy+Math.sin(angle)*r,
-      tx:0,ty:0, // target position
-      vx:0,vy:0,
-      hp:3,
-      morale:80+Math.random()*20,
-      // Visual variation
-      shade:0.85+Math.random()*0.3,
-      size:2+Math.random()*0.5,
-      bobOffset:Math.random()*Math.PI*2,
-    });
+    const a=(i/S.soldierCount)*Math.PI*2;
+    const r=16+Math.random()*8;
+    const s=makeSoldier(S.cx+Math.cos(a)*r,S.cy+Math.sin(a)*r,'nephite');
+    s.slot=i;
+    S.soldiers.push(s);
   }
 }
 
 // ══════════════════════════════════════
-// FORMATION MATH
+// ENEMY SPAWNS
 // ══════════════════════════════════════
-function getFormationTarget(idx,total){
-  const f=S.formation;
-  if(f==='circle'){
-    const angle=(idx/total)*Math.PI*2;
-    const r=16+Math.floor(idx/12)*8;
-    return{x:Math.cos(angle)*r, y:Math.sin(angle)*r};
+function spawnEnemyGroup(x,y,count){
+  const group=[];
+  for(let i=0;i<count;i++){
+    const a=(i/count)*Math.PI*2;
+    const r=10+Math.random()*8;
+    const e=makeSoldier(x+Math.cos(a)*r,y+Math.sin(a)*r,'lamanite');
+    e.hp=2;e.maxHp=2; // no armor
+    e.speed=45+Math.random()*10;
+    e.patrolX=x;e.patrolY=y;
+    e.aggroRange=80;
+    e.state='patrol'; // patrol, chase, fight, rout
+    e.patrolAngle=Math.random()*Math.PI*2;
+    group.push(e);
+    S.enemies.push(e);
   }
-  if(f==='wedge'){
-    const row=Math.floor(Math.sqrt(idx*2));
-    const col=idx-Math.floor(row*(row-1)/2);
-    const spread=6;
-    return{x:(col-row/2)*spread, y:-row*spread+4};
+  return group;
+}
+
+// ══════════════════════════════════════
+// FORMATIONS
+// ══════════════════════════════════════
+function getFormationTarget(idx,total,formation){
+  if(formation==='circle'){
+    const ring=Math.floor(idx/10);
+    const inRing=Math.min(10,total-ring*10);
+    const posInRing=idx%10;
+    const a=(posInRing/inRing)*Math.PI*2;
+    const r=14+ring*10;
+    return{x:Math.cos(a)*r,y:Math.sin(a)*r};
   }
-  if(f==='column'){
-    const col=idx%4;
-    const row=Math.floor(idx/4);
-    return{x:(col-1.5)*6, y:-row*6};
+  if(formation==='wedge'){
+    const row=Math.floor((-1+Math.sqrt(1+8*idx))/2);
+    const col=idx-(row*(row+1)/2);
+    const rowCount=row+1;
+    return{x:(col-(rowCount-1)/2)*7, y:-row*7};
   }
-  if(f==='line'){
-    const halfW=total/2;
-    return{x:(idx-halfW)*5, y:0};
+  if(formation==='column'){
+    const col=idx%3;
+    const row=Math.floor(idx/3);
+    return{x:(col-1)*6, y:-row*6};
+  }
+  if(formation==='line'){
+    const half=total/2;
+    return{x:(idx-half)*5, y:0};
+  }
+  if(formation==='travel'){
+    // Two files, long column — road march
+    const col=idx%2;
+    const row=Math.floor(idx/2);
+    return{x:(col-0.5)*5, y:-row*5};
   }
   return{x:0,y:0};
 }
@@ -160,290 +251,386 @@ function getFormationTarget(idx,total){
 // ══════════════════════════════════════
 function update(dt){
   S.time+=dt;
-  
+
   // Commander movement
   let dx=0,dy=0;
   if(keys['w']||keys['arrowup'])dy=-1;
   if(keys['s']||keys['arrowdown'])dy=1;
   if(keys['a']||keys['arrowleft'])dx=-1;
   if(keys['d']||keys['arrowright'])dx=1;
-  
-  if(dx||dy){
-    const len=Math.sqrt(dx*dx+dy*dy);
-    dx/=len;dy/=len;
+  S.moving=dx!==0||dy!==0;
+
+  if(S.moving){
+    const len=Math.sqrt(dx*dx+dy*dy);dx/=len;dy/=len;
     S.facing=Math.atan2(dy,dx);
-    S.cx+=dx*S.speed*dt;
-    S.cy+=dy*S.speed*dt;
-    // Clamp to map
-    S.cx=Math.max(8,Math.min(S.mapW-8,S.cx));
-    S.cy=Math.max(8,Math.min(S.mapH-8,S.cy));
+    const ts=terrainSpeed(S.cx,S.cy);
+    const spd=S.speed*ts*(S.rallying?0.6:1);
+    const nx=S.cx+dx*spd*dt;
+    const ny=S.cy+dy*spd*dt;
+    if(!inRiver(nx,ny)||atFord(nx,ny)){
+      S.cx=Math.max(8,Math.min(MAP.w-8,nx));
+      S.cy=Math.max(8,Math.min(MAP.h-8,ny));
+    }
   }
-  
+
   // Rally
   if(S.rallying){
     S.rallyTimer-=dt;
-    if(S.rallyTimer<=0){S.rallying=false;}
-    // Boost morale while rallying
-    S.soldiers.forEach(s=>{s.morale=Math.min(100,s.morale+dt*15);});
+    if(S.rallyTimer<=0)S.rallying=false;
+    S.soldiers.forEach(s=>{if(!s.dead){s.morale=Math.min(100,s.morale+dt*20);s.fleeing=false;}});
     S.faith=Math.min(100,S.faith+dt*2);
   }
-  
-  // Soldier formation following
+
+  // ── SOLDIER MOVEMENT — PHYSICAL ──
   const cos=Math.cos(S.facing),sin=Math.sin(S.facing);
-  S.soldiers.forEach((s,i)=>{
-    const ft=getFormationTarget(i,S.soldiers.length);
-    // Rotate formation target by facing direction
+  const alive=S.soldiers.filter(s=>!s.dead);
+  alive.forEach((s,i)=>{
+    s.slot=i;
+    // Get formation target in world space
+    const ft=getFormationTarget(i,alive.length,S.formation);
     const rotX=ft.x*cos-ft.y*sin;
     const rotY=ft.x*sin+ft.y*cos;
     s.tx=S.cx+rotX;
     s.ty=S.cy+rotY;
-    
-    // Smooth follow with slight stagger
-    const followSpeed=2.5+Math.random()*0.5;
-    const ddx=s.tx-s.x;
-    const ddy=s.ty-s.y;
+
+    // If in combat, don't follow formation — fight
+    const nearEnemy=findNearestEnemy(s.x,s.y,20);
+    if(nearEnemy&&!s.fleeing){
+      combat(s,nearEnemy,dt);
+      return;
+    }
+
+    // Distance to target
+    const ddx=s.tx-s.x,ddy=s.ty-s.y;
     const dist=Math.sqrt(ddx*ddx+ddy*ddy);
-    
-    if(dist>1){
-      // Asymptotic approach — faster when far, gentle when close
-      const factor=Math.min(1,followSpeed*dt*(1+dist*0.02));
-      s.x+=ddx*factor;
-      s.y+=ddy*factor;
+    if(dist<1)return;
+
+    // Physical: accelerate toward target, speed limited by terrain
+    const ts=terrainSpeed(s.x,s.y);
+    // Urgency: further from slot = run harder, up to a cap
+    const urgency=Math.min(2.5,1+dist*0.03);
+    const maxSpd=s.speed*ts*urgency;
+
+    // Desired velocity
+    const dvx=(ddx/dist)*maxSpd;
+    const dvy=(ddy/dist)*maxSpd;
+
+    // Smooth acceleration (not instant snap)
+    const accel=180*dt; // how fast they change velocity
+    s.vx+=(dvx-s.vx)*Math.min(1,accel/maxSpd);
+    s.vy+=(dvy-s.vy)*Math.min(1,accel/maxSpd);
+
+    // Clamp velocity
+    const v=Math.sqrt(s.vx*s.vx+s.vy*s.vy);
+    if(v>maxSpd){s.vx*=maxSpd/v;s.vy*=maxSpd/v;}
+
+    // Apply
+    let nx=s.x+s.vx*dt;
+    let ny=s.y+s.vy*dt;
+
+    // River blocking
+    if(inRiver(nx,ny)&&!atFord(nx,ny)){
+      // Try to path to ford — simplistic: just stop
+      s.vx*=0.1;s.vy*=0.1;
+    }else{
+      s.x=Math.max(4,Math.min(MAP.w-4,nx));
+      s.y=Math.max(4,Math.min(MAP.h-4,ny));
     }
-    
-    // Slight bob while moving
-    if(dist>3){
-      s.x+=Math.sin(S.time*8+s.bobOffset)*0.15;
-      s.y+=Math.cos(S.time*8+s.bobOffset+1)*0.1;
+
+    // Bob when moving fast
+    if(v>15){
+      s.x+=Math.sin(S.time*10+s.bobPhase)*0.12;
+      s.y+=Math.cos(S.time*10+s.bobPhase+1)*0.08;
     }
-    
-    // Clamp to map
-    s.x=Math.max(4,Math.min(S.mapW-4,s.x));
-    s.y=Math.max(4,Math.min(S.mapH-4,s.y));
   });
-  
-  // Camera follows commander
-  S.camX=S.cx-W/2;
-  S.camY=S.cy-H/2;
-  S.camX=Math.max(0,Math.min(S.mapW-W,S.camX));
-  S.camY=Math.max(0,Math.min(S.mapH-H,S.camY));
+
+  // ── ENEMY AI ──
+  S.enemies.forEach(e=>{
+    if(e.dead)return;
+
+    // Find nearest Nephite
+    const nearFriend=findNearestFriendly(e.x,e.y,e.aggroRange);
+
+    if(e.state==='rout'){
+      // Flee away from commander
+      const fx=e.x-S.cx,fy=e.y-S.cy;
+      const fl=Math.sqrt(fx*fx+fy*fy)||1;
+      e.x+=fx/fl*e.speed*1.2*dt;
+      e.y+=fy/fl*e.speed*1.2*dt;
+      return;
+    }
+
+    if(nearFriend&&nearFriend.dist<20){
+      // Fight
+      combat(e,nearFriend.unit,dt);
+      e.state='fight';
+    }else if(nearFriend){
+      // Chase
+      e.state='chase';
+      const ddx=nearFriend.unit.x-e.x,ddy=nearFriend.unit.y-e.y;
+      const d=Math.sqrt(ddx*ddx+ddy*ddy)||1;
+      const ts=terrainSpeed(e.x,e.y);
+      e.x+=ddx/d*e.speed*ts*dt;
+      e.y+=ddy/d*e.speed*ts*dt;
+    }else{
+      // Patrol
+      e.state='patrol';
+      e.patrolAngle+=dt*0.5;
+      const px=e.patrolX+Math.cos(e.patrolAngle)*25;
+      const py=e.patrolY+Math.sin(e.patrolAngle)*25;
+      const ddx=px-e.x,ddy=py-e.y;
+      const d=Math.sqrt(ddx*ddx+ddy*ddy)||1;
+      e.x+=ddx/d*15*dt;
+      e.y+=ddy/d*15*dt;
+    }
+
+    // Morale check — rout if low
+    if(e.morale<=0){e.state='rout';e.fleeing=true;}
+  });
+
+  // Camera
+  S.camX=S.cx-W/2;S.camY=S.cy-H/2;
+  S.camX=Math.max(0,Math.min(MAP.w-W,S.camX));
+  S.camY=Math.max(0,Math.min(MAP.h-H,S.camY));
+
+  // Clean dead
+  S.soldiers=S.soldiers.filter(s=>!s.dead);
+  S.enemies=S.enemies.filter(e=>!e.dead);
+}
+
+// ══════════════════════════════════════
+// COMBAT
+// ══════════════════════════════════════
+function findNearestEnemy(x,y,range){
+  let best=null,bestD=range;
+  S.enemies.forEach(e=>{
+    if(e.dead||e.state==='rout')return;
+    const d=Math.sqrt((e.x-x)*(e.x-x)+(e.y-y)*(e.y-y));
+    if(d<bestD){bestD=d;best=e;}
+  });
+  return best;
+}
+
+function findNearestFriendly(x,y,range){
+  let best=null,bestD=range;
+  S.soldiers.forEach(s=>{
+    if(s.dead||s.fleeing)return;
+    const d=Math.sqrt((s.x-x)*(s.x-x)+(s.y-y)*(s.y-y));
+    if(d<bestD){bestD=d;best={unit:s,dist:d};}
+  });
+  return best;
+}
+
+function combat(attacker,defender,dt){
+  attacker.attackCd-=dt;
+  if(attacker.attackCd>0)return;
+  attacker.attackCd=0.8+Math.random()*0.4;
+
+  // Armor: Nephites have armor, Lamanites don't
+  const dmg=attacker.team==='nephite'?1:0.6; // Nephite swords hit harder through armor advantage
+  const blocked=(defender.team==='nephite'&&Math.random()<0.3); // 30% block chance with armor
+
+  if(!blocked){
+    defender.hp-=dmg;
+    defender.morale-=8;
+    if(defender.hp<=0){
+      defender.dead=true;
+      // Morale shock to nearby allies
+      const allies=(defender.team==='nephite'?S.soldiers:S.enemies);
+      allies.forEach(a=>{
+        if(a.dead)return;
+        const d=Math.sqrt((a.x-defender.x)*(a.x-defender.x)+(a.y-defender.y)*(a.y-defender.y));
+        if(d<40)a.morale-=10;
+      });
+    }
+  }
+
+  // Attacker morale boost on hit
+  attacker.morale=Math.min(100,attacker.morale+2);
+
+  // Flanking bonus: if defender is fighting someone else (multiple engagers)
+  // Future: check angle between attacker and defender's facing
+
+  // Lamanite morale affected by being outnumbered locally
+  if(defender.team==='lamanite'){
+    let nephitesNear=0,lamanitesNear=0;
+    S.soldiers.forEach(s=>{if(!s.dead&&Math.abs(s.x-defender.x)<30&&Math.abs(s.y-defender.y)<30)nephitesNear++;});
+    S.enemies.forEach(e=>{if(!e.dead&&Math.abs(e.x-defender.x)<30&&Math.abs(e.y-defender.y)<30)lamanitesNear++;});
+    if(nephitesNear>lamanitesNear*1.5)defender.morale-=5; // outnumbered morale drain
+  }
 }
 
 // ══════════════════════════════════════
 // RENDER
 // ══════════════════════════════════════
 function render(){
-  ctx.save();
-  ctx.scale(SCALE,SCALE);
-  
-  // Clear
-  ctx.fillStyle='#2a2818';
-  ctx.fillRect(0,0,W,H);
-  
-  // Camera transform
-  ctx.save();
-  ctx.translate(-S.camX,-S.camY);
-  
-  // ── TERRAIN ──
+  ctx.save();ctx.scale(SCALE,SCALE);
+
+  ctx.fillStyle='#2a2818';ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.translate(-S.camX,-S.camY);
+
   drawTerrain();
-  
-  // ── SOLDIERS ──
-  S.soldiers.forEach(s=>{
-    const brightness=Math.floor(140*s.shade);
-    const g=Math.floor(120*s.shade);
-    const b=Math.floor(80*s.shade);
-    ctx.fillStyle=`rgb(${brightness},${g},${b})`;
-    // Body
-    ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-1),s.size|0,s.size|0);
-    // Tiny shield glint (armor — Moroni's innovation)
-    ctx.fillStyle='rgba(200,180,120,0.3)';
-    ctx.fillRect(Math.floor(s.x),Math.floor(s.y-2),1,1);
+
+  // Enemies
+  S.enemies.forEach(e=>{
+    if(e.dead)return;
+    // Red-brown for Lamanites (minimal armor — darker skin tones described in text)
+    const a=e.state==='rout'?0.4:0.8;
+    ctx.fillStyle=`rgba(140,60,40,${a})`;
+    ctx.fillRect(Math.floor(e.x-1),Math.floor(e.y-1),2,3);
+    // No armor glint — they're nearly naked per Alma 43
+    // Health pip
+    if(e.hp<e.maxHp){
+      ctx.fillStyle='rgba(200,50,30,0.6)';
+      ctx.fillRect(Math.floor(e.x-1),Math.floor(e.y-4),Math.ceil(2*(e.hp/e.maxHp)),1);
+    }
   });
-  
-  // ── COMMANDER ──
+
+  // Nephite soldiers
+  S.soldiers.forEach(s=>{
+    if(s.dead)return;
+    const b=Math.floor(130*s.shade),g=Math.floor(115*s.shade),r=Math.floor(75*s.shade);
+    ctx.fillStyle=`rgb(${b},${g},${r})`;
+    ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-1),s.size|0,(s.size+0.5)|0);
+    // Armor glint
+    ctx.fillStyle='rgba(200,180,120,0.25)';
+    ctx.fillRect(Math.floor(s.x),Math.floor(s.y-2),1,1);
+    // Health pip
+    if(s.hp<s.maxHp){
+      ctx.fillStyle='rgba(200,180,60,0.6)';
+      ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-4),Math.ceil(2*(s.hp/s.maxHp)),1);
+    }
+  });
+
+  // Commander
   const cx=Math.floor(S.cx),cy=Math.floor(S.cy);
-  // Shadow
-  ctx.fillStyle='rgba(0,0,0,0.2)';
-  ctx.fillRect(cx-2,cy+1,5,2);
-  // Body
-  ctx.fillStyle='#c8a040';
-  ctx.fillRect(cx-2,cy-3,4,5);
-  // Head
-  ctx.fillStyle='#d4b060';
-  ctx.fillRect(cx-1,cy-5,3,3);
-  // Facing indicator (small line in facing direction)
-  const fx=Math.cos(S.facing)*4,fy=Math.sin(S.facing)*4;
-  ctx.strokeStyle='#c8a040';
-  ctx.lineWidth=0.5;
-  ctx.beginPath();
-  ctx.moveTo(S.cx,S.cy-1);
-  ctx.lineTo(S.cx+fx,S.cy-1+fy);
-  ctx.stroke();
-  
+  ctx.fillStyle='rgba(0,0,0,0.15)';ctx.fillRect(cx-2,cy+2,5,2);
+  ctx.fillStyle='#c8a040';ctx.fillRect(cx-2,cy-3,4,5);
+  ctx.fillStyle='#d4b060';ctx.fillRect(cx-1,cy-5,3,3);
+  // Facing line
+  const fx=Math.cos(S.facing)*5,fy=Math.sin(S.facing)*5;
+  ctx.strokeStyle='rgba(200,160,64,0.5)';ctx.lineWidth=0.5;
+  ctx.beginPath();ctx.moveTo(S.cx,S.cy-1);ctx.lineTo(S.cx+fx,S.cy-1+fy);ctx.stroke();
+
   // Rally effect
   if(S.rallying){
     const pulse=0.3+Math.sin(S.time*6)*0.15;
-    ctx.strokeStyle=`rgba(200,160,64,${pulse})`;
-    ctx.lineWidth=0.5;
-    const r=20+Math.sin(S.time*3)*5;
-    ctx.beginPath();ctx.arc(S.cx,S.cy,r,0,Math.PI*2);ctx.stroke();
-    // Title of Liberty banner
-    ctx.fillStyle=`rgba(200,160,64,${pulse+0.2})`;
-    ctx.fillRect(cx-1,cy-10,2,7);
-    ctx.fillStyle=`rgba(180,140,50,${pulse+0.2})`;
-    ctx.fillRect(cx+1,cy-10,4,3);
+    ctx.strokeStyle=`rgba(200,160,64,${pulse})`;ctx.lineWidth=0.5;
+    ctx.beginPath();ctx.arc(S.cx,S.cy,22+Math.sin(S.time*3)*5,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle=`rgba(200,160,64,${pulse+0.2})`;ctx.fillRect(cx-1,cy-12,2,9);
+    ctx.fillStyle=`rgba(180,140,50,${pulse+0.2})`;ctx.fillRect(cx+1,cy-12,5,3);
   }
-  
-  ctx.restore(); // camera
-  
-  // ── MINIMAP ──
+
+  // Combat sparks
+  S.soldiers.forEach(s=>{
+    if(!s.dead&&s.attackCd>0.6){
+      ctx.fillStyle='rgba(255,220,120,0.5)';
+      ctx.fillRect(Math.floor(s.x+Math.random()*4-2),Math.floor(s.y+Math.random()*4-2),1,1);
+    }
+  });
+  S.enemies.forEach(e=>{
+    if(!e.dead&&e.attackCd>0.6){
+      ctx.fillStyle='rgba(255,100,60,0.5)';
+      ctx.fillRect(Math.floor(e.x+Math.random()*4-2),Math.floor(e.y+Math.random()*4-2),1,1);
+    }
+  });
+
+  ctx.restore();
   drawMinimap();
-  
-  ctx.restore(); // scale
+  ctx.restore();
 }
 
 // ══════════════════════════════════════
-// TERRAIN — Mission 1: Riplah area
+// TERRAIN RENDER
 // ══════════════════════════════════════
 function drawTerrain(){
-  // Ground base — earthy brown
-  ctx.fillStyle='#2a2818';
-  ctx.fillRect(0,0,S.mapW,S.mapH);
-  
-  // Grass patches
-  for(let x=0;x<S.mapW;x+=8){
-    for(let y=0;y<S.mapH;y+=8){
-      const n=Math.sin(x*0.1+y*0.13)*0.5+Math.sin(x*0.07-y*0.11)*0.5;
-      if(n>0.3){
-        ctx.fillStyle='rgba(60,70,30,0.15)';
-        ctx.fillRect(x,y,6,6);
-      }
-    }
-  }
-  
-  // River Sidon — runs roughly north-south through center-right
+  ctx.fillStyle='#2a2818';ctx.fillRect(0,0,MAP.w,MAP.h);
+
+  // Grass variation
+  for(let x=0;x<MAP.w;x+=8){for(let y=0;y<MAP.h;y+=8){
+    const n=Math.sin(x*0.1+y*0.13)*0.5+Math.sin(x*0.07-y*0.11)*0.5;
+    if(n>0.3){ctx.fillStyle='rgba(60,70,30,0.12)';ctx.fillRect(x,y,6,6);}
+  }}
+
+  // Roads
+  ctx.strokeStyle='#3a3428';ctx.lineCap='round';
+  ROADS.forEach(r=>{ctx.lineWidth=r.w;ctx.beginPath();ctx.moveTo(r.x1,r.y1);ctx.lineTo(r.x2,r.y2);ctx.stroke();});
+  // Road detail
+  ctx.strokeStyle='rgba(70,60,40,0.2)';
+  ROADS.forEach(r=>{ctx.lineWidth=r.w*0.3;ctx.beginPath();ctx.moveTo(r.x1,r.y1);ctx.lineTo(r.x2,r.y2);ctx.stroke();});
+
+  // River
   ctx.fillStyle='#1a2a3a';
   ctx.beginPath();
-  for(let y=0;y<=S.mapH;y+=4){
-    const rx=520+Math.sin(y*0.015)*30+Math.sin(y*0.04)*10;
-    if(y===0)ctx.moveTo(rx-15,y);
-    ctx.lineTo(rx-15,y);
-  }
-  for(let y=S.mapH;y>=0;y-=4){
-    const rx=520+Math.sin(y*0.015)*30+Math.sin(y*0.04)*10;
-    ctx.lineTo(rx+15,y);
-  }
+  for(let y=0;y<=MAP.h;y+=4){const rx=riverX(y);if(y===0)ctx.moveTo(rx-15,y);ctx.lineTo(rx-15,y);}
+  for(let y=MAP.h;y>=0;y-=4){ctx.lineTo(riverX(y)+15,y);}
   ctx.fill();
-  
-  // River shimmer
-  ctx.fillStyle='rgba(40,80,120,0.15)';
-  for(let y=0;y<S.mapH;y+=12){
-    const rx=520+Math.sin(y*0.015)*30+Math.sin(y*0.04)*10;
-    ctx.fillRect(rx-8+Math.sin(S.time*2+y*0.1)*3,y,6,2);
-  }
-  
-  // Ford (crossing point)
-  ctx.fillStyle='#3a3828';
-  const fordY=350;
-  const fordX=520+Math.sin(fordY*0.015)*30;
-  ctx.fillRect(fordX-18,fordY-4,36,8);
-  ctx.fillStyle='rgba(80,70,40,0.3)';
-  ctx.fillRect(fordX-16,fordY-2,32,4);
-  
-  // Hill Riplah — east side, south of river
-  ctx.fillStyle='rgba(80,70,40,0.2)';
-  ctx.beginPath();ctx.arc(650,420,60,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='rgba(90,80,45,0.15)';
-  ctx.beginPath();ctx.arc(650,420,40,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='rgba(100,90,50,0.1)';
-  ctx.beginPath();ctx.arc(650,420,20,0,Math.PI*2);ctx.fill();
-  // Hill label
-  ctx.fillStyle='rgba(140,130,90,0.4)';
-  ctx.font='5px Inter,sans-serif';
-  ctx.fillText('Hill Riplah',630,400);
-  
-  // Trees / wilderness — west side and scattered
-  for(let i=0;i<80;i++){
-    const tx=Math.random()*200;
-    const ty=Math.random()*S.mapH;
-    ctx.fillStyle='rgba(30,50,20,0.4)';
-    ctx.fillRect(tx,ty,3,3);
-    ctx.fillStyle='rgba(40,60,25,0.3)';
-    ctx.fillRect(tx-1,ty-2,5,2);
-  }
-  // More trees south
-  for(let i=0;i<40;i++){
-    const tx=200+Math.random()*200;
-    const ty=450+Math.random()*150;
-    ctx.fillStyle='rgba(30,50,20,0.35)';
-    ctx.fillRect(tx,ty,3,3);
-    ctx.fillStyle='rgba(40,60,25,0.25)';
-    ctx.fillRect(tx-1,ty-2,5,2);
-  }
-  
-  // Map border indicator
-  ctx.strokeStyle='rgba(100,90,60,0.1)';
-  ctx.lineWidth=1;
-  ctx.strokeRect(1,1,S.mapW-2,S.mapH-2);
+  // Shimmer
+  ctx.fillStyle='rgba(40,80,120,0.12)';
+  for(let y=0;y<MAP.h;y+=10){const rx=riverX(y);ctx.fillRect(rx-8+Math.sin(S.time*2+y*0.1)*3,y,5,2);}
+
+  // Ford
+  const fordRx=riverX(FORD_Y);
+  ctx.fillStyle='#3a3828';ctx.fillRect(fordRx-18,FORD_Y-5,36,10);
+  ctx.fillStyle='rgba(80,70,40,0.3)';ctx.fillRect(fordRx-14,FORD_Y-3,28,6);
+  ctx.fillStyle='rgba(100,90,60,0.3)';ctx.font='4px Inter';ctx.fillText('Ford',fordRx-6,FORD_Y-7);
+
+  // Hill Riplah
+  ctx.fillStyle='rgba(80,70,40,0.18)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(90,80,45,0.12)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*0.65,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(100,90,50,0.08)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*0.3,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(140,130,90,0.35)';ctx.font='5px Inter';ctx.fillText('Hill Riplah',HILL.x-18,HILL.y-HILL.r+8);
+
+  // Trees
+  TREES.forEach(t=>{
+    ctx.fillStyle='rgba(25,45,18,0.5)';ctx.fillRect(t.x,t.y,t.s*0.4,t.s);
+    ctx.fillStyle='rgba(35,55,22,0.4)';ctx.fillRect(t.x-t.s*0.5,t.y-t.s*0.5,t.s*1.5,t.s*0.7);
+  });
 }
 
 // ══════════════════════════════════════
 // MINIMAP
 // ══════════════════════════════════════
 function drawMinimap(){
-  const mw=60,mh=45;
-  const mx=W-mw-6,my=H-mh-6;
-  const sx=mw/S.mapW,sy=mh/S.mapH;
-  
-  // Background
-  ctx.fillStyle='rgba(10,10,6,0.7)';
-  ctx.fillRect(mx-1,my-1,mw+2,mh+2);
-  ctx.fillStyle='#1a1a10';
-  ctx.fillRect(mx,my,mw,mh);
-  
-  // River on minimap
-  ctx.fillStyle='rgba(30,60,90,0.5)';
-  ctx.fillRect(mx+520*sx-1,my,3,mh);
-  
+  const mw=60,mh=45,mx=W-mw-6,my=H-mh-6;
+  const sx=mw/MAP.w,sy=mh/MAP.h;
+  ctx.fillStyle='rgba(10,10,6,0.75)';ctx.fillRect(mx-1,my-1,mw+2,mh+2);
+  ctx.fillStyle='#1a1a10';ctx.fillRect(mx,my,mw,mh);
+  // Roads
+  ctx.strokeStyle='rgba(80,70,50,0.3)';ctx.lineWidth=0.5;
+  ROADS.forEach(r=>{ctx.beginPath();ctx.moveTo(mx+r.x1*sx,my+r.y1*sy);ctx.lineTo(mx+r.x2*sx,my+r.y2*sy);ctx.stroke();});
+  // River
+  ctx.fillStyle='rgba(30,60,90,0.4)';ctx.fillRect(mx+540*sx-1,my,2,mh);
   // Hill
-  ctx.fillStyle='rgba(80,70,40,0.3)';
-  ctx.beginPath();ctx.arc(mx+650*sx,my+420*sy,4,0,Math.PI*2);ctx.fill();
-  
+  ctx.fillStyle='rgba(80,70,40,0.25)';ctx.beginPath();ctx.arc(mx+HILL.x*sx,my+HILL.y*sy,3,0,Math.PI*2);ctx.fill();
+  // Enemies
+  ctx.fillStyle='rgba(200,60,40,0.6)';
+  S.enemies.forEach(e=>{if(!e.dead)ctx.fillRect(mx+e.x*sx,my+e.y*sy,1,1);});
   // Soldiers
   ctx.fillStyle='rgba(160,140,80,0.6)';
-  S.soldiers.forEach(s=>{
-    ctx.fillRect(mx+s.x*sx,my+s.y*sy,1,1);
-  });
-  
+  S.soldiers.forEach(s=>{if(!s.dead)ctx.fillRect(mx+s.x*sx,my+s.y*sy,1,1);});
   // Commander
-  ctx.fillStyle='#c8a040';
-  ctx.fillRect(mx+S.cx*sx-1,my+S.cy*sy-1,2,2);
-  
-  // Viewport box
-  ctx.strokeStyle='rgba(200,160,64,0.3)';
-  ctx.lineWidth=0.5;
+  ctx.fillStyle='#c8a040';ctx.fillRect(mx+S.cx*sx-1,my+S.cy*sy-1,2,2);
+  // Viewport
+  ctx.strokeStyle='rgba(200,160,64,0.25)';ctx.lineWidth=0.5;
   ctx.strokeRect(mx+S.camX*sx,my+S.camY*sy,W*sx,H*sy);
 }
 
 // ══════════════════════════════════════
-// INPUT HANDLING
+// INPUT
 // ══════════════════════════════════════
 function handleKey(k){
   if(!running)return;
-  if(k===' '){
-    // Rally — raise the standard
-    S.rallying=true;
-    S.rallyTimer=2;
-  }
-  if(k==='1'){S.formation='circle';updateFormationHud();}
-  if(k==='2'){S.formation='wedge';updateFormationHud();}
-  if(k==='3'){S.formation='column';updateFormationHud();}
-  if(k==='4'){S.formation='line';updateFormationHud();}
+  if(k===' '){S.rallying=true;S.rallyTimer=2.5;}
+  if(k==='1'){S.formation='circle';updFmt();}
+  if(k==='2'){S.formation='wedge';updFmt();}
+  if(k==='3'){S.formation='column';updFmt();}
+  if(k==='4'){S.formation='line';updFmt();}
+  if(k==='5'){S.formation='travel';updFmt();}
 }
-
-function updateFormationHud(){
-  const names={circle:'Circle',wedge:'Wedge',column:'Column',line:'Line'};
-  document.getElementById('formation-name').textContent=names[S.formation]||'Circle';
+function updFmt(){
+  const n={circle:'Circle',wedge:'Wedge',column:'Column',line:'Line',travel:'Travel'};
+  document.getElementById('formation-name').textContent=n[S.formation]||'Circle';
 }
 
 // ══════════════════════════════════════
@@ -451,31 +638,25 @@ function updateFormationHud(){
 // ══════════════════════════════════════
 function gameLoop(t){
   if(!running){requestAnimationFrame(gameLoop);return;}
-  const dt=Math.min((t-lastTime)/1000,0.05);
-  lastTime=t;
-  update(dt);
-  render();
-  
-  // Update HUD
+  const dt=Math.min((t-lastTime)/1000,0.05);lastTime=t;
+  update(dt);render();
   document.getElementById('faith-fill').style.width=S.faith+'%';
-  document.getElementById('army-count').textContent=S.soldiers.length+' soldiers';
-  
+  document.getElementById('army-count').textContent=S.soldiers.filter(s=>!s.dead).length+' soldiers';
   requestAnimationFrame(gameLoop);
 }
 
-// ══════════════════════════════════════
-// START
-// ══════════════════════════════════════
 function startGame(){
   document.getElementById('title-screen').style.display='none';
   document.getElementById('hud').style.display='block';
   document.getElementById('mission-text').style.display='block';
   initSoldiers();
-  running=true;
-  lastTime=performance.now();
+  // Spawn test enemy groups
+  spawnEnemyGroup(600,200,8);  // Small patrol north of river
+  spawnEnemyGroup(650,380,12); // Larger group near hill Riplah
+  spawnEnemyGroup(500,500,6);  // Scout group south
+  running=true;lastTime=performance.now();
 }
 
-// Resize
 function resize(){
   const maxW=window.innerWidth,maxH=window.innerHeight;
   const scale=Math.min(maxW/(W*SCALE),maxH/(H*SCALE));
@@ -483,9 +664,7 @@ function resize(){
   canvas.style.height=(H*SCALE*scale)+'px';
   canvas.style.marginTop=Math.max(0,(maxH-H*SCALE*scale)/2)+'px';
 }
-window.addEventListener('resize',resize);
-resize();
-
+window.addEventListener('resize',resize);resize();
 requestAnimationFrame(gameLoop);
 </script>
 </body></html>
