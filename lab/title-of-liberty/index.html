@@ -216,6 +216,13 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
     <button class="mercy-btn" onclick="chooseMercy(false)">Continue Fighting</button>
   </div>
   <div class="epilogue" id="epilogue" style="display:none"></div>
+  <button id="return-btn" class="mercy-btn" style="display:none;margin-top:20px" onclick="returnToTimeline()">Return to Timeline</button>
+</div>
+
+<div id="pause-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,6,0.85);z-index:30;flex-direction:column;align-items:center;justify-content:center">
+  <h2 style="font-family:'Cinzel',serif;font-size:1.5rem;color:#c8a040;letter-spacing:0.1em;margin-bottom:16px">Paused</h2>
+  <button class="mercy-btn" onclick="togglePause()">Resume</button>
+  <button class="mercy-btn" style="margin-top:8px" onclick="returnToTimeline()">Quit to Timeline</button>
 </div>
 
 <script>
@@ -228,6 +235,7 @@ ctx.imageSmoothingEnabled=false;
 let running=false,lastTime=0;
 const keys={};
 window.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){if(running)togglePause();return;}
   keys[e.key.toLowerCase()]=true;
   handleKey(e.key.toLowerCase());
   if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()||e.key))e.preventDefault();
@@ -373,9 +381,24 @@ function advanceStory(){
 function onStoryEnd(){
   if(S.phase==='briefing'){
     S.phase='scout';S.phaseTimer=0;
-    setObjective('Send a scout west toward the river to find the Lamanite army.');
+    setObjective('Send scouts west toward the river. We need to find their army. (Press A then E)');
     setPhaseLabel('Phase 1 of 4 — Scouting');
-    showCallout('Face west (press A) and press E to send a scout.',6);
+    // Lehi sends a scout first — player sees it as tutorial
+    setTimeout(()=>{
+      if(S.allies.length>0){
+        const lehi=S.allies[0];
+        const sc=makeUnit(lehi.x,lehi.y,'nephite');
+        sc.isLehi=true;
+        sc.scoutWaypoints=[
+          {x:500,y:200},{x:420,y:250},{x:370,y:300},{x:340,y:330},{x:310,y:350},
+          {x:280,y:340},{x:240,y:320},{x:200,y:300},
+        ];
+        sc.scoutWpIdx=0;sc.speed=55;sc.armored=false;sc.returning=false;sc.scoutImmunity=3;
+        sc.scoutFacing=Math.PI;sc.visionRange=90;sc.isLehiScout=true;
+        S.scouts.push(sc);
+        showCallout("Lehi sends a scout west. You should do the same — face west (A) and press E.",6);
+      }
+    },2000);
   }
 }
 
@@ -573,22 +596,33 @@ function updateMission(dt){
       spawnLamaniteArmy();
     }
 
-    // Check if any scout or soldier has spotted enemies
+    // Check if scouts have spotted enemies
     let spottedCount=0;
     S.enemies.forEach(e=>{if(e.spotted)spottedCount++;});
+    
+    // Count player scouts (not Lehi's)
+    const playerScouts=S.scouts.filter(sc=>!sc.dead&&!sc.isLehiScout);
+    const returningScouts=S.scouts.filter(sc=>!sc.dead&&sc.returning&&!sc.isLehiScout);
 
-    if(spottedCount>=3&&!S._scoutedEnemy){
+    // Need scouts to spot AND at least one to return with the report
+    if(spottedCount>=3&&returningScouts.length>0&&!S._scoutedEnemy){
       S._scoutedEnemy=true;
       S.phase='position';S.phaseTimer=0;
       setObjective('Move your forces behind Hill Riplah (south). Hide in the trees or behind the hill!');
       setPhaseLabel('Phase 2 of 4 — Get into position');
-      showCallout('Lamanite army spotted to the west! ~'+S.totalLamanites+' warriors! Get behind the hill!',6);
+      showCallout('Scout reports: Lamanite army to the west! ~'+S.totalLamanites+' warriors! Get behind the hill!',6);
+    }
+    
+    // Progress callouts
+    if(spottedCount>=3&&!S._scoutedEnemy&&returningScouts.length===0&&!S._waitingForReport){
+      S._waitingForReport=true;
+      showCallout('Scouts have found them! Walk near a returning scout to receive the report.',5);
     }
 
-    // Reminder at 15s if no scout sent
-    if(S.phaseTimer>15&&!S._scoutedEnemy&&S.scouts.length===0){
-      showCallout('Send a scout! Face east and press E.',4);
-      S.phaseTimer=10; // reset so it reminds again
+    // Reminder if no player scouts sent
+    if(S.phaseTimer>12&&!S._scoutedEnemy&&playerScouts.length===0){
+      showCallout('Send scouts west! Face west (A) and press E. Send 2-3 for safety.',4);
+      S.phaseTimer=8;
     }
   }
 
@@ -887,11 +921,19 @@ function update(dt){
       return;
     }
 
-    // Returning to commander
+    // Returning to commander (or Lehi for Lehi's scout)
     if(sc.returning){
-      const ddx=S.cx-sc.x,ddy=S.cy-sc.y;
+      const rtx=sc.isLehiScout&&S.allies.length>0?S.allies[0].x:S.cx;
+      const rty=sc.isLehiScout&&S.allies.length>0?S.allies[0].y:S.cy;
+      const ddx=rtx-sc.x,ddy=rty-sc.y;
       const d=Math.sqrt(ddx*ddx+ddy*ddy);
       if(d<20){
+        if(sc.isLehiScout){
+          // Lehi's scout returns to Lehi — just remove
+          S.scouts=S.scouts.filter(s=>s!==sc);
+          showCallout("Lehi's scout has returned with a report.",3);
+          return;
+        }
         S.scouts=S.scouts.filter(s=>s!==sc);
         sc.returning=false;
         sc.circleAngle=Math.random()*Math.PI*2;
@@ -909,6 +951,13 @@ function update(dt){
     // Normal scout behavior — follow waypoints, flee from enemies
     let nearE=null,nearD=Infinity;
     S.enemies.forEach(e=>{if(!e.dead){const d=Math.sqrt((e.x-sc.x)*(e.x-sc.x)+(e.y-sc.y)*(e.y-sc.y));if(d<nearD){nearD=d;nearE=e;}}});
+
+    // Auto-return when enemy spotted close enough (mission accomplished)
+    if(nearE&&nearD<90&&!sc._hasReport){
+      sc._hasReport=true;
+      // Flee briefly then start returning
+      setTimeout(()=>{if(!sc.dead)sc.returning=true;},1500);
+    }
 
     if(nearE&&nearD<80){
       const ax=sc.x-nearE.x,ay=sc.y-nearE.y;const al=Math.sqrt(ax*ax+ay*ay)||1;
@@ -1059,6 +1108,7 @@ function showResults(){
 function chooseMercy(mercy){
   document.getElementById('mercy-choice').style.display='none';
   const ep=document.getElementById('epilogue');ep.style.display='block';
+  document.getElementById('return-btn').style.display='inline-block';
   if(mercy){
     ep.innerHTML='Moroni stopped the battle and offered Zerahemnah terms: surrender your weapons and covenant to never fight again.<br><br>'+
       'Zerahemnah refused. He attacked Moroni, and a soldier struck off his scalp upon the sword. Many Lamanites saw this and were frightened, and came forward to make the covenant.<br><br>'+
@@ -1080,7 +1130,24 @@ function showDefeat(){
     '<div class="stat">The Lamanites march on Manti unopposed.</div>';
   document.getElementById('epilogue').style.display='block';
   document.getElementById('epilogue').innerHTML='Perhaps next time, use the terrain. Hide behind the hill. Wait for the crossing. Spring the trap.<br><br>'+
-    '<span style="color:#4a4230;font-size:0.65rem">Hint: Send scouts first (E), then move to the southeast behind Hill Riplah. Stay in the trees. Wait.</span>';
+    '<span style="color:#4a4230;font-size:0.65rem">Hint: Send scouts first (E), then move south behind Hill Riplah. Stay in the trees. Wait.</span>';
+  document.getElementById('return-btn').style.display='inline-block';
+}
+
+let paused=false;
+function togglePause(){
+  paused=!paused;
+  document.getElementById('pause-overlay').style.display=paused?'flex':'none';
+  if(!paused&&running){lastTime=performance.now();requestAnimationFrame(gameLoop);}
+}
+
+function returnToTimeline(){
+  running=false;paused=false;
+  document.getElementById('results').style.display='none';
+  document.getElementById('pause-overlay').style.display='none';
+  document.getElementById('title-screen').style.display='flex';
+  document.getElementById('hud').style.display='none';
+  document.getElementById('mission-text').style.display='none';
 }
 
 // ══════════════════════════════════════
@@ -1332,7 +1399,7 @@ function handleKey(k){
 // GAME LOOP
 // ══════════════════════════════════════
 function gameLoop(t){
-  if(!running){requestAnimationFrame(gameLoop);return;}
+  if(!running||paused){requestAnimationFrame(gameLoop);return;}
   const dt=Math.min((t-lastTime)/1000,0.05);lastTime=t;
   update(dt);render();
   requestAnimationFrame(gameLoop);
