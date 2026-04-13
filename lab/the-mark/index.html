@@ -90,7 +90,8 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 .status-chained{color:#8070a0}
 .status-fled{color:#607080}
 .status-unknown{color:#585050}
-.char-icon{margin-right:5px;font-size:0.7rem;flex-shrink:0}
+.char-icon{margin-right:5px;font-size:0.7rem;flex-shrink:0;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center}
+.char-portrait{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;font-size:0.5rem;font-weight:600;color:#1a1610;flex-shrink:0;margin-right:5px}
 @keyframes pulse-dying{0%,100%{opacity:1}50%{opacity:0.3}}
 
 /* Responsive: stack on mobile */
@@ -146,47 +147,47 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 const CHARACTERS=[
   // ── YOUR COUNCIL ──
   // ── YOUR COUNCIL (visible from start) ──
-  {id:'rowan',name:'Rowan',role:'Captain of the Guard',group:'council',status:'well',icon:'⚔️',visible:true,
+  {id:'rowan',name:'Rowan',role:'Captain of the Guard',group:'council',status:'well',icon:'⚔️',visible:true,portrait:'#8B6914',
    bio:'Forty-two. Built like the wall he patrols. Lost his wife to an Ash Walker raid six years ago. Never talks about it. Protects Brannhaven the only way he knows — with steel and stone. Good man. Scared man.',trust:60},
-  {id:'lira',name:'Lira',role:'Healer',group:'council',status:'well',icon:'🌿',visible:true,
+  {id:'lira',name:'Lira',role:'Healer',group:'council',status:'well',icon:'🌿',visible:true,portrait:'#5B8C5A',
    bio:'Thirty-five. Trained under the old leader. Knows every herb in the valley. Treats broken bones and broken hearts with equal seriousness. Believes in people past the point of evidence.',trust:60},
-  {id:'edric',name:'Edric',role:'Elder, Council',group:'council',status:'well',icon:'📜',visible:true,
+  {id:'edric',name:'Edric',role:'Elder, Council',group:'council',status:'well',icon:'📜',visible:true,portrait:'#6B6B8D',
    bio:'Sixty-one. Remembers things nobody else does — the old laws, the old agreements, the reason the wall was built where it was. Believes that rules kept Brannhaven alive when nothing else could.',trust:60},
-  {id:'wren',name:'Wren',role:'Child',group:'council',status:'well',icon:'🌸',visible:true,
+  {id:'wren',name:'Wren',role:'Child',group:'council',status:'well',icon:'🌸',visible:true,portrait:'#B08DAB',
    bio:'Eight years old. Sits on the wall and watches everything. Asks questions that adults avoid.'},
 
   // ── BRANNHAVEN (revealed by petitions) ──
-  {id:'corwin',name:'Corwin',role:'Scout',group:'brannhaven',status:'dead',icon:'',visible:false,
+  {id:'corwin',name:'Corwin',role:'Scout',group:'brannhaven',status:'dead',icon:'',visible:false,portrait:'#7A6A5A',
    bio:'Died beyond the wall trying to stop a defection.'},
-  {id:'hale',name:'Hale',role:'Scout (defected)',group:'brannhaven',status:'dead',icon:'',visible:false,
+  {id:'hale',name:'Hale',role:'Scout (defected)',group:'brannhaven',status:'dead',icon:'',visible:false,portrait:'#6A5A4A',
    bio:'Defected to the Reach. Killed for it. His mother still lives inside the wall.'},
-  {id:'hale_mother',name:'Hale\'s Mother',role:'Resident',group:'brannhaven',status:'grieving',icon:'',visible:false},
-  {id:'corwin_wife',name:'Senna',role:'Corwin\'s wife',group:'brannhaven',status:'grieving',icon:'',visible:false},
-  {id:'declan',name:'Declan',role:'Wall-crew',group:'brannhaven',status:'well',icon:'',visible:false,
+  {id:'hale_mother',name:'Hale\'s Mother',role:'Resident',group:'brannhaven',status:'grieving',icon:'',visible:false,portrait:'#8A7A6A'},
+  {id:'corwin_wife',name:'Senna',role:'Corwin\'s wife',group:'brannhaven',status:'grieving',icon:'',visible:false,portrait:'#9A7A6A'},
+  {id:'declan',name:'Declan',role:'Wall-crew',group:'brannhaven',status:'well',icon:'',visible:false,portrait:'#7A8A6A',
    bio:'Good with his hands. Wife died in the spring. Raising his daughter alone.'},
-  {id:'declan_daughter',name:'Mira',role:'Declan\'s daughter',group:'brannhaven',status:'sick',icon:'',visible:false,
+  {id:'declan_daughter',name:'Mira',role:'Declan\'s daughter',group:'brannhaven',status:'sick',icon:'',visible:false,portrait:'#A09080',
    bio:'Seven. Hungry. Sick.'},
-  {id:'marsh',name:'Marsh',role:'Trader',group:'brannhaven',status:'unknown',icon:'',visible:false,
+  {id:'marsh',name:'Marsh',role:'Trader',group:'brannhaven',status:'unknown',icon:'',visible:false,portrait:'#6A7A8A',
    bio:'Iron tools, high prices, no sentiment.'},
-  {id:'kael',name:'Kael',role:'Agitator',group:'brannhaven',status:'unknown',icon:'',visible:false,
+  {id:'kael',name:'Kael',role:'Agitator',group:'brannhaven',status:'unknown',icon:'',visible:false,portrait:'#8A6A5A',
    bio:'Talks about fairness. Draws crowds. Not entirely wrong.'},
 
   // ── OUTSIDERS (revealed by petitions) ──
-  {id:'elif',name:'Elif',role:'Refugee',group:'outsiders',status:'unknown',icon:'',visible:false,
+  {id:'elif',name:'Elif',role:'Refugee',group:'outsiders',status:'unknown',icon:'',visible:false,portrait:'#8A7060',
    bio:'Three weeks on foot from a Reach-absorbed settlement. Two children. An old man.'},
-  {id:'elif_boy',name:'Elif\'s son',role:'Child, ~6',group:'outsiders',status:'unknown',icon:'',visible:false},
-  {id:'elif_girl',name:'Elif\'s daughter',role:'Infant',group:'outsiders',status:'unknown',icon:'',visible:false},
-  {id:'avi',name:'Old Avi',role:'Elder',group:'outsiders',status:'unknown',icon:'',visible:false,
+  {id:'elif_boy',name:'Elif\'s son',role:'Child, ~6',group:'outsiders',status:'unknown',icon:'',visible:false,portrait:'#9A8070'},
+  {id:'elif_girl',name:'Elif\'s daughter',role:'Infant',group:'outsiders',status:'unknown',icon:'',visible:false,portrait:'#A09080'},
+  {id:'avi',name:'Old Avi',role:'Elder',group:'outsiders',status:'unknown',icon:'',visible:false,portrait:'#8080A0',
    bio:'Prays in a language no one here recognizes. Walks with a staff.'},
-  {id:'nath',name:'Nath',role:'Reach deserter',group:'outsiders',status:'unknown',icon:'',visible:false,
+  {id:'nath',name:'Nath',role:'Reach deserter',group:'outsiders',status:'unknown',icon:'',visible:false,portrait:'#6A7A6A',
    bio:'Stripped his insignia and ran. Knows patrol routes. Or he\'s a spy.'},
-  {id:'pacifists',name:'Thornfield families',role:'Pacifists (×6)',group:'outsiders',status:'unknown',icon:'',visible:false,
+  {id:'pacifists',name:'Thornfield families',role:'Pacifists (×6)',group:'outsiders',status:'unknown',icon:'',visible:false,portrait:'#8A8A7A',
    bio:'Buried their weapons. Will work. Will not fight. Ever.'},
 
   // ── THE REACH (revealed by events) ──
-  {id:'warden',name:'The Warden',role:'Leader of the Reach',group:'reach',status:'unknown',icon:'',visible:false,
+  {id:'warden',name:'The Warden',role:'Leader of the Reach',group:'reach',status:'unknown',icon:'',visible:false,portrait:'#5A4A4A',
    bio:'A pragmatist who decided chaos was worse than control.'},
-  {id:'envoy',name:'The Envoy',role:'Reach diplomat',group:'reach',status:'unknown',icon:'',visible:false,
+  {id:'envoy',name:'The Envoy',role:'Reach diplomat',group:'reach',status:'unknown',icon:'',visible:false,portrait:'#5A5A6A',
    bio:'Polite. Reasonable. Terrifying.'},
 ];
 
@@ -237,10 +238,13 @@ function renderRoster(){
       const stCls=STATUS_CLASSES[c.status]||'status-unknown';
       const stTxt=STATUS_TEXT[c.status]||c.status;
       const trustHtml=(c.trust!==undefined)?`<span style="font-family:Inter,sans-serif;font-size:0.5rem;color:#504838;margin-left:3px">${c.trust}%</span>`:'';
-      html+=`<div class="${cls}" title="${c.bio||''}">`;
-      html+=`<span class="char-icon">${c.icon||''}</span>`;
+      // Portrait: colored circle with initial, or emoji if set
+      const initial=c.name.charAt(0).toUpperCase();
+      const pColor=isDead?'#3A3030':c.portrait||'#605040';
+      const portraitHtml=c.icon?`<span class="char-icon">${c.icon}</span>`:`<span class="char-portrait" style="background:${pColor}">${initial}</span>`;
+      html+=`<div class="${cls}" title="${(c.bio||'').replace(/"/g,'&quot;')}">`;
+      html+=portraitHtml;
       html+=`<span class="char-name">${c.name}${trustHtml}</span>`;
-      html+=`<span class="char-role">${c.role.split(',')[0]}</span>`;
       html+=`<span class="char-status ${stCls}">${stTxt}</span>`;
       html+=`</div>`;
     });
