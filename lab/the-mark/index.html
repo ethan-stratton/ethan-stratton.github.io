@@ -77,6 +77,17 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 .maren-line{font-size:0.95rem;color:#b8a890;padding:12px 16px;margin:8px 0;background:rgba(160,140,110,0.04);border-left:2px solid rgba(160,140,110,0.15);border-radius:0 4px 4px 0;line-height:1.7}
 .maren-line .maren-name{font-family:'Inter',sans-serif;font-size:0.6rem;color:#8A7A6A;letter-spacing:0.08em;text-transform:uppercase;display:block;margin-bottom:4px}
 .gameover-msg{font-size:1.3rem;color:#c05040;text-align:center;margin:20px 0}
+.epilogue-scene{font-size:1.1rem;color:#a89878;line-height:1.8;max-width:600px;margin:24px auto;font-style:italic}
+.epilogue-detail{font-size:0.95rem;color:#887860;line-height:1.6;max-width:600px;margin:8px auto;padding-left:16px;border-left:1px solid rgba(200,160,80,0.1)}
+.epilogue-ledger{font-size:0.9rem;color:#706050;max-width:600px;margin:20px auto;padding:12px 16px;border:1px solid rgba(200,160,80,0.08);font-style:italic;border-radius:4px}
+.ledger-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,8,6,0.92);z-index:100;display:flex;justify-content:center;align-items:flex-start;padding:40px;overflow-y:auto}
+.ledger-content{max-width:600px;width:100%;background:#1e1a14;border:1px solid rgba(200,160,80,0.1);padding:30px;border-radius:4px}
+.ledger-title{font-family:'Crimson Text',serif;font-size:1.4rem;color:#c8b890;margin-bottom:20px;text-align:center}
+.ledger-entry{font-size:0.95rem;color:#a89878;line-height:1.6;margin-bottom:12px;padding-left:12px;border-left:1px solid rgba(200,160,80,0.1)}
+.ledger-day{font-family:'Inter',sans-serif;font-size:0.6rem;color:#706050;letter-spacing:0.08em;text-transform:uppercase;display:block;margin-bottom:2px}
+.ledger-close{display:block;margin:20px auto 0;padding:8px 24px;border:1px solid rgba(200,160,80,0.2);background:none;color:#c8b890;cursor:pointer;font-family:'Crimson Text',serif;font-size:1rem;border-radius:4px}
+.ledger-btn{display:block;margin:8px auto;padding:6px 16px;border:1px solid rgba(200,160,80,0.1);background:none;color:#a89878;cursor:pointer;font-family:'Inter',sans-serif;font-size:0.75rem;letter-spacing:0.05em;border-radius:4px}
+.ledger-btn:hover{border-color:rgba(200,160,80,0.3);color:#c8b890}
 
 /* End screen */
 #end-screen{text-align:center;padding:60px 20px}
@@ -186,6 +197,7 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 
 <div id="sidebar" style="display:none">
 <div id="advisor-panel"></div>
+<button class="ledger-btn" onclick="showLedger()">📜 Edric's Ledger</button>
 <h3>People</h3>
 <div id="roster"></div>
 </div>
@@ -193,6 +205,38 @@ body{background:#1a1610;color:#c8c0b0;font-family:'Crimson Text',serif;overflow-
 <div id="event-log"></div>
 
 <script>
+// ══════════════════════════════════════
+// AUDIO SYSTEM (Web Audio API, no files)
+// ══════════════════════════════════════
+let audioCtx=null;
+function initAudio(){if(audioCtx)return;audioCtx=new(window.AudioContext||window.webkitAudioContext)();startAmbientLoop();}
+function playTone(freq,dur,type='sine',vol=0.15){
+  if(!audioCtx)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(vol,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+dur);
+  o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+dur);
+}
+let ambientNode=null,ambientGain=null;
+function startAmbientLoop(){
+  if(!audioCtx||ambientNode)return;
+  const sr=audioCtx.sampleRate,buf=audioCtx.createBuffer(1,2*sr,sr),data=buf.getChannelData(0);
+  let last=0;for(let i=0;i<2*sr;i++){last=(last+0.02*((Math.random()*2)-1))/1.02;data[i]=last*3.5;}
+  ambientNode=audioCtx.createBufferSource();ambientNode.buffer=buf;ambientNode.loop=true;
+  ambientGain=audioCtx.createGain();ambientGain.gain.value=0.08;
+  ambientNode.connect(ambientGain);ambientGain.connect(audioCtx.destination);ambientNode.start();
+}
+function updateAmbientVolume(){
+  if(!ambientGain)return;const base=0.08,f=S.mor/100;
+  ambientGain.gain.setTargetAtTime(base*0.3+base*0.7*f,audioCtx.currentTime,0.5);
+}
+function soundDeath(){playTone(110,3,'sine',0.12);setTimeout(()=>playTone(82,3,'sine',0.08),500);}
+function soundWren(){playTone(523,0.3,'sine',0.06);setTimeout(()=>playTone(659,0.3,'sine',0.06),200);setTimeout(()=>playTone(784,0.5,'sine',0.06),400);}
+function soundDawn(){playTone(330,1.5,'triangle',0.06);setTimeout(()=>playTone(392,1.2,'triangle',0.06),400);setTimeout(()=>playTone(440,1,'triangle',0.06),800);}
+function soundDusk(){playTone(220,2,'sine',0.06);setTimeout(()=>playTone(196,2,'sine',0.05),600);}
+function soundPetition(){playTone(262,0.5,'triangle',0.08);}
+function soundChoice(){playTone(440,0.2,'triangle',0.1);setTimeout(()=>playTone(554,0.3,'triangle',0.08),100);}
+function soundDread(){playTone(73,4,'sawtooth',0.04);}
+function soundMaren(){playTone(392,0.4,'sine',0.05);setTimeout(()=>playTone(330,0.6,'sine',0.05),300);}
 // ══════════════════════════════════════
 // CHARACTER ROSTER
 // ══════════════════════════════════════
@@ -263,7 +307,7 @@ const S={
 function clamp(v,lo=0,hi=100){return Math.max(lo,Math.min(hi,v))}
 
 function getChar(id){return CHARACTERS.find(c=>c.id===id)}
-function setStatus(id,status){const c=getChar(id);if(c){c.status=status;c.visible=true;if(status==='dead')S.flags._last_death_day=S.day;}renderRoster();}
+function setStatus(id,status){const c=getChar(id);if(c){c.status=status;c.visible=true;if(status==='dead'){S.flags._last_death_day=S.day;soundDeath();}}renderRoster();}
 function setMultiStatus(updates){updates.forEach(([id,st])=>{const c=getChar(id);if(c){c.status=st;c.visible=true;if(st==='dead')S.flags._last_death_day=S.day;}});renderRoster();}
 function revealChars(ids){ids.forEach(id=>{const c=getChar(id);if(c)c.visible=true;});renderRoster();}
 
@@ -1067,12 +1111,13 @@ function adjustAssign(role,d){
 }
 
 function endDawn(){
-  S.phase='midday';updateHud();
+  S.phase='midday';updateHud();soundDawn();
   // Show ambient moment before petitions (if available)
   const ambient=getAmbient();
   if(ambient){
     S.ambientsSeen.add(ambient.id);
     const ambientText=getAmbientText(ambient);
+    if(ambient.mood==='dread')soundDread();
     const area=document.getElementById('phase-area');
     let h=`<div class="ambient-label">— a moment —</div>`;
     h+=`<div class="ambient-moment">${ambientText}</div>`;
@@ -1094,6 +1139,7 @@ function renderPetitions(){
   });
   if(!avail.length){renderNoPetition();return;}
   const pet=avail[0];S.usedPetitions.add(pet.id);
+  soundPetition();
   if(pet.reveal)revealChars(pet.reveal);
   const area=document.getElementById('phase-area');
   let h=`<div class="phase-title">Midday — Petition</div>`;
@@ -1113,6 +1159,7 @@ function renderNoPetition(){
 }
 
 function choosePetition(idx){
+  soundChoice();
   const pet=document.getElementById('phase-area')._currentPetition;
   const ch=pet.choices[idx];const ef=ch.effects;
   if(ef.food)S.food=clamp(S.food+ef.food);
@@ -1124,6 +1171,7 @@ function choosePetition(idx){
   if(ef.trustLira)S.trustLira=clamp(S.trustLira+ef.trustLira);
   if(ef.trustEdric)S.trustEdric=clamp(S.trustEdric+ef.trustEdric);
   if(ch.flag)S.flags[ch.flag]=true;
+  ledgerEntries.push({day:S.day, text:getLedgerEntry(pet.id, ch.flag)});
   if(ch.roster)setMultiStatus(ch.roster);
   // Delayed consequences — queue follow-up events
   if(ch.delayed){
@@ -1136,11 +1184,13 @@ function choosePetition(idx){
 function endMidday(){S.phase='dusk';updateHud();renderDusk();}
 
 function renderDusk(){
+  soundDusk();updateAmbientVolume();
   const events=generateDuskEvents();
   const area=document.getElementById('phase-area');
   let h=`<div class="phase-title">Dusk — The Day's End</div>`;
   events.forEach(ev=>{
     if(ev==='__wren__'){
+      soundWren();
       const wl=getWrenLine();
       h+=`<div class="wren-line">${wl}</div>`;
       logEvent(wl,'wren');
@@ -1159,6 +1209,7 @@ function renderDusk(){
       logEvent(`${name}: ${line}`);
     }
     else if(ev.startsWith('__maren__')){
+      soundMaren();
       const line=ev.slice(9);
       h+=`<div class="maren-line"><span class="maren-name">Maren</span>${line}</div>`;
       logEvent(`Maren: ${line}`);
@@ -1190,6 +1241,98 @@ function nextDay(){
   updateHud();renderDawn();
 }
 
+// ══════════════════════════════════════
+// EDRIC'S LEDGER
+// ══════════════════════════════════════
+const ledgerEntries=[];
+function getLedgerEntry(petId,flag){
+  const E={
+    burial_deny:'Corwin buried with honors. Hale denied rites. The mother was not consulted.',
+    burial_wall:'Hale hung from the wall as warning. Effective. Inhumane. Both true.',
+    burial_both:'Both buried. Corwin with ceremony, Hale quietly. Rowan objected. The leader overruled. Precedent: mercy extends even to traitors.',
+    burial_private:'Bodies returned to families. No ceremony. The crowd wanted blood or tears. They got neither.',
+    trader_deal:'Full price paid. Twenty percent of stores for tools. The math is sound. The feeling is not.',
+    trader_counter:'Counter-offer accepted. Ten percent and hospitality. A fair deal in an unfair world.',
+    trader_seize:'The cart was seized. The trader is dead. I advised against this. I was not asked.',
+    trader_decline:'The trader left with his cart. We remain without tools. Principle over pragmatism.',
+    sick_seal:'East quarter sealed. Twelve workers idle. The healer was not given her herbs.',
+    sick_herbs:'Quarantine with foraging mission approved. Risk accepted in service of healing.',
+    sick_ignore:'No quarantine ordered. The leader chose productivity over precaution. I note this without comment.',
+    sick_isolate:'Sick moved to healer\'s hall. A measured response. Time will tell if measured is enough.',
+    thief_punish:'Declan sentenced to hard labor. Five days. His daughter\'s rations reduced. The law is clear. The law is cold.',
+    thief_forgive:'Declan pardoned. Grain returned. No precedent set. This will happen again.',
+    thief_fix:'Declan pardoned and ration system reformed. The leader fixed the system instead of punishing the symptom. I did not expect this.',
+    thief_exile:'Declan exiled for theft. His daughter remains. A child, alone. I am recording this for whoever finds this ledger.',
+    elif_in:'Four refugees admitted. Food cost noted. The leader chose people over arithmetic.',
+    elif_send:'Refugees given supplies and directions. Turned away, but not empty-handed. A distinction that matters less than we pretend.',
+    elif_outside:'Refugees camped outside the wall. Neither in nor out. The worst kind of decision — the one that avoids deciding.',
+    elif_deny:'Gate closed. Four people, including children, turned away. The food stores are stable. I have nothing else to say about this.',
+    kael_arrest:'The agitator arrested. His words silenced. His followers have not been silenced.',
+    kael_council:'Kael invited to speak at council. A risk. The leader bet on sunlight over silence.',
+    kael_ignore:'Kael ignored. The crowd grows. Ignoring a fire does not put it out.',
+    kael_records:'Granary records opened. Public transparency. Kael\'s strongest argument dissolved by numbers. Clever.',
+    raid_fortify:'Defenses doubled after the raid. Costly. Necessary. Or perhaps those are the same thing.',
+    raid_strike:'Retaliatory strike ordered. Three dead. Forward camp destroyed. The Reach will not forget this. Neither will I.',
+    raid_rebuild:'Farm rebuilt. No retaliation. The leader chose construction over destruction. Rowan disagrees. I am less certain than he is.',
+    raid_talk:'Lira sent under white flag. Brave or foolish. If she returns, brave. If not, I will record it differently.',
+    nath_prison:'The deserter imprisoned. Information extracted under duress. Effective. The word "effective" has never felt so empty.',
+    nath_treat:'The deserter treated and heard. The leader chose trust over certainty.',
+    nath_expel:'Intelligence taken, man expelled. Transaction complete. I am uncomfortable calling a human life a transaction.',
+    nath_citizen:'The deserter made citizen. No conditions. The leader trusts a stranger more than Rowan thinks wise.',
+    pacifist_accept:'Six pacifists admitted. They will not fight. They will work and pray and tend a garden. Rowan is furious. Lira is weeping. I am... uncertain. That is rare for me.',
+    pacifist_compromise:'Pacifists admitted with conditions. They contribute to defense without fighting. A compromise that satisfies no one. Most compromises don\'t.',
+    pacifist_deny:'Pacifists turned away. Six people who buried their weapons rather than use them. Rowan approves. I wonder what we are defending, exactly.',
+    pacifist_vote:'Decision deferred to community vote. The leader chose democracy over efficiency. The community is still arguing.',
+    envoy_refuse:'The Warden\'s terms rejected. Brannhaven remains independent. The cost of independence has not yet been calculated.',
+    envoy_negotiate:'Counter-terms sent to the Reach. Diplomacy. The slowest form of war.',
+    envoy_accept:'The Warden\'s terms accepted. Brannhaven joins the Confederation. We keep our walls. We lose something else.',
+    envoy_vote:'Decision deferred to the community. On matters of sovereignty, perhaps that is the only honest answer.',
+    dam_destroy:'Upstream dam destroyed by force. Water restored. Neighbors made enemies. Water is temporary. Enemies are not.',
+    dam_negotiate:'Water-sharing negotiated. Partial flow. A fragile arrangement between fragile people.',
+    dam_well:'A well commissioned inside the walls. Permanent solution. Expensive. The best decisions usually are.',
+    dam_ration:'Water rationed. Drinking prioritized over crops. Survival over growth. A familiar choice.',
+    school_open:'School established. Two workers and a building committed to teaching children. Long-term investment. I approve, though I would not say so publicly.',
+    school_informal:'Avi teaches informally. No building, no commitment. Cheap. You get what you pay for.',
+    school_deny:'School denied. Children continue to roam. They will learn what they see. I hope they see something worth learning.',
+    school_labor:'Children apprenticed to workers. They learn labor. Whether they learn anything else remains to be seen.',
+    trial_accept:'Trial by panel established. Five citizens, chosen by lot. The leader willingly reduced their own power. I have recorded forty-three years of leaders. None of them did this.',
+    trial_partial:'Trial panels for serious cases. Day-to-day authority retained. A half-measure. But half is more than none.',
+    trial_reject:'Trial proposal rejected. The leader retains sole judgment. The word for this is autocracy. I write it without malice.',
+    trial_self:'The leader offered to stand trial first. I have been recording decisions for forty-three years. This is the first one that left me unable to write for several minutes.',
+    winter_equal:'Equal rations. No exceptions. The fairest option. Fairness and kindness are not always the same.',
+    winter_guard:'Guards eat full. Others take the cut. The wall is fed. The people behind it, less so.',
+    winter_protect:'Vulnerable protected. Workers cut. Compassion as policy. Compassion has costs.',
+    winter_open:'Granary opened. People trusted to take what they need. Either the most wise or most naive decision I have recorded.',
+    power_dissolve:'The leader dissolved their authority. Council of five, elected. I am recording this with a hand that shakes. Not from age.',
+    power_share:'Power shared with a council. The leader retains a seat. Half a revolution. Better than none.',
+    power_keep:'Power retained. The threat is cited. The threat is always cited. I record this without judgment. But I underline it.',
+    power_assembly:'Public assembly called. The people will decide. I do not know if this is wisdom or abdication. Perhaps both.',
+    siege_fight:'Full defense ordered. Everyone on the wall. Brannhaven fights for its life. I am writing this from the hearthhouse. My hands are shaking.',
+    siege_negotiate:'South gate opened under flag. Negotiation attempted. If this is surrender, let the record show it was chosen, not forced.',
+    siege_flee:'Evacuation ordered. Brannhaven abandoned. The people survive. The walls do not. I took the ledger.',
+    siege_pacifist:'Thornfield families sent as intermediaries. They walked out under white flag, unarmed, as they have always been. If this works, it will be because of who they are, not what we asked.',
+  };
+  return E[flag]||`Decision recorded. Details pending review.`;
+}
+function showLedger(){
+  if(!ledgerEntries.length){
+    const overlay=document.createElement('div');overlay.className='ledger-overlay';
+    overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+    overlay.innerHTML='<div class="ledger-content"><div class="ledger-title">📜 The Ledger of Brannhaven</div><div style="color:#706050;text-align:center;font-style:italic;margin:20px 0">The pages are blank. No decisions have been recorded yet.</div><button class="ledger-close" onclick="this.closest(\'.ledger-overlay\').remove()">Close</button></div>';
+    document.body.appendChild(overlay);return;
+  }
+  const overlay=document.createElement('div');overlay.className='ledger-overlay';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  let h='<div class="ledger-content"><div class="ledger-title">📜 The Ledger of Brannhaven</div>';
+  h+='<div style="font-size:0.85rem;color:#706050;text-align:center;margin-bottom:16px;font-style:italic">Kept by Edric, Elder of the Council</div>';
+  ledgerEntries.forEach(e=>{h+=`<div class="ledger-entry"><span class="ledger-day">Day ${e.day}</span>${e.text}</div>`;});
+  h+='<button class="ledger-close" onclick="this.closest(\'.ledger-overlay\').remove()">Close</button></div>';
+  overlay.innerHTML=h;document.body.appendChild(overlay);
+}
+
+// ══════════════════════════════════════
+// ENDINGS & EPILOGUES
+// ══════════════════════════════════════
 function showEnding(){
   document.getElementById('game-screen').style.display='none';
   document.getElementById('sidebar').style.display='none';
@@ -1205,29 +1348,51 @@ function showEnding(){
   else if(m<-0.5){title='Brannhaven persists.';name='THE OPEN GATE';wren='"I like that the gate is open. Grandma would\'ve liked it too. But some people left because of it."';}
   else{title='Brannhaven lives.';name='THE SHEPHERD';wren='"When I\'m old enough, I want to lead like you. Not because it\'s easy. Because you made it look hard, and did it anyway."';}
 
-  // Build roster summary for end screen
-  const deadChars=CHARACTERS.filter(c=>c.status==='dead').map(c=>c.name);
-  const goneChars=CHARACTERS.filter(c=>['gone','exiled','denied','fled'].includes(c.status)).map(c=>c.name);
-  const dyingChars=CHARACTERS.filter(c=>c.status==='dying').map(c=>c.name);
-  let rosterSummary='';
-  if(deadChars.length)rosterSummary+=`<br>Dead: ${deadChars.join(', ')}`;
-  if(dyingChars.length)rosterSummary+=`<br>Dying: ${dyingChars.join(', ')}`;
-  if(goneChars.length)rosterSummary+=`<br>Gone: ${goneChars.join(', ')}`;
+  // Epilogue scenes — 10 years later
+  const scenes={
+    'THE FAMINE':"Ten years later, travelers find Brannhaven's walls still standing. Nobody inside. Wildflowers grow through the floorboards of the Hearthhouse. A child's drawing on the east wall — a house with a triangle roof — has almost faded.",
+    'THE ABANDONMENT':"They say people from Brannhaven scattered across three valleys. Some joined the Reach. Some didn't. An old woman in a southern settlement still introduces herself as 'from Brannhaven,' but she can't remember the leader's name.",
+    'THE FORTRESS':"Brannhaven's walls have never been higher. Rowan's son commands the guard now. Trade has stopped — no one comes, no one leaves. The granary is full. The school was never built. Children learn to patrol. At dusk, a girl — not a child anymore — sits on the wall and watches the empty road. She stopped waving years ago.",
+    'THE IRON LAW':"The laws of Brannhaven are carved in stone at the gate. Seventeen statutes. No exceptions. People follow them not from belief but from habit. Edric's ledger is kept in a glass case. New leaders study it. Nobody reads the poetry his wife loved.",
+    'THE RUIN':"Brannhaven's gate stands open. Has for years. People come and go. Some stay. Most don't. The wall is crumbling on the south side — nobody repairs it. Lira's herb garden is the most tended thing in the settlement. On good days, it feels like freedom. On bad days, it feels like giving up.",
+    'THE OPEN GATE':"The gate is open, but the wall still stands. Traders come from the south now. A school teaches six languages. Elif's daughter married a boy from Brannhaven — Rowan walked her to the hearthhouse, stiff and proud and trying not to cry. The Reach still watches from the north. But Brannhaven watches back, and waves.",
+    'THE SHEPHERD':"You're not here anymore. You left after the first election — walked south with the river stone in your pocket and Maren's voice in your head. Wren is twenty-three now. She teaches at the school Lira started. Sometimes she sits on the wall at dusk, legs dangling, and watches the road. She doesn't remember your face. She remembers you listened."
+  };
+  const scene=scenes[name]||'';
+  
+  // Conditional epilogue fragments
+  let extras=[];
+  if(S.flags._senna_dead)extras.push("Senna's bowl is still on the shelf in the Hearthhouse. Nobody uses it.");
+  if(S.flags._maren_dead)extras.push("The river stone sits on a window ledge. Someone keeps it clean, though nobody remembers why.");
+  if(S.flags._maren_recovered)extras.push("Maren is still alive. She waits at the gate every evening. Old habit.");
+  if(S.flags.pacifist_accept)extras.push("The garden the Thornfield families planted finally bloomed. White flowers. They bloom every spring now.");
+  if(S.flags.school_open)extras.push("Avi still teaches. He's older than anyone thought possible. The children call him grandfather in six languages.");
+  if(S.flags.trial_accept||S.flags.trial_self)extras.push("The trial panels still meet. Kael sits on more of them than anyone.");
+  if(S.flags.nath_citizen)extras.push("Nath carved birds for every child born in Brannhaven since he arrived. There are fourteen on the east wall now.");
+  if(S.flags.elif_in&&!S.flags._mira_dead)extras.push("Elif's son learned to read in three languages. He keeps the new ledger now.");
+  
+  // Edric's final entry
+  const edricFinal={
+    'THE SHEPHERD':'The leader stepped down. No one asked them to. I have recorded every decision they made. For the record: they were imperfect. That is the highest praise I know.',
+    'THE FORTRESS':'The walls hold. The leader holds. I have no more entries to make. The ledger is full.',
+    'THE FAMINE':'The granary is—',
+    'THE ABANDONMENT':'I took the ledger with me. Someone should remember.',
+    'THE IRON LAW':'The system works. I helped build it. I am proud of that. I think.',
+    'THE RUIN':'I stopped writing on Day 14. There was nothing left to record.',
+    'THE OPEN GATE':'The leader made mistakes. Many of them. But the gate is open and the children are learning. That is the entry that matters.'
+  };
 
-  end.innerHTML=`
-    <h2>${title}</h2>
-    <div class="ending-name">${name}</div>
-    <div class="wren-final">${wren}</div>
-    <div class="stats">
-      Day ${S.day} / ${S.maxDays}<br>
-      Food: ${S.food} · Materials: ${S.mat} · People: ${S.ppl} · Morale: ${S.mor}<br>
-      Rowan: ${S.trustRowan}% · Lira: ${S.trustLira}% · Edric: ${S.trustEdric}%
-      ${rosterSummary}
-    </div>
-    <button class="start-btn" onclick="location.reload()">Play Again</button>`;
+  let h=`<h2>${title}</h2><div class="ending-name">${name}</div>`;
+  h+=`<div class="wren-final">${wren}</div>`;
+  h+=`<div class="epilogue-scene">${scene}</div>`;
+  extras.forEach(e=>{h+=`<p class="epilogue-detail">${e}</p>`;});
+  if(edricFinal[name])h+=`<div class="epilogue-ledger">Edric's final entry: "${edricFinal[name]}"</div>`;
+  h+=`<button class="start-btn" onclick="location.reload()">Play Again</button>`;
+  end.innerHTML=h;
 }
 
 function startGame(){
+  initAudio();
   document.getElementById('title-screen').style.display='none';
   document.getElementById('game-screen').style.display='block';
   document.getElementById('left-panel').style.display='block';
@@ -1394,6 +1559,54 @@ function paintSettlement(){
   ctx.fillStyle='#5B8C5A';ctx.font='16px sans-serif';ctx.fillText('🌿',180,buildY+22);
   ctx.fillStyle='#a89878';ctx.font='bold 10px Inter,sans-serif';
   ctx.fillText("Healer's Hall",160,buildY+56);
+  
+  // ── LIFE IN THE SQUARE (state-reactive) ──
+  const t2=Date.now()*0.001;
+  // Maren at the gate (if alive, dusk)
+  if(S.phase==='dusk'&&getChar('maren')?.status==='well'){
+    ctx.fillStyle='#8A7A6A';ctx.fillRect(W-35,wallY+wallH-12,4,8);ctx.fillRect(W-35,wallY+wallH-15,4,3);
+  }
+  // Senna by east wall (if alive and visible)
+  if(getChar('corwin_wife')?.visible&&getChar('corwin_wife')?.status!=='dead'){
+    ctx.fillStyle='#9A7A6A';ctx.fillRect(W-50,buildY+25,4,8);
+  }
+  // Senna's trowel (if dead)
+  if(S.flags._senna_dead){ctx.fillStyle='#5a4a3a';ctx.fillRect(W-50,buildY+30,3,6);}
+  // Wren on the wall
+  if(getChar('wren')?.visible&&(S.phase==='dusk'||S.day%2===0)){
+    ctx.fillStyle='#B08DAB';
+    ctx.fillRect(130,wallY-4,3,5);ctx.fillRect(130,wallY-7,3,3);
+    ctx.fillRect(129,wallY+1,2,4);ctx.fillRect(132,wallY+1,2,4);
+  }
+  // Elif's daughter (if admitted, mid-game)
+  if(S.flags.elif_in&&S.day>=6){ctx.fillStyle='#A09080';ctx.fillRect(100,buildY+30,3,5);}
+  // Her drawings on the wall
+  if(S.ambientsSeen.has('elif_daughter_drawing')){
+    ctx.fillStyle='rgba(200,180,80,0.3)';ctx.beginPath();ctx.arc(110,wallY+10,3,0,Math.PI*2);ctx.fill();
+  }
+  if(S.ambientsSeen.has('elif_girl_wall')){
+    ctx.fillStyle='rgba(200,160,80,0.25)';ctx.fillRect(115,wallY+8,2,5);ctx.fillRect(120,wallY+8,2,5);
+  }
+  // Thornfield garden
+  if(S.flags.pacifist_accept){
+    ctx.fillStyle='#4a6a28';ctx.fillRect(15,buildY+80,30,4);
+    ctx.fillStyle='#8A8A7A';ctx.fillRect(20,buildY+76,3,4);ctx.fillRect(30,buildY+76,3,4);
+  }
+  // Nath's birds on wall
+  if(S.flags.nath_citizen&&S.day>=10){
+    ctx.fillStyle='rgba(160,140,120,0.4)';ctx.fillRect(W-25,wallY+15,3,2);ctx.fillRect(W-20,wallY+12,3,2);
+  }
+  // Morale crowd density
+  const crowdCount=Math.max(0,Math.floor(S.mor/15));
+  ctx.fillStyle='rgba(200,180,140,0.3)';
+  for(let i=0;i<crowdCount;i++){
+    const cx=90+Math.sin(i*2.7+t2*0.2)*40;const cy=buildY+65+Math.cos(i*1.9)*8;
+    ctx.fillRect(cx,cy,2,5);
+  }
+  // Dark windows for dead
+  const deadCount=CHARACTERS.filter(c=>c.status==='dead'&&c.visible).length;
+  if(deadCount>=1){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(96,buildY+8,6,6);}
+  if(deadCount>=3){ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(130,buildY+8,6,6);}
   
   // ── FIELDS ──
   const fieldY=220;
