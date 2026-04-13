@@ -240,9 +240,11 @@ window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
 const MAP={w:900,h:700};
 const ROADS=[
   {x1:0,y1:350,x2:500,y2:350,w:12},
-  {x1:500,y1:350,x2:620,y2:400,w:10},
+  {x1:500,y1:350,x2:590,y2:395,w:10},
+  {x1:620,y2:400,x2:620,y1:400,w:10}, // ford crossing stub
+  {x1:620,y1:400,x2:750,y2:350,w:10}, // ford east to NE
+  {x1:620,y1:400,x2:900,y2:600,w:10}, // ford SE road
   {x1:300,y1:0,x2:300,y2:700,w:10},
-  {x1:900,y1:600,x2:620,y2:400,w:10},
 ];
 function riverX(y){return 600+Math.sin(y*0.012)*35+Math.sin(y*0.035)*12;}
 const FORD_Y=400,FORD_HALF_W=28,FORD_HALF_H=16,RIVER_HALF_W=18;
@@ -292,10 +294,18 @@ function moveToward(u,tx,ty,spd,dt){
   const ts=terrainSpeed(u.x,u.y);
   let nx=u.x+ddx/d*spd*ts*dt,ny=u.y+ddy/d*spd*ts*dt;
   if(inRiver(nx,ny)){
-    // Redirect toward ford
-    const fx=riverX(FORD_Y)-u.x,fy=FORD_Y-u.y;const fl=Math.sqrt(fx*fx+fy*fy)||1;
-    nx=u.x+fx/fl*spd*ts*dt;ny=u.y+fy/fl*spd*ts*dt;
-    if(inRiver(nx,ny))return;
+    // Try ford redirect
+    if(atFord(u.x,u.y)||Math.abs(u.y-FORD_Y)<FORD_HALF_H+10){
+      // Near ford — push through
+      const fx=riverX(FORD_Y)-u.x,fy=FORD_Y-u.y;const fl=Math.sqrt(fx*fx+fy*fy)||1;
+      nx=u.x+fx/fl*spd*ts*dt;ny=u.y+fy/fl*spd*ts*dt;
+      if(!inRiver(nx,ny)){u.x=Math.max(4,Math.min(MAP.w-4,nx));u.y=Math.max(4,Math.min(MAP.h-4,ny));}
+    }else{
+      // Redirect toward ford first
+      const fx=riverX(FORD_Y)-u.x,fy=FORD_Y-u.y;const fl=Math.sqrt(fx*fx+fy*fy)||1;
+      u.x+=fx/fl*spd*ts*dt;u.y+=fy/fl*spd*ts*dt;
+    }
+    return;
   }
   u.x=Math.max(4,Math.min(MAP.w-4,nx));u.y=Math.max(4,Math.min(MAP.h-4,ny));
 }
@@ -501,7 +511,7 @@ function getFormationTarget(soldier,idx,total,formation){
   if(formation==='wedge'){
     const row=Math.floor((-1+Math.sqrt(1+8*idx))/2);
     const col=idx-(row*(row+1)/2);const rc=row+1;
-    return{x:(col-(rc-1)/2)*7,y:row*7,ws:false};
+    return{x:(col-(rc-1)/2)*7,y:-row*7,ws:false};
   }
   if(formation==='column'){
     const half=Math.floor(total/2),rel=idx-half,col=(idx%3)-1;
@@ -1254,16 +1264,22 @@ function handleKey(k){
   if(!running)return;
   if(k===' '){
     S.rallying=true;S.rallyTimer=3;
-    // Unstick: soldiers on screen recalculate positions and get pulled hard toward commander
+    // Unstick: ALL soldiers in river get teleported to nearest bank
+    // On-screen soldiers get velocity zeroed and retargeted
     S.soldiers.forEach(s=>{
       if(s.dead)return;
-      const onScreen=s.x>S.camX&&s.x<S.camX+W&&s.y>S.camY&&s.y<S.camY+H;
-      if(!onScreen)return;
-      // If stuck in river, teleport to nearest bank
       if(inRiver(s.x,s.y)){
         const rx=riverX(s.y);
-        s.x=s.x<rx?rx-RIVER_HALF_W-4:rx+RIVER_HALF_W+4;
+        s.x=s.x<rx?rx-RIVER_HALF_W-5:rx+RIVER_HALF_W+5;
         s.vx=0;s.vy=0;
+      }
+      // Hard pull toward commander
+      const dist=Math.sqrt((s.x-S.cx)**2+(s.y-S.cy)**2);
+      if(dist>100){
+        // Teleport partway toward commander
+        const pull=Math.min(0.3,dist/1000);
+        s.x+=(S.cx-s.x)*pull;
+        s.y+=(S.cy-s.y)*pull;
       }
     });
   }
@@ -1275,13 +1291,18 @@ function handleKey(k){
       const sc=alive[alive.length-1];
       S.soldiers=S.soldiers.filter(s=>s!==sc);
       sc.scoutFacing=S.facing;sc.speed=60;sc.armored=false;sc.returning=false;sc.scoutImmunity=3;
-      // Mission 1: smart path — follow road east to ford, then scout along river
+      // Mission 1: smart path — go east toward ford, cross, then scout south along east bank
+      // Waypoints are absolute; scout picks the nearest one to start from
       sc.scoutWaypoints=[
-        {x:400,y:350},{x:500,y:355},{x:560,y:375},{x:590,y:395},
-        {x:620,y:410},{x:650,y:450},{x:680,y:500},{x:720,y:550},
-        {x:780,y:600},{x:840,y:650},
+        {x:500,y:355},{x:560,y:380},{x:riverX(FORD_Y),y:FORD_Y}, // approach ford
+        {x:riverX(FORD_Y)+30,y:FORD_Y}, // cross ford
+        {x:680,y:440},{x:720,y:500},{x:760,y:560}, // scout south along east bank
+        {x:800,y:620},{x:850,y:670},
       ];
-      sc.scoutWpIdx=0;
+      // Skip waypoints that are behind the scout
+      let bestWp=0,bestD=Infinity;
+      sc.scoutWaypoints.forEach((wp,i)=>{const d=Math.sqrt((wp.x-sc.x)**2+(wp.y-sc.y)**2);if(d<bestD){bestD=d;bestWp=i;}});
+      sc.scoutWpIdx=bestWp;
       S.scouts.push(sc);
       showCallout('Scout deployed!',2);
     }else{
