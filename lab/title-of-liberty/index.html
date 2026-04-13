@@ -163,7 +163,7 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
     "Yea, verily, verily I say unto you, if all men had been, and were, and ever would be, like unto Moroni, behold, the very powers of hell would have been shaken forever."
     <div class="ref">— Alma 48:17</div>
   </div>
-  <div class="controls-hint">WASD move · SPACE rally · 1-5 formations · E scout · Q send retriever · H headcount</div>
+  <div class="controls-hint">WASD move · SPACE rally · 1-5 formations · E scout · H headcount · G/C/V hold/charge/fall back · Z/X/B Lehi orders · F1-F3 faith</div>
 </div>
 
 <div id="story-overlay" style="display:none" onclick="advanceStory()">
@@ -198,6 +198,21 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
   <div id="hud-cmds" style="pointer-events:auto">
     <button class="cmd-btn" onclick="doHeadcount()">📋 Headcount <span class="hotkey">[H]</span></button>
     <button class="cmd-btn" onclick="doSendRetriever()">📯 Retrieve Scout <span class="hotkey">[Q]</span></button>
+    <div class="sep"></div>
+    <div class="label" style="color:#8a7a50;margin-top:4px">⚔ Battle Commands</div>
+    <button class="cmd-btn" id="cmd-hold" onclick="battleCmd('hold')">🛡 Hold Ground <span class="hotkey">[G]</span></button>
+    <button class="cmd-btn" id="cmd-charge" onclick="battleCmd('charge')">⚔ Charge! <span class="hotkey">[C]</span></button>
+    <button class="cmd-btn" id="cmd-fallback" onclick="battleCmd('fallback')">🔙 Fall Back <span class="hotkey">[V]</span></button>
+    <div class="sep"></div>
+    <div class="label" style="color:#c8a040;margin-top:4px">🙏 Faith Powers <span id="faith-cost" style="font-size:0.5rem;color:#6a6248"></span></div>
+    <button class="cmd-btn" id="faith-inspire" onclick="faithAbility('inspire')">✨ Inspire (20 faith) <span class="hotkey">[F1]</span></button>
+    <button class="cmd-btn" id="faith-shield" onclick="faithAbility('shield')">🛡 Shield of Faith (30 faith) <span class="hotkey">[F2]</span></button>
+    <button class="cmd-btn" id="faith-reveal" onclick="faithAbility('reveal')">👁 Prophet's Eye (15 faith) <span class="hotkey">[F3]</span></button>
+    <div class="sep"></div>
+    <div class="label" style="color:#6a8aaa;margin-top:4px">📨 Lehi Orders</div>
+    <button class="cmd-btn" id="lehi-hold" onclick="lehiOrder('hold')">⏸ Lehi: Hold Position <span class="hotkey">[Z]</span></button>
+    <button class="cmd-btn" id="lehi-charge" onclick="lehiOrder('charge')">⚔ Lehi: Charge! <span class="hotkey">[X]</span></button>
+    <button class="cmd-btn" id="lehi-flank" onclick="lehiOrder('flank')">↩ Lehi: Flank Right <span class="hotkey">[B]</span></button>
   </div>
 </div>
 
@@ -268,7 +283,7 @@ window.addEventListener('keydown',e=>{
   if(S._cutscenes&&S._cutsceneIdx<S._cutscenes.length){advanceCutscene();return;}
   keys[e.key.toLowerCase()]=true;
   handleKey(e.key.toLowerCase());
-  if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()||e.key))e.preventDefault();
+  if(['arrowup','arrowdown','arrowleft','arrowright',' ','f1','f2','f3'].includes(e.key.toLowerCase()||e.key))e.preventDefault();
 });
 window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
 
@@ -381,7 +396,33 @@ const SND={
     play();
   },
   stopAmbient(){if(this._ambientId){clearTimeout(this._ambientId);this._ambientId=null;}if(this._ambientGain){this._ambientGain.disconnect();this._ambientGain=null;}},
-  setAmbientVol(v){if(this._ambientGain)this._ambientGain.gain.value=Math.max(0,Math.min(0.08,v));}
+  setAmbientVol(v){if(this._ambientGain)this._ambientGain.gain.value=Math.max(0,Math.min(0.08,v));},
+  // Environmental sounds
+  _envTimers:{bird:0,water:0,wind:0},
+  updateEnv(x,y,dt){
+    this._envTimers.bird-=dt;this._envTimers.water-=dt;this._envTimers.wind-=dt;
+    // Bird chirps in/near trees
+    const nearTree=TREES.some(t=>Math.abs(x-t.x)<40&&Math.abs(y-t.y)<40);
+    if(nearTree&&this._envTimers.bird<=0){
+      this._envTimers.bird=2+Math.random()*5;
+      const f=1800+Math.random()*1200;
+      this.tone(f,0.06,'sine',0.04);
+      setTimeout(()=>this.tone(f*1.2,0.05,'sine',0.03),80);
+      setTimeout(()=>this.tone(f*0.9,0.07,'sine',0.03),180);
+    }
+    // Water near river
+    const rx=riverX(y);const riverDist=Math.abs(x-rx);
+    if(riverDist<50&&this._envTimers.water<=0){
+      this._envTimers.water=0.8+Math.random()*1.5;
+      const vol=Math.max(0.01,0.04*(1-riverDist/50));
+      this.noise(0.15,vol);
+    }
+    // Wind on hills
+    if(onHill(x,y)&&this._envTimers.wind<=0){
+      this._envTimers.wind=2+Math.random()*3;
+      this.noise(0.4,0.02);
+    }
+  }
 };
 SND.init();
 
@@ -444,8 +485,28 @@ function getShake(){
 // ══════════════════════════════════════
 // CASUALTY NAMES
 // ══════════════════════════════════════
-const NEPHITE_NAMES=['Helam','Ammon','Nephi','Gideon','Teancum','Shiblon','Helorum','Pahoram','Lehi','Mathoni','Ether','Moronihah','Corianton','Zenock','Zenos','Limhi','Himni','Omner','Jonas','Aaron','Amulek','Zeezrom','Alma','Gid','Timothy','Lachoneus','Hagoth','Cumeni','Antipus'];
-function assignName(s){if(!s._name)s._name=NEPHITE_NAMES[Math.floor(Math.random()*NEPHITE_NAMES.length)];}
+const NEPHITE_NAMES=[
+  // Canon Alma-era names (up to Alma 43)
+  'Helam','Ammon','Nephi','Gideon','Teancum','Shiblon','Pahoran','Lehi','Moronihah',
+  'Corianton','Zenock','Zenos','Limhi','Himni','Omner','Aaron','Amulek','Zeezrom',
+  'Alma','Gid','Timothy','Lachoneus','Hagoth','Cumeni','Antipus','Helaman','Zoram',
+  'Teomner','Mathoni','Ether','Jonas','Muloki','Ammah',
+  // Patronymic/generated (BoM naming patterns: -hah, -ihah, -onihah, -cum, -anti, -omer)
+  'Gideonihah','Helamhah','Amnor','Shemnon','Lehonti','Corom','Zemnarihah',
+  'Mathonihah','Gidhah','Shiblom','Amnihah','Pagonti','Moronti','Coriantum',
+  'Heloram','Ammonihah','Shimnon','Gidgiddonah','Teomner','Zenephi',
+  'Nephihah','Cumorah','Antion','Moriancum','Zenoham','Shiblonihah',
+  'Orihi','Hemni','Akish','Limhah','Pacumeni','Neum','Jacom',
+  'Antipionah','Limnah','Gadianton','Cezoram',
+];
+function assignName(s){
+  if(!s._name){
+    // Pick without repeat within same army when possible
+    const used=S.soldiers.map(u=>u._name).filter(Boolean);
+    const avail=NEPHITE_NAMES.filter(n=>!used.includes(n));
+    s._name=(avail.length>0?avail:NEPHITE_NAMES)[Math.floor(Math.random()*(avail.length||NEPHITE_NAMES.length))];
+  }
+}
 
 // ══════════════════════════════════════
 const S={
@@ -483,6 +544,12 @@ const S={
   _travelScatterTimer:0,
   casualties:[],
   _marchSndTimer:0,
+  battleCmd:'follow', // follow|hold|charge|fallback
+  lehiOrder:'hold',
+  lehiMessengers:[],
+  _inspireTimer:0,_inspireX:0,_inspireY:0,
+  _shieldTimer:0,
+  _revealTimer:0,
 };
 
 // ══════════════════════════════════════
@@ -931,6 +998,97 @@ function doSendRetriever(){
 }
 
 // ══════════════════════════════════════
+// BATTLE COMMANDS
+// ══════════════════════════════════════
+function battleCmd(cmd){
+  if(S.phase!=='battle'&&S.phase!=='surround'&&S.phase!=='wait'){
+    showCallout('No battle to command.',2);return;
+  }
+  S.battleCmd=cmd;
+  const alive=S.soldiers.filter(s=>!s.dead);
+  if(cmd==='hold'){
+    alive.forEach(s=>{s._holdPos={x:s.x,y:s.y};});
+    showCallout('HOLD GROUND! Stand firm, brothers!',3);
+    SND.tone(330,0.15,'square',0.1);
+  }else if(cmd==='charge'){
+    alive.forEach(s=>{s._holdPos=null;s.morale=Math.min(100,s.morale+10);});
+    S.faith=Math.max(0,S.faith-5);
+    showCallout('CHARGE! For our families!',3);
+    SND.rallyHorn();addTrauma(0.08);
+  }else if(cmd==='fallback'){
+    alive.forEach(s=>{s._holdPos=null;});
+    showCallout('Fall back! Regroup behind me!',3);
+    SND.tone(180,0.2,'sine',0.1);
+  }
+}
+
+// ══════════════════════════════════════
+// FAITH ABILITIES
+// ══════════════════════════════════════
+function faithAbility(type){
+  if(type==='inspire'){
+    if(S.faith<20){showCallout('Not enough faith.',2);return;}
+    S.faith-=20;
+    S.soldiers.filter(s=>!s.dead).forEach(s=>{
+      const d=Math.sqrt((s.x-S.cx)*(s.x-S.cx)+(s.y-S.cy)*(s.y-S.cy));
+      if(d<60){s.morale=Math.min(100,s.morale+30);s.fleeing=false;s.state='idle';}
+    });
+    addTrauma(0.05);
+    // Golden ring burst
+    S._inspireTimer=1.5;S._inspireX=S.cx;S._inspireY=S.cy;
+    showCallout('"Be faithful and diligent in keeping the commandments of God!" — Alma 37:35',4);
+    SND.tone(440,0.3,'triangle',0.12);setTimeout(()=>SND.tone(554,0.2,'triangle',0.1),150);
+  }else if(type==='shield'){
+    if(S.faith<30){showCallout('Not enough faith.',2);return;}
+    S.faith-=30;
+    S.soldiers.filter(s=>!s.dead).forEach(s=>{s._shielded=2.5;});
+    S._shieldTimer=2.5;
+    showCallout('"The Lord God will proceed to make bare his arm in the eyes of all the nations" — 1 Nephi 22:11',4);
+    SND.tone(330,0.4,'sine',0.15);SND.tone(440,0.4,'sine',0.1);
+  }else if(type==='reveal'){
+    if(S.faith<15){showCallout('Not enough faith.',2);return;}
+    S.faith-=15;
+    S.enemies.forEach(e=>{if(!e.dead){e.spotted=true;S.knownEnemies.set(e.id,{x:e.x,y:e.y,lastSeen:S.time,conf:1,alive:true});}});
+    S._revealTimer=3;
+    showCallout('"Now Moroni... sent certain men that they should spy out where the Lamanites were encamped" — Alma 43:23',4);
+    SND.tone(660,0.15,'sine',0.08);SND.tone(880,0.15,'sine',0.06);
+  }
+}
+
+// ══════════════════════════════════════
+// LEHI COORDINATION
+// ══════════════════════════════════════
+function lehiOrder(order){
+  if(S.allies.length===0){showCallout('Lehi\'s force is not yet deployed.',2);return;}
+  // Send a messenger soldier to Lehi
+  const alive=S.soldiers.filter(s=>!s.dead);
+  if(alive.length<=5&&order!=='hold'){showCallout('Too few soldiers to send a messenger.',2);return;}
+  
+  S.lehiOrder=order;
+  
+  // Spawn visible messenger running to Lehi
+  if(order!=='hold'||!S._lehiMessengerSent){
+    const lehiPos=S.allies[0];
+    const msg={cx:S.cx,cy:S.cy,tx:lehiPos.x,ty:lehiPos.y,speed:80,done:false,order};
+    S.lehiMessengers=S.lehiMessengers||[];
+    S.lehiMessengers.push(msg);
+    S._lehiMessengerSent=true;
+  }
+  
+  if(order==='hold'){
+    S.lehiAttacking=false;
+    S.allies.forEach(a=>{a.state='idle';a._holdPos={x:a.x,y:a.y};});
+    showCallout('Signal to Lehi: Hold position!',3);
+  }else if(order==='charge'){
+    showCallout('Messenger sent to Lehi: CHARGE! Cut off their retreat!',3);
+    // Delayed — messenger must arrive first
+  }else if(order==='flank'){
+    showCallout('Messenger sent to Lehi: Flank right, strike their eastern flank!',3);
+  }
+  SND.tone(500,0.1,'square',0.06);SND.tone(400,0.1,'square',0.05);
+}
+
+// ══════════════════════════════════════
 // UPDATE
 // ══════════════════════════════════════
 function update(dt){
@@ -983,12 +1141,63 @@ function update(dt){
   // ── Soldiers ──
   const alive=S.soldiers.filter(s=>!s.dead);
   alive.forEach((s,i)=>{
+    // Shield of faith — reduce damage taken
+    if(s._shielded>0)s._shielded-=dt;
+    
     const ft=getFormationTarget(s,i,alive.length,S.formation);
     const wp=fmtToWorld(ft,S.facing,S.cx,S.cy);s.tx=wp.x;s.ty=wp.y;
+    
+    // Battle commands modify behavior
+    if(S.battleCmd==='hold'&&s._holdPos){
+      s.tx=s._holdPos.x;s.ty=s._holdPos.y;
+    }else if(S.battleCmd==='charge'){
+      const ne=findNearest(s.x,s.y,120,S.enemies);
+      if(ne){s.tx=ne.x;s.ty=ne.y;}
+    }else if(S.battleCmd==='fallback'){
+      // Move toward commander but further back
+      s.tx=S.cx-Math.cos(S.facing)*20;s.ty=S.cy-Math.sin(S.facing)*20;
+    }
+    
     const ne=findNearest(s.x,s.y,20,S.enemies);
     if(ne&&!s.fleeing){doCombat(s,ne,dt);return;}
     moveSoldierToTarget(s,dt);
   });
+
+  // ── Faith timers ──
+  if(S._inspireTimer>0)S._inspireTimer-=dt;
+  if(S._shieldTimer>0)S._shieldTimer-=dt;
+  if(S._revealTimer>0)S._revealTimer-=dt;
+
+  // ── Lehi messengers ──
+  if(S.lehiMessengers){
+    S.lehiMessengers.forEach(m=>{
+      if(m.done)return;
+      const dx=m.tx-m.cx,dy=m.ty-m.cy,d=Math.sqrt(dx*dx+dy*dy);
+      if(d<15){
+        m.done=true;
+        // Execute order on arrival
+        if(m.order==='charge'){
+          triggerLehiAttack();
+          showCallout('Lehi receives the order — his men charge!',3);
+          SND.rallyHorn();
+        }else if(m.order==='flank'){
+          S.lehiAttacking=true;
+          // Flank: move to east side then charge
+          const avgEX=S.enemies.filter(e=>!e.dead).reduce((s,e)=>s+e.x,0)/(S.enemies.filter(e=>!e.dead).length||1);
+          const avgEY=S.enemies.filter(e=>!e.dead).reduce((s,e)=>s+e.y,0)/(S.enemies.filter(e=>!e.dead).length||1);
+          S.allies.forEach(a=>{
+            a.state='charge';
+            a.tx=avgEX+40+Math.random()*20;a.ty=avgEY+Math.random()*30-15;
+            a._holdPos=null;
+          });
+          showCallout('Lehi\'s force moves to flank!',3);
+        }
+      }else{
+        m.cx+=dx/d*m.speed*(1/60);m.cy+=dy/d*m.speed*(1/60);
+      }
+    });
+    S.lehiMessengers=S.lehiMessengers.filter(m=>!m.done);
+  }
 
   // ── Enemies ──
   S.enemies.forEach(e=>{
@@ -1153,9 +1362,11 @@ function update(dt){
   S.allies=S.allies.filter(a=>!a.dead);
   S.enemies.forEach(e=>{if(e.dead){const kn=S.knownEnemies.get(e.id);if(kn)kn.alive=false;}});
 
-  // Ambient volume: louder during combat
+  // Ambient volume + environmental sounds
   const inCombat=S.phase==='battle'||S.phase==='surround';
   SND.setAmbientVol(inCombat?0.06:0.03);
+  // Env sounds based on commander position
+  SND.updateEnv(S.cx,S.cy,dt);
 
   updateHtmlHud();
 }
@@ -1282,10 +1493,17 @@ function doCombat(atk,def,dt){
   }
 
   const blocked=def.armored&&Math.random()<0.3;
+  // Shield of Faith
+  if(def._shielded>0){defMult*=0.3;}
   if(!blocked){
     def.hp-=dmg*defMult;def.morale-=8;
     def._hitFlash=0.1;
-    spawnBlood(def.x,def.y,2);
+    if(def.armored){
+      // Sparks on armor, not blood
+      for(let i=0;i<2;i++)PARTICLES.push({x:def.x,y:def.y,vx:(Math.random()-0.5)*40,vy:-Math.random()*30,life:0.2+Math.random()*0.2,maxLife:0.4,color:'spark'});
+    }else{
+      spawnBlood(def.x,def.y,2);
+    }
     SND.swordHit();
     addTrauma(0.05);
     if(def.hp<=0){
@@ -1607,6 +1825,46 @@ function render(){
     ctx.fillStyle=`rgba(180,140,50,${p+0.2})`;ctx.fillRect(cx+1,cy-12,5,3);
   }
 
+  // ── Faith ability visuals ──
+  // Inspire golden ring burst
+  if(S._inspireTimer>0){
+    const r=30*(1.5-S._inspireTimer);
+    const a=S._inspireTimer/1.5;
+    ctx.strokeStyle=`rgba(255,220,80,${a*0.6})`;ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(S._inspireX,S._inspireY,r,0,Math.PI*2);ctx.stroke();
+    ctx.strokeStyle=`rgba(255,200,60,${a*0.3})`;
+    ctx.beginPath();ctx.arc(S._inspireX,S._inspireY,r*0.7,0,Math.PI*2);ctx.stroke();
+  }
+  // Shield shimmer on soldiers
+  if(S._shieldTimer>0){
+    S.soldiers.forEach(s=>{if(!s.dead&&s._shielded>0){
+      const sa=Math.sin(S.time*8+s.bobPhase)*0.15+0.2;
+      ctx.fillStyle=`rgba(200,180,100,${sa})`;
+      ctx.fillRect(Math.floor(s.x-2),Math.floor(s.y-2),4,1);
+      ctx.fillRect(Math.floor(s.x-2),Math.floor(s.y+2),4,1);
+    }});
+  }
+  // Reveal — all enemies pulse briefly
+  if(S._revealTimer>0){
+    const ra=Math.sin(S.time*10)*0.2+0.3;
+    S.enemies.forEach(e=>{if(!e.dead){
+      ctx.fillStyle=`rgba(255,200,80,${ra*0.3})`;
+      ctx.fillRect(Math.floor(e.x-1),Math.floor(e.y-1),2,2);
+    }});
+  }
+
+  // ── Lehi messengers ──
+  if(S.lehiMessengers){
+    S.lehiMessengers.forEach(m=>{
+      if(!m.done){
+        ctx.fillStyle='rgba(100,180,200,0.9)';
+        ctx.fillRect(Math.floor(m.cx),Math.floor(m.cy),1,2);
+        ctx.fillStyle='rgba(150,200,220,0.5)';
+        ctx.fillRect(Math.floor(m.cx),Math.floor(m.cy-1),1,1);
+      }
+    });
+  }
+
   // Combat sparks
   [...S.soldiers,...S.allies].forEach(s=>{if(!s.dead&&s.attackCd>0.6){ctx.fillStyle='rgba(255,220,120,0.5)';ctx.fillRect(Math.floor(s.x+Math.random()*4-2),Math.floor(s.y+Math.random()*4-2),1,1);}});
   S.enemies.forEach(e=>{if(!e.dead&&e.attackCd>0.6&&getEnemyDisp(e)){ctx.fillStyle='rgba(255,100,60,0.5)';ctx.fillRect(Math.floor(e.x+Math.random()*4-2),Math.floor(e.y+Math.random()*4-2),1,1);}});
@@ -1623,10 +1881,14 @@ function render(){
 
   drawTerrainZoneHints();
 
-  // Blood particles
+  // Particles (blood + sparks)
   PARTICLES.forEach(p=>{
     const a=p.life/p.maxLife;
-    ctx.fillStyle=`rgba(160,20,10,${a})`;
+    if(p.color==='spark'){
+      ctx.fillStyle=`rgba(255,220,100,${a})`;
+    }else{
+      ctx.fillStyle=`rgba(160,20,10,${a})`;
+    }
     ctx.fillRect(Math.floor(p.x),Math.floor(p.y),1,1);
   });
 
@@ -1751,6 +2013,18 @@ function handleKey(k){
       showCallout('Not enough soldiers to spare a scout.',2);
     }
   }
+  // Battle commands
+  if(k==='g')battleCmd('hold');
+  if(k==='c')battleCmd('charge');
+  if(k==='v')battleCmd('fallback');
+  // Faith abilities
+  if(k==='f1')faithAbility('inspire');
+  if(k==='f2')faithAbility('shield');
+  if(k==='f3')faithAbility('reveal');
+  // Lehi orders
+  if(k==='z')lehiOrder('hold');
+  if(k==='x')lehiOrder('charge');
+  if(k==='b')lehiOrder('flank');
   const fk={'1':'circle','2':'wedge','3':'column','4':'line','5':'travel'};
   if(fk[k]&&S.formation!==fk[k]){
     S.formation=fk[k];
