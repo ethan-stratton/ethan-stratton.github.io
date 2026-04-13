@@ -236,6 +236,7 @@ let running=false,lastTime=0;
 const keys={};
 window.addEventListener('keydown',e=>{
   if(e.key==='Escape'){if(running)togglePause();return;}
+  if(S._cutscenes&&S._cutsceneIdx<S._cutscenes.length){advanceCutscene();return;}
   keys[e.key.toLowerCase()]=true;
   handleKey(e.key.toLowerCase());
   if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()||e.key))e.preventDefault();
@@ -1107,19 +1108,77 @@ function showResults(){
 
 function chooseMercy(mercy){
   document.getElementById('mercy-choice').style.display='none';
-  const ep=document.getElementById('epilogue');ep.style.display='block';
-  document.getElementById('return-btn').style.display='inline-block';
-  if(mercy){
-    ep.innerHTML='Moroni stopped the battle and offered Zerahemnah terms: surrender your weapons and covenant to never fight again.<br><br>'+
-      'Zerahemnah refused. He attacked Moroni, and a soldier struck off his scalp upon the sword. Many Lamanites saw this and were frightened, and came forward to make the covenant.<br><br>'+
-      'Eventually Zerahemnah himself surrendered. The Nephites let the survivors depart into the wilderness.<br><br>'+
-      '<span style="color:#5a5238;font-size:0.7rem;font-style:italic">— Alma 44:1–24</span>';
-  }else{
-    ep.innerHTML='The fighting continued. Many more fell on both sides. The Lamanites, surrounded and terrified, eventually threw down their weapons and begged for mercy.<br><br>'+
-      'The cost was heavy. More Nephites died than needed to.<br><br>'+
-      '<span style="color:#5a5238;font-size:0.7rem;font-style:italic">"Now Moroni was a man whose soul did joy in the liberty and the freedom of his country" — Alma 48:11</span>';
-  }
+  S._mercyChoice=mercy;
+  // Start cutscene sequence instead of static epilogue
+  S._cutsceneIdx=0;
+  S._cutscenes=mercy?[
+    {speaker:'Moroni',text:'Behold, Zerahemnah — I command you in the name of that all-powerful God to surrender your weapons. Covenant that you will not return to war against us, and we will spare your lives.',ref:'Alma 44:6',bg:'battlefield'},
+    {speaker:'Zerahemnah',text:'We will give up our weapons, but we will not make an oath which we know we will break. We are not of your faith.',ref:'Alma 44:8',bg:'battlefield'},
+    {speaker:'Moroni',text:'Then the battle shall resume.',ref:'Alma 44:9',bg:'battlefield'},
+    {speaker:'',text:'Zerahemnah rushed forward to strike Moroni — but a soldier stepped in and smote off his scalp upon the sword.',ref:'Alma 44:12',bg:'scalp'},
+    {speaker:'',text:'The soldier raised the scalp on the point of his sword and cried to the Lamanites with a loud voice:',ref:'Alma 44:13',bg:'scalp'},
+    {speaker:'Soldier',text:'Even as this scalp has fallen, so shall ye fall unless you deliver up your weapons and depart with a covenant of peace!',ref:'Alma 44:14',bg:'scalp'},
+    {speaker:'',text:'Many Lamanites came forward and cast their weapons at the feet of Moroni, entering into a covenant of peace. They were suffered to depart into the wilderness.',ref:'Alma 44:15',bg:'peace'},
+    {speaker:'',text:'Zerahemnah was exceedingly angry and stirred up the remainder to fight more powerfully.',ref:'Alma 44:16',bg:'battlefield'},
+    {speaker:'',text:'When Moroni saw their determination, he commanded his men to stop. He spoke once more of the covenant.',ref:'Alma 44:19',bg:'peace'},
+    {speaker:'',text:'Zerahemnah himself at last surrendered his weapons and entered into the covenant. The dead were cast into the waters of Sidon, and their bones are in the depths of the sea.',ref:'Alma 44:22',bg:'river'},
+  ]:[
+    {speaker:'',text:'The fighting continued without mercy. Many more fell on both sides — the river ran thick with blood.',ref:'Alma 44:17–18',bg:'battlefield'},
+    {speaker:'',text:'Zerahemnah rallied his men again and again, but they were hemmed in on every side.',ref:'Alma 44:16',bg:'battlefield'},
+    {speaker:'',text:'At last, seeing their utter destruction, the surviving Lamanites threw down their weapons. They were compelled to enter into the covenant.',ref:'Alma 44:19',bg:'peace'},
+    {speaker:'',text:'The cost was heavy. More Nephites fell than needed to. The dead were cast into the River Sidon.',ref:'Alma 44:22',bg:'river'},
+    {speaker:'Moroni',text:'"Now Moroni was a man whose soul did joy in the liberty and the freedom of his country."',ref:'Alma 48:11',bg:'peace'},
+  ];
+  showCutsceneSlide();
 }
+
+function showCutsceneSlide(){
+  const scenes=S._cutscenes;
+  if(S._cutsceneIdx>=scenes.length){
+    // Done — show final stats
+    const ep=document.getElementById('epilogue');ep.style.display='block';
+    const nephiteLost=S.deadSoldiers;
+    const mercy=S._mercyChoice;
+    ep.innerHTML=(mercy?
+      'The Nephites returned to their homes in peace. Moroni\'s strategy at the River Sidon became legendary — an ambush so complete it ended the war in a single day.':
+      'The victory was total, but the fields were stained. Moroni wept for the fallen — both Nephite and Lamanite. This was not the war he wanted.')+
+      '<br><br><span style="color:#5a5238;font-size:0.7rem;font-style:italic">Nephite fallen: '+nephiteLost+' of '+S.soldierCount+'</span>';
+    document.getElementById('return-btn').style.display='inline-block';
+    return;
+  }
+  const sc=scenes[S._cutsceneIdx];
+  const ep=document.getElementById('epilogue');ep.style.display='block';
+  
+  // Build cutscene HTML with speaker portrait and text
+  let bgColor='#1a1610';
+  if(sc.bg==='scalp')bgColor='#2a1410';
+  if(sc.bg==='river')bgColor='#101a20';
+  if(sc.bg==='peace')bgColor='#1a1a10';
+  
+  let portraitColor='#c8a040';
+  if(sc.speaker==='Zerahemnah')portraitColor='#c04040';
+  if(sc.speaker==='Soldier')portraitColor='#80a060';
+  
+  ep.innerHTML=
+    (sc.speaker?`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">`+
+      `<div style="width:28px;height:28px;border-radius:50%;background:${portraitColor};display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:#1a1610;font-weight:bold">${sc.speaker[0]}</div>`+
+      `<span style="color:${portraitColor};font-family:'Cinzel',serif;font-size:0.85rem">${sc.speaker}</span>`+
+    `</div>`:'')+
+    `<div style="color:#a89868;line-height:1.8;font-size:0.85rem;font-family:'Cinzel',serif">${sc.text}</div>`+
+    (sc.ref?`<div style="color:#4a4230;font-size:0.6rem;margin-top:8px;font-style:italic">${sc.ref}</div>`:'')+
+    `<div style="color:#5a5238;font-size:0.55rem;margin-top:14px;cursor:pointer" onclick="advanceCutscene()">▸ Click or press any key to continue</div>`;
+  
+  document.body.style.background=bgColor;
+}
+
+function advanceCutscene(){
+  if(!S._cutscenes)return;
+  S._cutsceneIdx++;
+  showCutsceneSlide();
+}
+
+// Allow click to advance cutscene
+document.addEventListener('click',()=>{if(S._cutscenes&&S._cutsceneIdx<S._cutscenes.length)advanceCutscene();});
 
 function showDefeat(){
   running=false;
@@ -1143,7 +1202,11 @@ function togglePause(){
 
 function returnToTimeline(){
   running=false;paused=false;
+  S._cutscenes=null;S._cutsceneIdx=0;
+  document.body.style.background='#1a1610';
   document.getElementById('results').style.display='none';
+  document.getElementById('epilogue').style.display='none';
+  document.getElementById('return-btn').style.display='none';
   document.getElementById('pause-overlay').style.display='none';
   document.getElementById('title-screen').style.display='flex';
   document.getElementById('hud').style.display='none';
@@ -1326,7 +1389,10 @@ function drawMinimap(){
   ctx.fillStyle='#1a1a10';ctx.fillRect(mx,my,mw,mh);
   ctx.strokeStyle='rgba(80,70,50,0.3)';ctx.lineWidth=0.5;
   ROADS.forEach(r=>{ctx.beginPath();ctx.moveTo(mx+r.x1*sx,my+r.y1*sy);ctx.lineTo(mx+r.x2*sx,my+r.y2*sy);ctx.stroke();});
-  ctx.fillStyle='rgba(30,60,90,0.4)';ctx.fillRect(mx+600*sx-1,my,2,mh);
+  // River — draw as vertical line at ~x=300
+  ctx.fillStyle='rgba(30,60,90,0.4)';
+  for(let y=0;y<MAP.h;y+=10){const rx=riverX(y);ctx.fillRect(mx+rx*sx-0.5,my+y*sy,1.5,10*sy+1);}
+  // Hill
   ctx.fillStyle='rgba(80,70,40,0.25)';ctx.beginPath();ctx.arc(mx+HILL.x*sx,my+HILL.y*sy,3,0,Math.PI*2);ctx.fill();
   S.enemies.forEach(e=>{if(e.dead)return;const d=getEnemyDisp(e);if(!d||d.a<0.05)return;const ex=mx+d.x*sx,ey=my+d.y*sy;if(ex<mx||ex>mx+mw||ey<my||ey>my+mh)return;ctx.fillStyle=`rgba(200,60,40,${d.a*0.7})`;ctx.fillRect(ex,ey,1,1);});
   ctx.fillStyle='rgba(100,140,200,0.5)';S.allies.forEach(a=>{if(!a.dead)ctx.fillRect(mx+a.x*sx,my+a.y*sy,1,1);});
@@ -1334,7 +1400,6 @@ function drawMinimap(){
   ctx.fillStyle='rgba(120,200,80,0.7)';S.scouts.forEach(sc=>{if(!sc.dead)ctx.fillRect(mx+sc.x*sx,my+sc.y*sy,1,1);});
   ctx.fillStyle='#c8a040';ctx.fillRect(mx+S.cx*sx-1,my+S.cy*sy-1,2,2);
   ctx.strokeStyle='rgba(200,160,64,0.25)';ctx.lineWidth=0.5;ctx.strokeRect(mx+S.camX*sx,my+S.camY*sy,W*sx,H*sy);
-  // Hill label on minimap
   ctx.fillStyle='rgba(140,130,90,0.25)';ctx.font='3px Inter';ctx.fillText('Hill',mx+HILL.x*sx-4,my+HILL.y*sy-4);
 }
 
