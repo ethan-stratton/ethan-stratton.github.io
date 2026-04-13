@@ -39,6 +39,13 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 .cmd-btn{display:inline-block;padding:3px 8px;margin-right:3px;margin-top:4px;font-size:0.55rem;font-family:'Cinzel',serif;color:#6a6248;letter-spacing:0.04em;background:rgba(10,10,6,0.5);border:1px solid rgba(200,160,64,0.1);border-radius:2px;cursor:pointer;transition:all 0.2s;text-align:left}
 .cmd-btn:hover{border-color:rgba(200,160,64,0.3);color:#a89868}
 .cmd-btn .hotkey{color:#4a4230;font-family:'Inter',sans-serif;font-size:0.5rem}
+.bar-group{display:flex;flex-wrap:wrap;gap:2px;margin:3px 0 2px}
+.bar-opt{padding:2px 6px;font-size:0.5rem;font-family:'Inter',sans-serif;color:#5a5238;background:rgba(10,10,6,0.4);border:1px solid rgba(200,160,64,0.08);border-radius:2px;cursor:pointer;transition:all 0.15s;user-select:none}
+.bar-opt:hover{border-color:rgba(200,160,64,0.25);color:#a89868;background:rgba(200,160,64,0.05)}
+.bar-opt.active{border-color:rgba(200,160,64,0.3);color:#c8a040;background:rgba(200,160,64,0.08)}
+.bar-opt.cooldown{opacity:0.35;pointer-events:none}
+.bar-cost{font-size:0.4rem;color:#4a4230;margin-left:3px}
+.faith-opt{border-color:rgba(200,160,64,0.12)}
 
 #mission-text{position:fixed;top:12px;right:12px;z-index:5;pointer-events:none;text-align:right;max-width:220px}
 #mission-title{font-size:0.7rem;color:#8a7a50;font-family:'Cinzel',serif;letter-spacing:0.06em}
@@ -198,21 +205,28 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
   <div id="hud-cmds" style="pointer-events:auto">
     <button class="cmd-btn" onclick="doHeadcount()">📋 Headcount <span class="hotkey">[H]</span></button>
     <button class="cmd-btn" onclick="doSendRetriever()">📯 Retrieve Scout <span class="hotkey">[Q]</span></button>
-    <div class="sep"></div>
-    <div class="label" style="color:#8a7a50;margin-top:4px">⚔ Battle Commands</div>
-    <button class="cmd-btn" id="cmd-hold" onclick="battleCmd('hold')">🛡 Hold Ground <span class="hotkey">[G]</span></button>
-    <button class="cmd-btn" id="cmd-charge" onclick="battleCmd('charge')">⚔ Charge! <span class="hotkey">[C]</span></button>
-    <button class="cmd-btn" id="cmd-fallback" onclick="battleCmd('fallback')">🔙 Fall Back <span class="hotkey">[V]</span></button>
-    <div class="sep"></div>
-    <div class="label" style="color:#c8a040;margin-top:4px">🙏 Faith Powers <span id="faith-cost" style="font-size:0.5rem;color:#6a6248"></span></div>
-    <button class="cmd-btn" id="faith-inspire" onclick="faithAbility('inspire')">✨ Inspire (20 faith) <span class="hotkey">[F1]</span></button>
-    <button class="cmd-btn" id="faith-shield" onclick="faithAbility('shield')">🛡 Shield of Faith (30 faith) <span class="hotkey">[F2]</span></button>
-    <button class="cmd-btn" id="faith-reveal" onclick="faithAbility('reveal')">👁 Prophet's Eye (15 faith) <span class="hotkey">[F3]</span></button>
-    <div class="sep"></div>
-    <div class="label" style="color:#6a8aaa;margin-top:4px">📨 Lehi Orders</div>
-    <button class="cmd-btn" id="lehi-hold" onclick="lehiOrder('hold')">⏸ Lehi: Hold Position <span class="hotkey">[Z]</span></button>
-    <button class="cmd-btn" id="lehi-charge" onclick="lehiOrder('charge')">⚔ Lehi: Charge! <span class="hotkey">[X]</span></button>
-    <button class="cmd-btn" id="lehi-flank" onclick="lehiOrder('flank')">↩ Lehi: Flank Right <span class="hotkey">[B]</span></button>
+  </div>
+  <div class="sep"></div>
+  <div class="label" style="color:#8a7a50">⚔ Orders</div>
+  <div class="bar-group" id="battle-bar">
+    <div class="bar-opt active" id="bo-follow" onclick="battleCmd('follow')">Follow</div>
+    <div class="bar-opt" id="bo-hold" onclick="battleCmd('hold')">Hold</div>
+    <div class="bar-opt" id="bo-charge" onclick="battleCmd('charge')">Charge</div>
+    <div class="bar-opt" id="bo-fallback" onclick="battleCmd('fallback')">Retreat</div>
+  </div>
+  <div class="sep"></div>
+  <div class="label" style="color:#c8a040">🙏 Faith</div>
+  <div class="bar-group" id="faith-bar">
+    <div class="bar-opt faith-opt" id="fo-inspire" onclick="faithAbility('inspire')">✨ Inspire<span class="bar-cost">20</span></div>
+    <div class="bar-opt faith-opt" id="fo-shield" onclick="faithAbility('shield')">🛡 Shield<span class="bar-cost">30</span></div>
+    <div class="bar-opt faith-opt" id="fo-reveal" onclick="faithAbility('reveal')">👁 Reveal<span class="bar-cost">15</span></div>
+  </div>
+  <div class="sep"></div>
+  <div class="label" style="color:#6a8aaa">📨 Lehi</div>
+  <div class="bar-group" id="lehi-bar">
+    <div class="bar-opt active" id="lo-hold" onclick="lehiOrder('hold')">Hold</div>
+    <div class="bar-opt" id="lo-charge" onclick="lehiOrder('charge')">Charge</div>
+    <div class="bar-opt" id="lo-flank" onclick="lehiOrder('flank')">Flank</div>
   </div>
 </div>
 
@@ -1001,10 +1015,18 @@ function doSendRetriever(){
 // BATTLE COMMANDS
 // ══════════════════════════════════════
 function battleCmd(cmd){
+  S.battleCmd=cmd;
+  document.querySelectorAll('#battle-bar .bar-opt').forEach(el=>el.classList.remove('active'));
+  const el=document.getElementById('bo-'+cmd);if(el)el.classList.add('active');
+  
+  if(cmd==='follow'){
+    S.soldiers.forEach(s=>{if(!s.dead)s._holdPos=null;});
+    showCallout('Follow me!',2);
+    return;
+  }
   if(S.phase!=='battle'&&S.phase!=='surround'&&S.phase!=='wait'){
     showCallout('No battle to command.',2);return;
   }
-  S.battleCmd=cmd;
   const alive=S.soldiers.filter(s=>!s.dead);
   if(cmd==='hold'){
     alive.forEach(s=>{s._holdPos={x:s.x,y:s.y};});
@@ -1026,6 +1048,7 @@ function battleCmd(cmd){
 // FAITH ABILITIES
 // ══════════════════════════════════════
 function faithAbility(type){
+  const elId={'inspire':'fo-inspire','shield':'fo-shield','reveal':'fo-reveal'}[type];
   if(type==='inspire'){
     if(S.faith<20){showCallout('Not enough faith.',2);return;}
     S.faith-=20;
@@ -1034,7 +1057,6 @@ function faithAbility(type){
       if(d<60){s.morale=Math.min(100,s.morale+30);s.fleeing=false;s.state='idle';}
     });
     addTrauma(0.05);
-    // Golden ring burst
     S._inspireTimer=1.5;S._inspireX=S.cx;S._inspireY=S.cy;
     showCallout('"Be faithful and diligent in keeping the commandments of God!" — Alma 37:35',4);
     SND.tone(440,0.3,'triangle',0.12);setTimeout(()=>SND.tone(554,0.2,'triangle',0.1),150);
@@ -1053,6 +1075,11 @@ function faithAbility(type){
     showCallout('"Now Moroni... sent certain men that they should spy out where the Lamanites were encamped" — Alma 43:23',4);
     SND.tone(660,0.15,'sine',0.08);SND.tone(880,0.15,'sine',0.06);
   }
+  // Cooldown visual
+  if(elId){
+    const el=document.getElementById(elId);
+    if(el){el.classList.add('cooldown');setTimeout(()=>el.classList.remove('cooldown'),3000);}
+  }
 }
 
 // ══════════════════════════════════════
@@ -1060,9 +1087,11 @@ function faithAbility(type){
 // ══════════════════════════════════════
 function lehiOrder(order){
   if(S.allies.length===0){showCallout('Lehi\'s force is not yet deployed.',2);return;}
-  // Send a messenger soldier to Lehi
   const alive=S.soldiers.filter(s=>!s.dead);
   if(alive.length<=5&&order!=='hold'){showCallout('Too few soldiers to send a messenger.',2);return;}
+  
+  document.querySelectorAll('#lehi-bar .bar-opt').forEach(el=>el.classList.remove('active'));
+  const el=document.getElementById('lo-'+order);if(el)el.classList.add('active');
   
   S.lehiOrder=order;
   
