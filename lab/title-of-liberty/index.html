@@ -278,8 +278,31 @@ function terrainName(x,y){
   if(inTrees(x,y))return{name:'Wilderness',color:'#4a7a3a',icon:'♣'};
   return{name:'Open Ground',color:'#6a6248',icon:'·'};
 }
-function isConcealed(x,y){return inTrees(x,y)||onHill(x,y);}
+function isConcealed(x,y){
+  if(inTrees(x,y))return true;
+  if(onHill(x,y))return true;
+  // Behind the hill (south/west side) — concealed from east approach
+  const dh=Math.sqrt((x-HILL.x)*(x-HILL.x)+(y-HILL.y)*(y-HILL.y));
+  if(dh<HILL.r+30&&x<HILL.x+10)return true;
+  return false;
+}
+// Move a unit toward tx,ty with river avoidance. Returns new x,y.
+function moveToward(u,tx,ty,spd,dt){
+  const ddx=tx-u.x,ddy=ty-u.y;const d=Math.sqrt(ddx*ddx+ddy*ddy);
+  if(d<2)return;
+  const ts=terrainSpeed(u.x,u.y);
+  let nx=u.x+ddx/d*spd*ts*dt,ny=u.y+ddy/d*spd*ts*dt;
+  if(inRiver(nx,ny)){
+    // Redirect toward ford
+    const fx=riverX(FORD_Y)-u.x,fy=FORD_Y-u.y;const fl=Math.sqrt(fx*fx+fy*fy)||1;
+    nx=u.x+fx/fl*spd*ts*dt;ny=u.y+fy/fl*spd*ts*dt;
+    if(inRiver(nx,ny))return;
+  }
+  u.x=Math.max(4,Math.min(MAP.w-4,nx));u.y=Math.max(4,Math.min(MAP.h-4,ny));
+}
 function nudgeAroundRiver(x,y,tx,ty){
+  // If target is in the river, redirect to ford
+  if(inRiver(tx,ty))return{tx:riverX(FORD_Y),ty:FORD_Y};
   const rx=riverX(y);const cross=(x<rx-RIVER_HALF_W&&tx>rx+RIVER_HALF_W)||(x>rx+RIVER_HALF_W&&tx<rx-RIVER_HALF_W);
   if(!cross)return{tx,ty};return{tx:riverX(FORD_Y),ty:FORD_Y};
 }
@@ -397,7 +420,7 @@ function makeUnit(x,y,team){
     state:'idle',aggroRange:80,spotted:false,
     waypointIdx:0,isLehi:false,
     // Scout state
-    scoutFacing:0,returning:false,
+    scoutFacing:0,returning:false,scoutImmunity:0,
   };
 }
 
@@ -806,7 +829,7 @@ function update(dt){
       const ddx=target.x-e.x,ddy=target.y-e.y;
       const d=Math.sqrt(ddx*ddx+ddy*ddy);
       if(d<20){doCombat(e,target,dt);}
-      else{const ts=terrainSpeed(e.x,e.y);e.x+=ddx/d*e.speed*ts*dt;e.y+=ddy/d*e.speed*ts*dt;}
+      else{moveToward(e,target.x,target.y,e.speed,dt);}
     }
     if(e.morale<=0&&e.state!=='rout'){e.state='rout';e.fleeing=true;}
   });
@@ -820,11 +843,9 @@ function update(dt){
       const ddx=target.x-a.x,ddy=target.y-a.y;
       const d=Math.sqrt(ddx*ddx+ddy*ddy);
       if(d<20){doCombat(a,target,dt);}
-      else{const ts=terrainSpeed(a.x,a.y);a.x+=ddx/d*a.speed*ts*dt;a.y+=ddy/d*a.speed*ts*dt;}
+      else{moveToward(a,target.x,target.y,a.speed,dt);}
     }else{
-      const ddx=a.tx-a.x,ddy=a.ty-a.y;
-      const d=Math.sqrt(ddx*ddx+ddy*ddy);
-      if(d>2){const ts=terrainSpeed(a.x,a.y);a.x+=ddx/d*a.speed*ts*dt;a.y+=ddy/d*a.speed*ts*dt;}
+      moveToward(a,a.tx,a.ty,a.speed,dt);
     }
     if(a.morale<=0){a.dead=true;S.deadAllies++;}
   });
@@ -883,20 +904,17 @@ function update(dt){
 
     if(nearE&&nearD<80){
       const ax=sc.x-nearE.x,ay=sc.y-nearE.y;const al=Math.sqrt(ax*ax+ay*ay)||1;
-      const ts=terrainSpeed(sc.x,sc.y);
-      sc.x+=ax/al*sc.speed*ts*1.1*dt;sc.y+=ay/al*sc.speed*ts*1.1*dt;
+      moveToward(sc,sc.x+ax/al*50,sc.y+ay/al*50,sc.speed*1.1,dt);
     }else{
-      const ts=terrainSpeed(sc.x,sc.y);
-      sc.x+=Math.cos(sc.scoutFacing)*sc.speed*ts*0.6*dt;
-      sc.y+=Math.sin(sc.scoutFacing)*sc.speed*ts*0.6*dt;
+      const tx=sc.x+Math.cos(sc.scoutFacing)*50,ty=sc.y+Math.sin(sc.scoutFacing)*50;
+      moveToward(sc,tx,ty,sc.speed*0.6,dt);
     }
-    sc.x=Math.max(4,Math.min(MAP.w-4,sc.x));
-    sc.y=Math.max(4,Math.min(MAP.h-4,sc.y));
   });
 
   // Walk near a scout to pick them up (no instant recall)
   S.scouts.forEach(sc=>{
     if(sc.dead||sc.returning||sc.isRetriever)return;
+    if(sc.scoutImmunity>0){sc.scoutImmunity-=dt;return;} // just deployed, don't auto-pickup
     const d=Math.sqrt((sc.x-S.cx)*(sc.x-S.cx)+(sc.y-S.cy)*(sc.y-S.cy));
     if(d<25)sc.returning=true;
   });
@@ -937,7 +955,12 @@ function moveSoldierToTarget(s,dt){
   const v=Math.sqrt(s.vx*s.vx+s.vy*s.vy);
   if(v>maxSpd){s.vx*=maxSpd/v;s.vy*=maxSpd/v;}
   let nx=s.x+s.vx*dt,ny=s.y+s.vy*dt;
-  if(inRiver(nx,ny)){const fx=riverX(FORD_Y)-s.x,fy=FORD_Y-s.y;const fl=Math.sqrt(fx*fx+fy*fy)||1;s.vx=fx/fl*s.speed*ts*0.8;s.vy=fy/fl*s.speed*ts*0.8;nx=s.x+s.vx*dt;ny=s.y+s.vy*dt;if(inRiver(nx,ny))return;}
+  if(inRiver(nx,ny)){
+    // Hard reject: push toward ford, never enter river
+    const fx=riverX(FORD_Y)-s.x,fy=FORD_Y-s.y;const fl=Math.sqrt(fx*fx+fy*fy)||1;
+    s.vx=fx/fl*s.speed*0.8;s.vy=fy/fl*s.speed*0.8;
+    return; // don't move into river at all
+  }
   s.x=Math.max(4,Math.min(MAP.w-4,nx));s.y=Math.max(4,Math.min(MAP.h-4,ny));
   if(v>15){s.x+=Math.sin(S.time*10+s.bobPhase)*0.12;s.y+=Math.cos(S.time*10+s.bobPhase+1)*0.08;}
 }
@@ -1234,7 +1257,7 @@ function handleKey(k){
     if(alive.length>5){
       const sc=alive[alive.length-1];
       S.soldiers=S.soldiers.filter(s=>s!==sc);
-      sc.scoutFacing=S.facing;sc.speed=60;sc.armored=false;sc.returning=false;
+      sc.scoutFacing=S.facing;sc.speed=60;sc.armored=false;sc.returning=false;sc.scoutImmunity=3;
       S.scouts.push(sc);
       showCallout('Scout deployed!',2);
     }else{
