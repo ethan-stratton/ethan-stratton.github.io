@@ -415,25 +415,12 @@ function advanceStory(){
 }
 function onStoryEnd(){
   if(S.phase==='briefing'){
-    S.phase='scout';S.phaseTimer=0;
-    setObjective('Send scouts west toward the river. We need to find their army. (Press A then E)');
-    setPhaseLabel('Phase 1 of 4 — Scouting');
-    // Lehi sends a scout first — player sees it as tutorial
-    setTimeout(()=>{
-      if(S.allies.length>0){
-        const lehi=S.allies[0];
-        const sc=makeUnit(lehi.x,lehi.y,'nephite');
-        sc.isLehi=true;
-        sc.scoutWaypoints=[
-          {x:500,y:200},{x:420,y:250},{x:370,y:300},{x:340,y:330},{x:310,y:350},
-          {x:280,y:340},{x:240,y:320},{x:200,y:300},
-        ];
-        sc.scoutWpIdx=0;sc.speed=55;sc.armored=false;sc.returning=false;sc.scoutImmunity=3;
-        sc.scoutFacing=Math.PI;sc.visionRange=90;sc.isLehiScout=true;
-        S.scouts.push(sc);
-        showCallout("Lehi sends a scout west. You should do the same — face west (A) and press E.",6);
-      }
-    },2000);
+    // Show camp after briefing
+    ['camp-armor','camp-pray','camp-intel','camp-council'].forEach(id=>{
+      const el=document.getElementById(id);if(el){el.disabled=false;el.style.opacity='1';}
+      const fl=document.getElementById(id+'-flavor');if(fl)fl.textContent='';
+    });
+    document.getElementById('camp-overlay').style.display='flex';
   }
 }
 
@@ -1644,6 +1631,30 @@ function campCouncil(){
 }
 function campBegin(){
   document.getElementById('camp-overlay').style.display='none';
+  // Now start scout phase
+  S.phase='scout';S.phaseTimer=0;
+  setObjective('Send scouts west toward the river. We need to find their army. (Press A then E)');
+  setPhaseLabel('Phase 1 of 4 — Scouting');
+  setTimeout(()=>{
+    if(S.allies.length>0){
+      const lehi=S.allies[0];
+      const sc=makeUnit(lehi.x,lehi.y,'nephite');
+      sc.isLehi=true;
+      sc.scoutWaypoints=[
+        {x:500,y:200},{x:420,y:250},{x:370,y:300},{x:340,y:330},{x:310,y:350},
+        {x:280,y:340},{x:240,y:320},{x:200,y:300},
+      ];
+      sc.scoutWpIdx=0;sc.speed=55;sc.armored=false;sc.returning=false;sc.scoutImmunity=3;
+      sc.scoutFacing=Math.PI;sc.visionRange=90;sc.isLehiScout=true;
+      S.scouts.push(sc);
+      showCallout("Lehi sends a scout west. You should do the same — face west (A) and press E.",6);
+    }
+  },2000);
+}
+
+function beginMission(idx){
+  if(idx!==0)return;
+  document.getElementById('title-screen').style.display='none';
   document.getElementById('hud').style.display='block';
   document.getElementById('formation-bar').style.display='block';
   document.getElementById('terrain-indicator').style.display='block';
@@ -1652,17 +1663,6 @@ function campBegin(){
   spawnLehi();
   S.phase='briefing';
   showStory(BRIEFING);
-}
-
-function beginMission(idx){
-  if(idx!==0)return;
-  document.getElementById('title-screen').style.display='none';
-  // Reset camp buttons
-  ['camp-armor','camp-pray','camp-intel','camp-council'].forEach(id=>{
-    const el=document.getElementById(id);if(el){el.disabled=false;el.style.opacity='1';}
-    const fl=document.getElementById(id+'-flavor');if(fl)fl.textContent='';
-  });
-  document.getElementById('camp-overlay').style.display='flex';
 }
 
 function resize(){
