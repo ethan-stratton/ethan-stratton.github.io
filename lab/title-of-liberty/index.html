@@ -1,24 +1,51 @@
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Title of Liberty — Mission 1: Riplah</title>
+<html><head><meta charset="utf-8"><title>Title of Liberty — The War Chapters</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#1a1a10;color:#c8c0a8;overflow:hidden;font-family:'Inter',sans-serif}
 canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
+
+/* ── Title Screen ── */
 #title-screen{position:fixed;top:0;left:0;right:0;bottom:0;background:#0e0e08;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10}
-#title-screen h1{font-family:'Cinzel',serif;font-size:3.2rem;color:#c8a040;letter-spacing:0.12em;text-align:center;margin-bottom:8px;text-shadow:0 2px 20px rgba(200,160,64,0.2)}
-#title-screen .subtitle{font-family:'Cinzel',serif;font-size:1.1rem;color:#8a7a50;letter-spacing:0.15em;margin-bottom:40px}
-#title-screen .verse{max-width:560px;font-size:0.9rem;color:#6a6248;line-height:1.7;text-align:center;font-style:italic;margin-bottom:40px}
-#title-screen .ref{font-size:0.75rem;color:#4a4230;margin-top:6px;font-style:normal;letter-spacing:0.05em}
-.start-btn{padding:14px 48px;border:1px solid rgba(200,160,64,0.3);background:none;color:#c8a040;font-family:'Cinzel',serif;font-size:1.1rem;letter-spacing:0.1em;cursor:pointer;transition:all 0.3s;border-radius:2px}
-.start-btn:hover{background:rgba(200,160,64,0.08);border-color:rgba(200,160,64,0.6)}
-.controls-hint{margin-top:24px;font-size:0.7rem;color:#4a4230;letter-spacing:0.08em}
+#title-screen h1{font-family:'Cinzel',serif;font-size:3.2rem;color:#c8a040;letter-spacing:0.12em;text-align:center;margin-bottom:4px;text-shadow:0 2px 20px rgba(200,160,64,0.2)}
+#title-screen .subtitle{font-family:'Cinzel',serif;font-size:1.1rem;color:#8a7a50;letter-spacing:0.15em;margin-bottom:32px}
+
+/* ── Timeline ── */
+#timeline{width:90%;max-width:700px;position:relative;margin-bottom:36px}
+#timeline-line{height:2px;background:linear-gradient(90deg,transparent 0%,#4a4230 10%,#4a4230 90%,transparent 100%);width:100%;position:absolute;top:18px}
+.tl-nodes{display:flex;justify-content:space-between;position:relative}
+.tl-node{display:flex;flex-direction:column;align-items:center;cursor:default;opacity:0.35;transition:all 0.3s;min-width:60px}
+.tl-node.unlocked{opacity:1;cursor:pointer}
+.tl-node.unlocked:hover .tl-dot{background:#c8a040;box-shadow:0 0 12px rgba(200,160,64,0.4)}
+.tl-dot{width:12px;height:12px;border-radius:50%;border:2px solid #4a4230;background:#1a1a10;transition:all 0.3s;margin-bottom:8px}
+.tl-node.unlocked .tl-dot{border-color:#c8a040;background:#2a2410}
+.tl-year{font-size:0.55rem;color:#5a5238;font-family:'Inter',sans-serif;letter-spacing:0.04em}
+.tl-name{font-size:0.6rem;color:#6a6248;font-family:'Cinzel',serif;letter-spacing:0.04em;margin-top:2px;text-align:center;max-width:80px;line-height:1.3}
+.tl-node.unlocked .tl-name{color:#a89868}
+.tl-node.unlocked .tl-year{color:#8a7a50}
+
+#title-screen .verse{max-width:560px;font-size:0.85rem;color:#5a5238;line-height:1.7;text-align:center;font-style:italic;margin-bottom:32px}
+#title-screen .ref{font-size:0.7rem;color:#3a3220;margin-top:6px;font-style:normal;letter-spacing:0.05em}
+.controls-hint{margin-top:20px;font-size:0.65rem;color:#3a3220;letter-spacing:0.06em;text-align:center;line-height:1.6}
+
+/* ── HUD ── */
 #hud{position:fixed;top:12px;left:12px;z-index:5;pointer-events:none}
-#hud div{font-size:0.75rem;color:#a89868;margin-bottom:4px;font-family:'Inter',sans-serif}
-#hud .label{color:#6a6248;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase}
-#mission-text{position:fixed;top:12px;right:12px;z-index:5;pointer-events:none;text-align:right;max-width:200px}
+#hud div{font-size:0.7rem;color:#a89868;margin-bottom:3px;font-family:'Inter',sans-serif}
+#hud .label{color:#5a5238;font-size:0.55rem;letter-spacing:0.06em;text-transform:uppercase}
+#hud .sep{height:1px;background:rgba(200,160,64,0.08);margin:6px 0;width:120px}
+
+/* ── Sidebar commands ── */
+#sidebar-cmds{position:fixed;top:12px;left:140px;z-index:5;pointer-events:auto}
+.cmd-btn{display:block;padding:3px 8px;margin-bottom:3px;font-size:0.55rem;font-family:'Cinzel',serif;color:#6a6248;letter-spacing:0.04em;background:rgba(10,10,6,0.5);border:1px solid rgba(200,160,64,0.1);border-radius:2px;cursor:pointer;transition:all 0.2s;text-align:left;min-width:90px}
+.cmd-btn:hover{border-color:rgba(200,160,64,0.3);color:#a89868}
+.cmd-btn .hotkey{color:#4a4230;font-family:'Inter',sans-serif;font-size:0.5rem}
+
+#mission-text{position:fixed;top:12px;right:12px;z-index:5;pointer-events:none;text-align:right;max-width:220px}
 #mission-title{font-size:0.7rem;color:#8a7a50;font-family:'Cinzel',serif;letter-spacing:0.06em}
 #mission-obj{font-size:0.55rem;color:#6a6248;margin-top:4px;line-height:1.5;font-family:'Inter',sans-serif}
+#phase-label{font-size:0.5rem;color:#4a4230;margin-top:3px;font-family:'Inter',sans-serif;letter-spacing:0.04em}
+
 #formation-bar{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:5;display:none;pointer-events:none}
 #formation-bar .fmt-group{display:flex;gap:4px}
 .fmt-slot{width:50px;height:28px;border:1px solid rgba(200,160,64,0.15);background:rgba(10,10,6,0.6);border-radius:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:all 0.25s}
@@ -28,26 +55,32 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 .fmt-slot.active .key,.fmt-slot.active .name{color:#c8a040}
 #terrain-indicator{position:fixed;bottom:14px;left:14px;z-index:5;pointer-events:none;display:none}
 .terrain-name{font-size:0.65rem;font-family:'Inter',sans-serif;letter-spacing:0.06em;transition:color 0.3s}
-#armor-label{position:fixed;top:80px;left:12px;z-index:5;pointer-events:none;display:none;font-size:0.6rem;font-family:'Inter',sans-serif;letter-spacing:0.06em}
 
-/* Story / Briefing overlay */
+/* ── Story overlay ── */
 #story-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,6,0.92);z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer}
 #story-overlay .story-text{max-width:520px;font-size:0.95rem;color:#a89868;line-height:1.8;text-align:center;font-family:'Cinzel',serif;letter-spacing:0.03em}
 #story-overlay .story-ref{font-size:0.7rem;color:#5a5238;margin-top:12px;font-family:'Inter',sans-serif;font-style:italic}
 #story-overlay .story-hint{font-size:0.6rem;color:#3a3220;margin-top:24px;font-family:'Inter',sans-serif;letter-spacing:0.05em}
 #story-overlay .story-speaker{font-size:0.7rem;color:#c8a040;margin-bottom:10px;font-family:'Cinzel',serif;letter-spacing:0.08em}
 
-/* Callout banner */
-#callout{position:fixed;top:45px;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;text-align:center;opacity:0;transition:opacity 0.4s}
-#callout .callout-text{font-size:0.7rem;color:#c8a040;font-family:'Cinzel',serif;letter-spacing:0.06em;background:rgba(10,10,6,0.7);padding:6px 16px;border:1px solid rgba(200,160,64,0.15);border-radius:2px}
+/* ── Callout ── */
+#callout{position:fixed;top:45px;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;text-align:center;opacity:0;transition:opacity 0.4s;max-width:400px}
+#callout .callout-text{font-size:0.65rem;color:#c8a040;font-family:'Cinzel',serif;letter-spacing:0.04em;background:rgba(10,10,6,0.8);padding:6px 16px;border:1px solid rgba(200,160,64,0.15);border-radius:2px;line-height:1.4}
 
-/* Results screen */
+/* ── Headcount overlay ── */
+#headcount-overlay{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:15;display:none;background:rgba(10,10,6,0.92);border:1px solid rgba(200,160,64,0.15);border-radius:4px;padding:16px 24px;min-width:200px;font-family:'Inter',sans-serif}
+#headcount-overlay h3{font-family:'Cinzel',serif;font-size:0.8rem;color:#c8a040;margin-bottom:10px;letter-spacing:0.06em}
+#headcount-overlay .hc-row{font-size:0.65rem;color:#8a7a50;margin:3px 0}
+#headcount-overlay .hc-row span{color:#a89868}
+#headcount-overlay .hc-hint{font-size:0.5rem;color:#3a3220;margin-top:8px}
+
+/* ── Results ── */
 #results{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,6,0.95);z-index:25;display:none;flex-direction:column;align-items:center;justify-content:center}
 #results h2{font-family:'Cinzel',serif;font-size:2rem;color:#c8a040;letter-spacing:0.1em;margin-bottom:24px}
 #results .stat{font-size:0.8rem;color:#8a7a50;margin:4px 0;font-family:'Inter',sans-serif}
 #results .mercy-choice{margin-top:24px;display:flex;gap:12px}
-#results .mercy-btn{padding:10px 28px;border:1px solid rgba(200,160,64,0.3);background:none;color:#c8a040;font-family:'Cinzel',serif;font-size:0.9rem;cursor:pointer;border-radius:2px;transition:all 0.3s}
-#results .mercy-btn:hover{background:rgba(200,160,64,0.08);border-color:rgba(200,160,64,0.6)}
+.mercy-btn{padding:10px 28px;border:1px solid rgba(200,160,64,0.3);background:none;color:#c8a040;font-family:'Cinzel',serif;font-size:0.9rem;cursor:pointer;border-radius:2px;transition:all 0.3s}
+.mercy-btn:hover{background:rgba(200,160,64,0.08);border-color:rgba(200,160,64,0.6)}
 #results .epilogue{max-width:480px;font-size:0.85rem;color:#8a7a50;line-height:1.7;text-align:center;margin-top:20px;font-family:'Cinzel',serif}
 </style>
 </head><body>
@@ -55,12 +88,63 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 <div id="title-screen">
   <h1>TITLE OF LIBERTY</h1>
   <div class="subtitle">THE WAR CHAPTERS</div>
+
+  <div id="timeline">
+    <div id="timeline-line"></div>
+    <div class="tl-nodes">
+      <div class="tl-node unlocked" onclick="beginMission(0)">
+        <div class="tl-dot"></div>
+        <div class="tl-year">~74 BC</div>
+        <div class="tl-name">Hill Riplah</div>
+      </div>
+      <div class="tl-node">
+        <div class="tl-dot"></div>
+        <div class="tl-year">~72 BC</div>
+        <div class="tl-name">Amalickiah's Revolt</div>
+      </div>
+      <div class="tl-node">
+        <div class="tl-dot"></div>
+        <div class="tl-year">~67 BC</div>
+        <div class="tl-name">City of Noah</div>
+      </div>
+      <div class="tl-node">
+        <div class="tl-dot"></div>
+        <div class="tl-year">~66 BC</div>
+        <div class="tl-name">Morianton</div>
+      </div>
+      <div class="tl-node">
+        <div class="tl-dot"></div>
+        <div class="tl-year">~64 BC</div>
+        <div class="tl-name">King-Men</div>
+      </div>
+      <div class="tl-node">
+        <div class="tl-dot"></div>
+        <div class="tl-year">~63 BC</div>
+        <div class="tl-name">Stripling Warriors</div>
+      </div>
+      <div class="tl-node">
+        <div class="tl-dot"></div>
+        <div class="tl-year">~62 BC</div>
+        <div class="tl-name">Cumeni</div>
+      </div>
+      <div class="tl-node">
+        <div class="tl-dot"></div>
+        <div class="tl-year">~62 BC</div>
+        <div class="tl-name">Retaking Nephihah</div>
+      </div>
+      <div class="tl-node">
+        <div class="tl-dot"></div>
+        <div class="tl-year">~62 BC</div>
+        <div class="tl-name">Final Peace</div>
+      </div>
+    </div>
+  </div>
+
   <div class="verse">
     "Yea, verily, verily I say unto you, if all men had been, and were, and ever would be, like unto Moroni, behold, the very powers of hell would have been shaken forever."
     <div class="ref">— Alma 48:17</div>
   </div>
-  <button class="start-btn" onclick="beginMission()">BEGIN</button>
-  <div class="controls-hint">WASD to move · SPACE to rally · 1-5 formations · E send scout</div>
+  <div class="controls-hint">WASD move · SPACE rally · 1-5 formations · E scout · Q recall · H headcount</div>
 </div>
 
 <div id="story-overlay" style="display:none" onclick="advanceStory()">
@@ -74,11 +158,20 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 
 <div id="hud" style="display:none">
   <div class="label">Faith</div>
-  <div style="width:120px;height:6px;background:#2a2a1a;border:1px solid #4a4230;border-radius:2px;margin-bottom:8px">
+  <div style="width:120px;height:6px;background:#2a2a1a;border:1px solid #4a4230;border-radius:2px;margin-bottom:6px">
     <div id="faith-fill" style="width:70%;height:100%;background:#c8a040;border-radius:1px;transition:width 0.5s"></div>
   </div>
-  <div class="label">Army</div>
+  <div class="label">Forces</div>
   <div id="army-count">40 soldiers</div>
+  <div id="scout-count" style="display:none"></div>
+  <div id="ally-count" style="display:none"></div>
+  <div class="sep"></div>
+  <div id="concealment-status" style="display:none;font-size:0.6rem"></div>
+</div>
+
+<div id="sidebar-cmds" style="display:none">
+  <button class="cmd-btn" onclick="doHeadcount()">📋 Headcount <span class="hotkey">[H]</span></button>
+  <button class="cmd-btn" onclick="doRecallAll()">📯 Recall Scouts <span class="hotkey">[Q]</span></button>
 </div>
 
 <div id="formation-bar">
@@ -92,14 +185,20 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 </div>
 
 <div id="terrain-indicator"><div class="terrain-name" id="terrain-name">Open Ground</div></div>
-<div id="armor-label">🛡 <span style="color:#8a7a50">Armored</span></div>
 
 <div id="mission-text" style="display:none">
-  <div id="mission-title">Mission 1: Riplah</div>
-  <div id="mission-obj">Scout the Lamanite approach</div>
+  <div id="mission-title">Mission 1: Hill Riplah</div>
+  <div id="mission-obj"></div>
+  <div id="phase-label"></div>
 </div>
 
 <div id="callout"><div class="callout-text" id="callout-text"></div></div>
+
+<div id="headcount-overlay">
+  <h3>📋 Headcount</h3>
+  <div id="hc-body"></div>
+  <div class="hc-hint">press H or click to dismiss</div>
+</div>
 
 <div id="results">
   <h2 id="results-title">Victory</h2>
@@ -120,56 +219,64 @@ ctx.imageSmoothingEnabled=false;
 
 let running=false,lastTime=0;
 const keys={};
-window.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;handleKey(e.key.toLowerCase());e.preventDefault();});
+window.addEventListener('keydown',e=>{
+  keys[e.key.toLowerCase()]=true;
+  handleKey(e.key.toLowerCase());
+  if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase()||e.key))e.preventDefault();
+});
 window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
 
 // ══════════════════════════════════════
 // MAP
 // ══════════════════════════════════════
-const MAP={w:900,h:700}; // bigger map for the full battle
+const MAP={w:900,h:700};
 const ROADS=[
   {x1:0,y1:350,x2:500,y2:350,w:12},
   {x1:500,y1:350,x2:620,y2:400,w:10},
   {x1:300,y1:0,x2:300,y2:700,w:10},
-  // Lamanite approach road from south-east
   {x1:900,y1:600,x2:620,y2:400,w:10},
 ];
 function riverX(y){return 600+Math.sin(y*0.012)*35+Math.sin(y*0.035)*12;}
-const FORD_Y=400;
-const FORD_HALF_W=26;
-const FORD_HALF_H=14;
-const RIVER_HALF_W=18;
-const HILL={x:740,y:500,r:60};
+const FORD_Y=400,FORD_HALF_W=28,FORD_HALF_H=16,RIVER_HALF_W=18;
+const HILL={x:740,y:500,r:65};
 
 const TREES=[];
-(function genTrees(){
-  for(let i=0;i<120;i++)TREES.push({x:Math.random()*220,y:Math.random()*MAP.h,s:2+Math.random()*2});
-  for(let i=0;i<60;i++)TREES.push({x:250+Math.random()*250,y:500+Math.random()*200,s:2+Math.random()*2});
+(function(){
+  // Dense western wilderness
+  for(let i=0;i<130;i++)TREES.push({x:Math.random()*220,y:Math.random()*MAP.h,s:2+Math.random()*2});
+  // Southern wilderness (important for player concealment)
+  for(let i=0;i<80;i++)TREES.push({x:250+Math.random()*300,y:480+Math.random()*220,s:2+Math.random()*2});
+  // Scattered
   for(let i=0;i<40;i++)TREES.push({x:250+Math.random()*300,y:Math.random()*MAP.h,s:1.5+Math.random()*1.5});
+  // North wilderness (for Lehi)
+  for(let i=0;i<50;i++)TREES.push({x:400+Math.random()*200,y:100+Math.random()*200,s:2+Math.random()*1.5});
 })();
 
 // ══════════════════════════════════════
 // TERRAIN
 // ══════════════════════════════════════
-function onRoad(x,y){
-  for(const r of ROADS){const dx=r.x2-r.x1,dy=r.y2-r.y1,l2=dx*dx+dy*dy;let t=l2?((x-r.x1)*dx+(y-r.y1)*dy)/l2:0;t=Math.max(0,Math.min(1,t));const px=r.x1+t*dx,py=r.y1+t*dy;if(Math.sqrt((x-px)*(x-px)+(y-py)*(y-py))<r.w/2)return true;}return false;
-}
+function onRoad(x,y){for(const r of ROADS){const dx=r.x2-r.x1,dy=r.y2-r.y1,l2=dx*dx+dy*dy;let t=l2?((x-r.x1)*dx+(y-r.y1)*dy)/l2:0;t=Math.max(0,Math.min(1,t));const px=r.x1+t*dx,py=r.y1+t*dy;if(Math.sqrt((x-px)*(x-px)+(y-py)*(y-py))<r.w/2)return true;}return false;}
 function atFord(x,y){return Math.abs(x-riverX(FORD_Y))<FORD_HALF_W&&Math.abs(y-FORD_Y)<FORD_HALF_H;}
 function inRiver(x,y){if(atFord(x,y))return false;return Math.abs(x-riverX(y))<RIVER_HALF_W;}
 function onHill(x,y){return Math.sqrt((x-HILL.x)*(x-HILL.x)+(y-HILL.y)*(y-HILL.y))<HILL.r;}
-function inTrees(x,y){for(const t of TREES){if(Math.abs(x-t.x)<6&&Math.abs(y-t.y)<6)return true;}return false;}
+function inTrees(x,y){for(const t of TREES){if(Math.abs(x-t.x)<8&&Math.abs(y-t.y)<8)return true;}return false;}
 function terrainSpeed(x,y){if(inRiver(x,y))return 0.15;if(onRoad(x,y))return 1.4;if(onHill(x,y))return 0.7;if(inTrees(x,y))return 0.6;return 1.0;}
 function terrainName(x,y){
-  if(inRiver(x,y))return{name:'River ≈≈≈',color:'#4a7a9a'};if(atFord(x,y))return{name:'Ford',color:'#8a7a50'};if(onRoad(x,y))return{name:'Road ►►►',color:'#a89868'};if(onHill(x,y))return{name:'Hill ▲▲',color:'#8a7a40'};if(inTrees(x,y))return{name:'Wilderness ♣♣',color:'#4a7a3a'};return{name:'Open Ground',color:'#6a6248'};
+  if(inRiver(x,y))return{name:'River',color:'#4a7a9a',icon:'≈≈'};
+  if(atFord(x,y))return{name:'Ford',color:'#8a7a50',icon:'══'};
+  if(onRoad(x,y))return{name:'Road',color:'#a89868',icon:'►'};
+  if(onHill(x,y))return{name:'Hill Riplah',color:'#8a7a40',icon:'▲'};
+  if(inTrees(x,y))return{name:'Wilderness',color:'#4a7a3a',icon:'♣'};
+  return{name:'Open Ground',color:'#6a6248',icon:'·'};
 }
 function isConcealed(x,y){return inTrees(x,y)||onHill(x,y);}
 function nudgeAroundRiver(x,y,tx,ty){
   const rx=riverX(y);const cross=(x<rx-RIVER_HALF_W&&tx>rx+RIVER_HALF_W)||(x>rx+RIVER_HALF_W&&tx<rx-RIVER_HALF_W);
-  if(!cross)return{tx,ty};if(Math.abs(y-FORD_Y)>FORD_HALF_H)return{tx:riverX(FORD_Y),ty:FORD_Y};return{tx,ty};
+  if(!cross)return{tx,ty};return{tx:riverX(FORD_Y),ty:FORD_Y};
 }
 
 // ══════════════════════════════════════
-// GAME STATE
+// STATE
 // ══════════════════════════════════════
 const S={
   cx:300,cy:350,speed:55,facing:0,moving:false,
@@ -177,88 +284,84 @@ const S={
   formation:'circle',faith:70,
   rallying:false,rallyTimer:0,
   time:0,camX:0,camY:0,
-  enemies:[],scouts:[],allies:[], // Lehi's force
+  enemies:[],scouts:[],allies:[],
+  deadSoldiers:0,deadAllies:0,totalLamanites:0,
   knownEnemies:new Map(),nextId:0,
-  // Mission state
-  phase:'briefing', // briefing, scout, position, wait, battle, surround, mercy, victory, defeat
-  phaseTimer:0,
+  // Mission phases: briefing → scout → position → wait → battle → surround → results
+  phase:'briefing',phaseTimer:0,
   lamanitesMarching:false,
-  lamanitesCrossed:false,
-  lehiAttacking:false,
-  lehiReady:false,
   playerConcealed:false,
   ambushReady:false,
-  surrounded:false,
-  nephiteDead:0,
-  lamaniteDead:0,
-  totalLamanites:0,
+  lehiAttacking:false,
   calloutTimer:0,
-  calloutQueue:[],
+  headcountOpen:false,
+  // Phase completion flags
+  _enemiesSpawned:false,
+  _scoutedEnemy:false,
+  _inPosition:false,
+  _marchStarted:false,
+  _crossingDone:false,
+  _battleStarted:false,
+  _surrenderOffered:false,
+  // Timers for delayed feedback
+  _positionReminderTimer:0,
+  _waitReminderTimer:0,
 };
 
 // ══════════════════════════════════════
-// STORY / BRIEFING SYSTEM
+// STORY SYSTEM
 // ══════════════════════════════════════
 const BRIEFING=[
-  {speaker:'Captain Moroni',text:'The Zoramite dissenters have joined with the Lamanites. Zerahemnah leads a great host against us.',ref:'Alma 43:5–6'},
-  {speaker:'Captain Moroni',text:'I have sent to Alma to inquire of the Lord. He tells us the Lamanites will cross the Sidon near the hill Riplah, marching toward Manti.',ref:'Alma 43:23–24'},
-  {speaker:'Captain Moroni',text:'We have what they do not — breastplates, arm-shields, helmets, and thick clothing. They come nearly naked.',ref:'Alma 43:19–21'},
-  {speaker:'Captain Moroni',text:'Here is our plan. You will take your company and hide behind the hill Riplah, south of the ford. Lehi will position his force in the wilderness to the north.',ref:'Alma 43:31–34'},
-  {speaker:'Captain Moroni',text:'When they cross the river, Lehi will strike from behind. You will close from the south. They will be caught between us.',ref:''},
-  {speaker:'Captain Moroni',text:'Send scouts ahead. Find their army. Then get into position and STAY HIDDEN until they cross. Do not engage early.',ref:''},
-  {speaker:'',text:'Scout the Lamanite approach. Position your forces behind the hill. Wait for the signal.',ref:''},
+  {speaker:'Captain Moroni',text:'The Zoramite dissenters have joined with the Lamanites. Zerahemnah leads a great host against us — far outnumbering our own forces.',ref:'Alma 43:5–6'},
+  {speaker:'Captain Moroni',text:'I have sent to Alma to inquire of the Lord. The Lamanites will cross the river Sidon near the hill Riplah, marching toward Manti.',ref:'Alma 43:23–24'},
+  {speaker:'Captain Moroni',text:'We have what they do not — breastplates, arm-shields, and thick clothing. They come nearly naked, armed only with swords and cimeters.',ref:'Alma 43:19–21'},
+  {speaker:'Captain Moroni',text:'Here is our plan. Take your company south of the ford and hide behind the hill Riplah. Captain Lehi will wait in the northern wilderness.',ref:'Alma 43:31–34'},
+  {speaker:'Captain Moroni',text:'When the Lamanites cross the ford, Lehi strikes their rear. You close from the south. Caught between two forces, they will have nowhere to run.',ref:''},
+  {speaker:'Captain Moroni',text:'First — send scouts east to find their army and track their approach. Then move to the hill and STAY HIDDEN. Do not engage until they have crossed.',ref:''},
+  {speaker:'',text:'Your orders:\n\n① Scout east — find the Lamanite army\n② Move to Hill Riplah — conceal your forces\n③ Wait for the crossing\n④ Spring the trap',ref:''},
 ];
 
-let storyQueue=[];
-let storyIdx=0;
+let storyQueue=[],storyIdx=0;
 
 function showStory(queue){
-  storyQueue=queue;storyIdx=0;
-  running=false;
-  const ov=document.getElementById('story-overlay');
-  ov.style.display='flex';
+  storyQueue=queue;storyIdx=0;running=false;
+  document.getElementById('story-overlay').style.display='flex';
   renderStoryPage();
 }
-
 function renderStoryPage(){
-  const page=storyQueue[storyIdx];
-  document.getElementById('story-speaker').textContent=page.speaker||'';
-  document.getElementById('story-text').textContent=page.text;
-  document.getElementById('story-ref').textContent=page.ref||'';
+  const p=storyQueue[storyIdx];
+  document.getElementById('story-speaker').textContent=p.speaker||'';
+  document.getElementById('story-text').textContent=p.text;
+  document.getElementById('story-ref').textContent=p.ref||'';
 }
-
 function advanceStory(){
   storyIdx++;
   if(storyIdx>=storyQueue.length){
     document.getElementById('story-overlay').style.display='none';
     running=true;lastTime=performance.now();
-    onStoryEnd();
-    return;
+    onStoryEnd();return;
   }
   renderStoryPage();
 }
-
 function onStoryEnd(){
   if(S.phase==='briefing'){
-    S.phase='scout';
-    setObjective('Send scouts east to find the Lamanite army');
-    showCallout('Send a scout east toward the river (face east, press E)');
+    S.phase='scout';S.phaseTimer=0;
+    setObjective('Send a scout east toward the river to find the Lamanite army.');
+    setPhaseLabel('Phase 1 of 4 — Scouting');
+    showCallout('Face east (press D) and press E to send a scout.',6);
   }
 }
 
 // ══════════════════════════════════════
-// CALLOUT SYSTEM
+// CALLOUT
 // ══════════════════════════════════════
 function showCallout(text,dur){
-  const el=document.getElementById('callout');
   document.getElementById('callout-text').textContent=text;
-  el.style.opacity='1';
+  document.getElementById('callout').style.opacity='1';
   S.calloutTimer=dur||4;
 }
-
-function setObjective(text){
-  document.getElementById('mission-obj').textContent=text;
-}
+function setObjective(t){document.getElementById('mission-obj').textContent=t;}
+function setPhaseLabel(t){document.getElementById('phase-label').textContent=t;}
 
 // ══════════════════════════════════════
 // UNIT FACTORY
@@ -273,18 +376,17 @@ function makeUnit(x,y,team){
     attackCd:0,fleeing:false,dead:false,
     armored:team==='nephite',barkTimer:0,
     circleAngle:0,circleRing:0,
-    // Enemy-specific
-    state:'idle',patrolX:x,patrolY:y,aggroRange:80,patrolAngle:Math.random()*Math.PI*2,
-    spotted:false,
-    // March waypoint index
-    waypointIdx:0,
+    state:'idle',aggroRange:80,spotted:false,
+    waypointIdx:0,isLehi:false,
+    // Scout state
+    scoutFacing:0,returning:false,
   };
 }
 
 function initSoldiers(){
   S.soldiers=[];
   for(let i=0;i<S.soldierCount;i++){
-    const ring=Math.floor(i/10),inRing=Math.min(10,S.soldierCount-ring*10),pos=i%10;
+    const ring=Math.floor(i/10),pos=i%10,inRing=Math.min(10,S.soldierCount-ring*10);
     const angle=(pos/inRing)*Math.PI*2,r=12+ring*8;
     const s=makeUnit(S.cx+Math.cos(angle)*r,S.cy+Math.sin(angle)*r,'nephite');
     s.circleAngle=angle;s.circleRing=ring;
@@ -293,47 +395,59 @@ function initSoldiers(){
 }
 
 // ══════════════════════════════════════
-// SPAWN LAMANITE ARMY (marching from SE)
+// LAMANITE ARMY
 // ══════════════════════════════════════
-const LAMANITE_MARCH_PATH=[
-  {x:880,y:680},{x:800,y:600},{x:720,y:520},{x:660,y:460},
-  {x:620,y:420}, // approach the ford
-  {x:610,y:400}, // at the ford
-  {x:580,y:390}, // crossing
-  {x:540,y:370}, // west side
-  {x:480,y:350}, // onto the road heading west
-  {x:400,y:350},{x:300,y:350},{x:200,y:350}, // marching west
+const MARCH_PATH=[
+  {x:880,y:680},{x:820,y:620},{x:760,y:560},{x:700,y:500},{x:660,y:460},
+  {x:630,y:430},{x:615,y:410}, // approach ford
+  {x:605,y:400},{x:590,y:395},{x:570,y:385}, // crossing
+  {x:540,y:370},{x:500,y:355}, // west side
+  {x:440,y:350},{x:360,y:350},{x:280,y:350},{x:200,y:350}, // march west
 ];
 
 function spawnLamaniteArmy(){
-  const count=80;
-  S.totalLamanites=count;
+  const count=80;S.totalLamanites=count;
   for(let i=0;i<count;i++){
-    const a=Math.random()*Math.PI*2,r=Math.random()*30;
-    const sp=LAMANITE_MARCH_PATH[0];
+    const a=Math.random()*Math.PI*2,r=Math.random()*35;
+    const sp=MARCH_PATH[0];
     const e=makeUnit(sp.x+Math.cos(a)*r,sp.y+Math.sin(a)*r,'lamanite');
-    e.state='march';
+    e.state='idle'; // idle until march starts
     e.waypointIdx=0;
-    e.speed=30+Math.random()*10; // marching speed
-    e.aggroRange=60; // shorter range while marching — they're not expecting ambush
+    e.speed=22+Math.random()*8; // SLOWER march
+    e.aggroRange=45; // SHORT aggro while marching — not expecting attack
     S.enemies.push(e);
   }
+  S._enemiesSpawned=true;
+}
+
+function startLamaniteMarch(){
+  if(S._marchStarted)return;
+  S._marchStarted=true;
+  S.lamanitesMarching=true;
+  S.enemies.forEach(e=>{if(!e.dead)e.state='march';});
 }
 
 // ══════════════════════════════════════
-// SPAWN LEHI'S FORCE (AI ally)
+// LEHI
 // ══════════════════════════════════════
 function spawnLehi(){
-  // Lehi positions north of the ford, in the wilderness
-  const lx=500,ly=200;
+  const lx=480,ly=180;
   for(let i=0;i<30;i++){
     const a=Math.random()*Math.PI*2,r=Math.random()*20;
     const s=makeUnit(lx+Math.cos(a)*r,ly+Math.sin(a)*r,'nephite');
-    s.isLehi=true;
-    s.speed=35+Math.random()*10;
+    s.isLehi=true;s.speed=35+Math.random()*10;
     S.allies.push(s);
   }
-  S.lehiReady=true;
+}
+
+function triggerLehiAttack(){
+  if(S.lehiAttacking)return;
+  S.lehiAttacking=true;
+  S.allies.forEach(a=>{
+    a.state='charge';
+    a.tx=riverX(FORD_Y)-40+Math.random()*30;
+    a.ty=FORD_Y-20+Math.random()*40;
+  });
 }
 
 // ══════════════════════════════════════
@@ -372,13 +486,12 @@ function fmtToWorld(ft,facing,cx,cy){
 // ══════════════════════════════════════
 // VISION
 // ══════════════════════════════════════
-const VISION_RANGE=120;
-const FOG_DECAY=0.15;
+const VISION_RANGE=120,FOG_DECAY=0.15;
 
 function updateVision(dt){
   const fr=[{x:S.cx,y:S.cy}];
   S.soldiers.forEach(s=>{if(!s.dead)fr.push({x:s.x,y:s.y});});
-  S.scouts.forEach(sc=>{if(!sc.dead)fr.push({x:sc.x,y:sc.y,r:VISION_RANGE*1.5});});
+  S.scouts.forEach(sc=>{if(!sc.dead)fr.push({x:sc.x,y:sc.y,r:VISION_RANGE*1.8});});
   S.allies.forEach(a=>{if(!a.dead)fr.push({x:a.x,y:a.y});});
 
   S.enemies.forEach(e=>{
@@ -386,210 +499,207 @@ function updateVision(dt){
     let vis=false;
     for(const f of fr){const d=Math.sqrt((f.x-e.x)*(f.x-e.x)+(f.y-e.y)*(f.y-e.y));if(d<(f.r||VISION_RANGE)){vis=true;break;}}
     const kn=S.knownEnemies.get(e.id);
-    if(vis){e.spotted=true;S.knownEnemies.set(e.id,{x:e.x,y:e.y,lastSeen:S.time,conf:1,alive:true});}
-    else if(kn){kn.conf=Math.max(0,kn.conf-FOG_DECAY*dt);if(kn.conf>0&&kn.conf<0.8){kn.x+=(Math.random()-0.5)*0.5*dt;kn.y+=(Math.random()-0.5)*0.5*dt;}}
+    if(vis){
+      e.spotted=true;
+      S.knownEnemies.set(e.id,{x:e.x,y:e.y,lastSeen:S.time,conf:1,alive:true});
+    }else if(kn){
+      kn.conf=Math.max(0,kn.conf-FOG_DECAY*dt);
+      if(kn.conf>0&&kn.conf<0.8){kn.x+=(Math.random()-0.5)*0.5*dt;kn.y+=(Math.random()-0.5)*0.5*dt;}
+    }
   });
 }
 
 function getEnemyDisp(e){
   const kn=S.knownEnemies.get(e.id);if(!kn)return null;
   if(kn.conf>0.8)return{x:e.x,y:e.y,a:0.9};
-  return{x:kn.x,y:kn.y,a:kn.conf*0.6+0.1};
+  if(kn.conf>0.05)return{x:kn.x,y:kn.y,a:kn.conf*0.6+0.1};
+  return null;
 }
 
 // ══════════════════════════════════════
-// CONCEALMENT CHECK
+// CONCEALMENT
 // ══════════════════════════════════════
 function checkConcealment(){
-  // Is the player's army concealed from the Lamanite army?
-  // All living soldiers + commander must be in trees or behind hill
-  let allHidden=isConcealed(S.cx,S.cy);
-  if(allHidden){
-    for(const s of S.soldiers){
-      if(!s.dead&&!isConcealed(s.x,s.y)){allHidden=false;break;}
-    }
-  }
-  S.playerConcealed=allHidden;
-  return allHidden;
+  // Commander must be concealed, and >70% of soldiers must be concealed
+  if(!isConcealed(S.cx,S.cy)){S.playerConcealed=false;return false;}
+  let hidden=0,total=0;
+  S.soldiers.forEach(s=>{if(!s.dead){total++;if(isConcealed(s.x,s.y))hidden++;}});
+  S.playerConcealed=total===0||hidden/total>0.7;
+  return S.playerConcealed;
 }
 
 // ══════════════════════════════════════
-// MISSION PHASE LOGIC
+// MISSION PHASES
 // ══════════════════════════════════════
 function updateMission(dt){
   S.phaseTimer+=dt;
+  if(S.calloutTimer>0){S.calloutTimer-=dt;if(S.calloutTimer<=0)document.getElementById('callout').style.opacity='0';}
 
-  // Callout timer
-  if(S.calloutTimer>0){
-    S.calloutTimer-=dt;
-    if(S.calloutTimer<=0)document.getElementById('callout').style.opacity='0';
-  }
-
+  // ── Phase: SCOUT ──
   if(S.phase==='scout'){
-    // Check if any scout or soldier has spotted an enemy
-    let spotted=false;
-    S.enemies.forEach(e=>{if(e.spotted)spotted=true;});
-    if(spotted&&!S._scoutDone){
-      S._scoutDone=true;
-      S.phase='position';
-      setObjective('Hide your forces behind Hill Riplah or in the wilderness. Stay concealed!');
-      showCallout('Lamanite army spotted! Get into position behind the hill!',5);
-    }
-    // Spawn enemies after a delay so the player has time to send scouts
-    if(S.phaseTimer>3&&!S._enemiesSpawned){
-      S._enemiesSpawned=true;
+    // Spawn enemies after 8 seconds (give player time to send scouts)
+    if(S.phaseTimer>8&&!S._enemiesSpawned){
       spawnLamaniteArmy();
     }
+
+    // Check if any scout or soldier has spotted enemies
+    let spottedCount=0;
+    S.enemies.forEach(e=>{if(e.spotted)spottedCount++;});
+
+    if(spottedCount>=3&&!S._scoutedEnemy){
+      S._scoutedEnemy=true;
+      S.phase='position';S.phaseTimer=0;
+      setObjective('Move your forces to Hill Riplah (southeast). Hide in the trees or behind the hill!');
+      setPhaseLabel('Phase 2 of 4 — Get into position');
+      showCallout('Lamanite army spotted to the east! ~'+S.totalLamanites+' warriors! Get to the hill!',6);
+    }
+
+    // Reminder at 15s if no scout sent
+    if(S.phaseTimer>15&&!S._scoutedEnemy&&S.scouts.length===0){
+      showCallout('Send a scout! Face east and press E.',4);
+      S.phaseTimer=10; // reset so it reminds again
+    }
   }
 
+  // ── Phase: POSITION ──
   if(S.phase==='position'){
     checkConcealment();
-    // Check if player is in position (near hill or in southern trees)
-    const nearHill=Math.sqrt((S.cx-HILL.x)*(S.cx-HILL.x)+(S.cy-HILL.y)*(S.cy-HILL.y))<HILL.r+30;
-    const inSouthTrees=S.cy>450&&S.cx<400&&inTrees(S.cx,S.cy);
-    if((nearHill||inSouthTrees)&&S.playerConcealed&&!S._positionDone){
-      S._positionDone=true;
-      S.phase='wait';
-      S.phaseTimer=0;
-      setObjective('Hold position. Wait for the Lamanites to cross the ford.');
-      showCallout('Good position! Lehi is ready in the north. Hold until they cross.',5);
-      // Start the Lamanite march
-      S.lamanitesMarching=true;
+    const distToHill=Math.sqrt((S.cx-HILL.x)*(S.cx-HILL.x)+(S.cy-HILL.y)*(S.cy-HILL.y));
+    const nearHill=distToHill<HILL.r+40;
+    const inSouthernWild=S.cy>440&&isConcealed(S.cx,S.cy);
+
+    if((nearHill||inSouthernWild)&&S.playerConcealed&&!S._inPosition){
+      S._inPosition=true;
+      S.phase='wait';S.phaseTimer=0;
+      setObjective('Hold position. The Lamanites are approaching the ford. Do NOT break cover!');
+      setPhaseLabel('Phase 3 of 4 — Wait for crossing');
+      showCallout('Good position! Hold here. Lehi is ready in the north. The Lamanites are marching...',6);
+      // NOW start the march
+      startLamaniteMarch();
     }
-    // If not concealed after 20 seconds, warn
-    if(S.phaseTimer>15&&!S.playerConcealed&&!S._concealWarn){
-      S._concealWarn=true;
-      showCallout('You are exposed! Move into the trees or behind the hill!',4);
+
+    // Reminders
+    S._positionReminderTimer+=dt;
+    if(S._positionReminderTimer>12){
+      S._positionReminderTimer=0;
+      if(!S.playerConcealed){
+        showCallout('You are EXPOSED! Move into the wilderness or behind Hill Riplah!',4);
+      }else if(!nearHill&&!inSouthernWild){
+        const dir=S.cx<HILL.x?'east':'';
+        showCallout('Move toward Hill Riplah (southeast corner of the map).',4);
+      }
     }
   }
 
+  // ── Phase: WAIT ──
   if(S.phase==='wait'){
     checkConcealment();
-    // Lamanites march toward the ford
-    // Check if they've crossed
-    let crossedCount=0;
-    S.enemies.forEach(e=>{
-      if(!e.dead&&e.x<riverX(e.y)-RIVER_HALF_W)crossedCount++;
-    });
-    if(crossedCount>30&&!S._crossedDone){
-      S._crossedDone=true;
-      S.lamanitesCrossed=true;
+
+    // Count Lamanites west of the river
+    let crossed=0;
+    S.enemies.forEach(e=>{if(!e.dead&&e.x<riverX(e.y)-RIVER_HALF_W)crossed++;});
+
+    // Concealment break warning
+    if(!S.playerConcealed){
+      S._waitReminderTimer+=dt;
+      if(S._waitReminderTimer>5){
+        S._waitReminderTimer=0;
+        showCallout('Stay hidden! If they see you the ambush fails!',3);
+      }
+    }
+
+    // Progress callouts
+    if(crossed>5&&!S._crossNote1){S._crossNote1=true;showCallout('The Lamanites are beginning to cross the ford...',4);}
+    if(crossed>30&&!S._crossNote2){S._crossNote2=true;showCallout('Most of their force is across. Almost time...',4);}
+
+    // Trigger battle when enough have crossed
+    if(crossed>40&&!S._crossingDone){
+      S._crossingDone=true;
+      S.phase='battle';S.phaseTimer=0;
+
       if(S.playerConcealed){
-        // Perfect ambush!
-        S.phase='battle';
         S.ambushReady=true;
-        setObjective('ATTACK! Close the pincer!');
-        showCallout('They have crossed! Lehi strikes from the north — ATTACK NOW!',5);
+        setObjective('ATTACK NOW! Close the pincer from the south!');
+        setPhaseLabel('Phase 4 of 4 — THE AMBUSH');
+        showCallout('They have crossed! Lehi strikes from the north — CHARGE!',6);
         triggerLehiAttack();
-        // Morale bonus for ambush
         S.soldiers.forEach(s=>{s.morale=100;});
         S.faith=Math.min(100,S.faith+20);
       }else{
-        // Spotted — no ambush, straight fight
-        S.phase='battle';
         S.ambushReady=false;
-        setObjective('The Lamanites saw you! Fight without the element of surprise!');
-        showCallout('They spotted us! No ambush — this will be costly!',5);
+        setObjective('They spotted us! Fight without surprise — this will be costly!');
+        setPhaseLabel('Phase 4 of 4 — BATTLE');
+        showCallout('No ambush — they saw us! Fight hard!',5);
         triggerLehiAttack();
-        // Morale penalty
-        S.enemies.forEach(e=>{e.aggroRange=120;}); // enemies are alert
+        S.enemies.forEach(e=>{e.aggroRange=120;});
       }
     }
-    // If player breaks concealment during wait, alert
-    if(!S.playerConcealed&&S.phaseTimer>2&&!S._waitWarn){
-      S._waitWarn=true;
-      showCallout('Stay hidden! The Lamanites will see you!',3);
+
+    // Failsafe: if 60 seconds pass in wait without crossing (something stuck), force battle
+    if(S.phaseTimer>90&&!S._crossingDone){
+      S._crossingDone=true;
+      S.phase='battle';
+      S.ambushReady=S.playerConcealed;
+      setObjective(S.ambushReady?'ATTACK!':'Fight!');
+      setPhaseLabel('Phase 4 of 4 — BATTLE');
+      showCallout('Engage!',4);
+      triggerLehiAttack();
     }
   }
 
+  // ── Phase: BATTLE ──
   if(S.phase==='battle'){
-    // Make all enemies aggressive
-    S.enemies.forEach(e=>{
-      if(!e.dead&&e.state==='march')e.state='fight_chase';
-    });
+    S.enemies.forEach(e=>{if(!e.dead&&e.state==='march')e.state='fight';});
 
-    // Check for surround condition: most enemies are between player army and Lehi
-    const aliveEnemies=S.enemies.filter(e=>!e.dead&&e.state!=='rout');
-    const routedEnemies=S.enemies.filter(e=>!e.dead&&e.state==='rout');
-
-    if(aliveEnemies.length<S.totalLamanites*0.3&&!S._surrenderOffered){
+    const alive=S.enemies.filter(e=>!e.dead&&e.state!=='rout');
+    if(alive.length<S.totalLamanites*0.3&&!S._surrenderOffered){
       S._surrenderOffered=true;
       S.phase='surround';
-      S.surrounded=true;
-      setObjective('The Lamanites are surrounded. Choose mercy or continue fighting.');
-      showCallout('Zerahemnah is surrounded! What will you do?',6);
-      // Pause combat briefly
-      setTimeout(()=>{showResults();},2000);
+      setObjective('The Lamanites are surrounded.');
+      showCallout('Zerahemnah is surrounded!',5);
+      setTimeout(()=>showResults(),2000);
     }
 
-    // Defeat check
-    if(S.soldiers.filter(s=>!s.dead).length===0){
-      S.phase='defeat';
-      showDefeat();
+    if(S.soldiers.filter(s=>!s.dead).length===0&&S.allies.filter(a=>!a.dead).length===0){
+      S.phase='defeat';showDefeat();
     }
   }
 }
 
 // ══════════════════════════════════════
-// LEHI'S ATTACK
+// HEADCOUNT
 // ══════════════════════════════════════
-function triggerLehiAttack(){
-  S.lehiAttacking=true;
-  // Lehi's force charges toward the ford area
-  S.allies.forEach(a=>{
-    a.state='charge';
-    a.tx=riverX(FORD_Y)-40+Math.random()*30;
-    a.ty=FORD_Y-20+Math.random()*40;
-  });
-}
-
-// ══════════════════════════════════════
-// RESULTS
-// ══════════════════════════════════════
-function showResults(){
-  running=false;
-  const r=document.getElementById('results');
-  r.style.display='flex';
-  const nephiteLost=S.soldierCount-S.soldiers.filter(s=>!s.dead).length;
+function doHeadcount(){
+  const ov=document.getElementById('headcount-overlay');
+  if(S.headcountOpen){ov.style.display='none';S.headcountOpen=false;return;}
+  S.headcountOpen=true;ov.style.display='block';
+  const alive=S.soldiers.filter(s=>!s.dead).length;
+  const scouts=S.scouts.filter(s=>!s.dead).length;
+  const allyAlive=S.allies.filter(a=>!a.dead).length;
+  const missing=S.deadSoldiers;
+  const enemySpotted=S.enemies.filter(e=>e.spotted&&!e.dead).length;
   const enemyDead=S.enemies.filter(e=>e.dead).length;
-  const enemyRouted=S.enemies.filter(e=>!e.dead&&e.state==='rout').length;
-  const ambushText=S.ambushReady?'Ambush successful — they never saw you coming.':'They spotted your forces. The element of surprise was lost.';
 
-  document.getElementById('results-title').textContent='The Lamanites Are Surrounded';
-  document.getElementById('results-stats').innerHTML=
-    `<div class="stat">${ambushText}</div>`+
-    `<div class="stat">Nephite losses: ${nephiteLost} of ${S.soldierCount}</div>`+
-    `<div class="stat">Lamanite dead: ${enemyDead} of ${S.totalLamanites}</div>`+
-    `<div class="stat">Lamanite routed: ${enemyRouted}</div>`;
-  document.getElementById('mercy-choice').style.display='flex';
+  let html=`<div class="hc-row">Soldiers present: <span>${alive}</span></div>`;
+  html+=`<div class="hc-row">Scouts deployed: <span>${scouts}</span></div>`;
+  if(missing>0)html+=`<div class="hc-row" style="color:#8a5a3a">Fallen (unrecovered): <span>${missing}</span></div>`;
+  if(allyAlive>0)html+=`<div class="hc-row">Lehi's force: <span>~${allyAlive}</span></div>`;
+  html+=`<div class="hc-row" style="margin-top:6px">Enemy spotted: <span>${enemySpotted>0?'~'+enemySpotted:'unknown'}</span></div>`;
+  if(enemyDead>0)html+=`<div class="hc-row">Enemy dead: <span>${enemyDead}</span></div>`;
+  document.getElementById('hc-body').innerHTML=html;
+}
+document.getElementById('headcount-overlay').addEventListener('click',()=>{doHeadcount();});
+
+// ══════════════════════════════════════
+// SCOUT RECALL
+// ══════════════════════════════════════
+function recallScout(sc){
+  sc.returning=true;
 }
 
-function chooseMercy(mercy){
-  document.getElementById('mercy-choice').style.display='none';
-  const ep=document.getElementById('epilogue');
-  ep.style.display='block';
-  if(mercy){
-    ep.innerHTML='Moroni stopped the battle and offered Zerahemnah terms: surrender your weapons and covenant to never fight again.<br><br>'+
-      'Zerahemnah refused. He attacked Moroni, and a soldier struck off his scalp upon the sword. Many Lamanites saw this and were frightened, and came forward to make the covenant.<br><br>'+
-      'Eventually Zerahemnah himself surrendered. The Nephites let the survivors depart into the wilderness.<br><br>'+
-      '<span style="color:#5a5238;font-size:0.7rem;font-style:italic">— Alma 44:1–24</span>';
-  }else{
-    ep.innerHTML='The fighting continued. Many more fell on both sides. The Lamanites, surrounded and terrified, eventually threw down their weapons and begged for mercy.<br><br>'+
-      'The cost was heavy. More Nephites died than needed to.<br><br>'+
-      '<span style="color:#5a5238;font-size:0.7rem;font-style:italic">"Now Moroni was a man whose soul did joy in the liberty and the freedom of his country" — Alma 48:11</span>';
-  }
-}
-
-function showDefeat(){
-  running=false;
-  const r=document.getElementById('results');
-  r.style.display='flex';
-  document.getElementById('results-title').textContent='Defeat';
-  document.getElementById('results-stats').innerHTML=
-    '<div class="stat">Your army was destroyed.</div>'+
-    '<div class="stat">The Lamanites march on Manti unopposed.</div>';
-  document.getElementById('epilogue').style.display='block';
-  document.getElementById('epilogue').textContent='Perhaps next time, use the terrain. Hide behind the hill. Wait for the crossing. Spring the trap.';
+function doRecallAll(){
+  S.scouts.forEach(sc=>{if(!sc.dead)sc.returning=true;});
+  if(S.scouts.length>0)showCallout('Scouts recalled!',2);
 }
 
 // ══════════════════════════════════════
@@ -612,13 +722,20 @@ function update(dt){
     const ts=terrainSpeed(S.cx,S.cy);
     const spd=S.speed*ts*(S.rallying?0.7:1);
     let nx=S.cx+dx*spd*dt,ny=S.cy+dy*spd*dt;
-    if(inRiver(nx,ny)){ny+=(FORD_Y>ny?1:-1)*spd*dt*0.5;}
-    else{S.cx=Math.max(8,Math.min(MAP.w-8,nx));S.cy=Math.max(8,Math.min(MAP.h-8,ny));}
+    if(!inRiver(nx,ny)){S.cx=Math.max(8,Math.min(MAP.w-8,nx));S.cy=Math.max(8,Math.min(MAP.h-8,ny));}
+    else{
+      // Nudge toward ford
+      const fy=FORD_Y-S.cy,fx=riverX(FORD_Y)-S.cx;const fl=Math.sqrt(fx*fx+fy*fy)||1;
+      S.cx+=fx/fl*spd*dt*0.5;S.cy+=fy/fl*spd*dt*0.5;
+    }
   }
 
-  if(S.rallying){S.rallyTimer-=dt;if(S.rallyTimer<=0)S.rallying=false;S.soldiers.forEach(s=>{if(!s.dead){s.morale=Math.min(100,s.morale+dt*20);s.fleeing=false;}});S.faith=Math.min(100,S.faith+dt*2);}
+  if(S.rallying){S.rallyTimer-=dt;if(S.rallyTimer<=0)S.rallying=false;
+    S.soldiers.forEach(s=>{if(!s.dead){s.morale=Math.min(100,s.morale+dt*20);s.fleeing=false;}});
+    S.faith=Math.min(100,S.faith+dt*2);
+  }
 
-  // ── Player soldiers ──
+  // ── Soldiers ──
   const alive=S.soldiers.filter(s=>!s.dead);
   alive.forEach((s,i)=>{
     const ft=getFormationTarget(s,i,alive.length,S.formation);
@@ -628,29 +745,30 @@ function update(dt){
     moveSoldierToTarget(s,dt);
   });
 
-  // ── Enemy AI ──
+  // ── Enemies ──
   S.enemies.forEach(e=>{
     if(e.dead)return;
     if(e.state==='march'){
-      // March along waypoints
-      const wp=LAMANITE_MARCH_PATH[e.waypointIdx];
+      const wp=MARCH_PATH[e.waypointIdx];
       if(!wp){e.state='idle';return;}
       const ddx=wp.x-e.x+((e.id%7)-3)*2,ddy=wp.y-e.y+((e.id%5)-2)*2;
       const d=Math.sqrt(ddx*ddx+ddy*ddy);
-      if(d<15){e.waypointIdx++;return;}
+      if(d<18){e.waypointIdx++;return;}
       const ts=terrainSpeed(e.x,e.y);
-      const spd=e.speed*ts;
-      e.x+=ddx/d*spd*dt;e.y+=ddy/d*spd*dt;
-      // Check for nearby Nephites while marching (but shorter range)
-      const nf=findNearest(e.x,e.y,e.aggroRange,S.soldiers.concat(S.allies));
-      if(nf&&!S.playerConcealed){e.state='fight_chase';}
+      e.x+=ddx/d*e.speed*ts*dt;e.y+=ddy/d*e.speed*ts*dt;
+      // Only aggro on PLAYER soldiers if NOT concealed (ignore scouts)
+      if(!S.playerConcealed){
+        const nf=findNearest(e.x,e.y,e.aggroRange,S.soldiers);
+        if(nf){e.state='fight';}
+      }
       return;
     }
     if(e.state==='rout'){
       const fx=e.x-S.cx,fy=e.y-S.cy;const fl=Math.sqrt(fx*fx+fy*fy)||1;
       e.x+=fx/fl*e.speed*1.3*dt;e.y+=fy/fl*e.speed*1.3*dt;return;
     }
-    // fight_chase or idle with aggro
+    if(e.state==='idle')return; // waiting for march order
+    // fight
     const target=findNearest(e.x,e.y,120,S.soldiers.concat(S.allies));
     if(target){
       const ddx=target.x-e.x,ddy=target.y-e.y;
@@ -658,47 +776,75 @@ function update(dt){
       if(d<20){doCombat(e,target,dt);}
       else{const ts=terrainSpeed(e.x,e.y);e.x+=ddx/d*e.speed*ts*dt;e.y+=ddy/d*e.speed*ts*dt;}
     }
-    if(e.morale<=0){e.state='rout';e.fleeing=true;}
+    if(e.morale<=0&&e.state!=='rout'){e.state='rout';e.fleeing=true;}
   });
 
-  // ── Lehi's allies ──
+  // ── Lehi ──
   S.allies.forEach(a=>{
     if(a.dead)return;
-    if(a.state==='charge'||S.lehiAttacking){
-      const target=findNearest(a.x,a.y,150,S.enemies);
-      if(target){
-        const ddx=target.x-a.x,ddy=target.y-a.y;
-        const d=Math.sqrt(ddx*ddx+ddy*ddy);
-        if(d<20){doCombat(a,target,dt);}
-        else{const ts=terrainSpeed(a.x,a.y);a.x+=ddx/d*a.speed*ts*dt;a.y+=ddy/d*a.speed*ts*dt;}
-      }else{
-        // Move toward target position
-        const ddx=a.tx-a.x,ddy=a.ty-a.y;
-        const d=Math.sqrt(ddx*ddx+ddy*ddy);
-        if(d>2){const ts=terrainSpeed(a.x,a.y);a.x+=ddx/d*a.speed*ts*dt;a.y+=ddy/d*a.speed*ts*dt;}
-      }
+    if(!S.lehiAttacking)return; // Lehi stays put until triggered
+    const target=findNearest(a.x,a.y,150,S.enemies);
+    if(target){
+      const ddx=target.x-a.x,ddy=target.y-a.y;
+      const d=Math.sqrt(ddx*ddx+ddy*ddy);
+      if(d<20){doCombat(a,target,dt);}
+      else{const ts=terrainSpeed(a.x,a.y);a.x+=ddx/d*a.speed*ts*dt;a.y+=ddy/d*a.speed*ts*dt;}
+    }else{
+      const ddx=a.tx-a.x,ddy=a.ty-a.y;
+      const d=Math.sqrt(ddx*ddx+ddy*ddy);
+      if(d>2){const ts=terrainSpeed(a.x,a.y);a.x+=ddx/d*a.speed*ts*dt;a.y+=ddy/d*a.speed*ts*dt;}
     }
-    if(a.morale<=0){a.dead=true;}
+    if(a.morale<=0){a.dead=true;S.deadAllies++;}
   });
 
   // ── Scouts ──
   S.scouts.forEach(sc=>{
     if(sc.dead)return;
+
+    // Returning?
+    if(sc.returning){
+      const ddx=S.cx-sc.x,ddy=S.cy-sc.y;
+      const d=Math.sqrt(ddx*ddx+ddy*ddy);
+      if(d<20){
+        // Rejoin army
+        sc.returning=false;
+        S.scouts=S.scouts.filter(s=>s!==sc);
+        sc.circleAngle=Math.random()*Math.PI*2;
+        sc.circleRing=Math.floor(S.soldiers.length/10);
+        sc.armored=true;
+        S.soldiers.push(sc);
+        showCallout('Scout returned to formation.',2);
+        return;
+      }
+      const ts=terrainSpeed(sc.x,sc.y);
+      sc.x+=ddx/d*sc.speed*ts*dt;sc.y+=ddy/d*sc.speed*ts*dt;
+      return;
+    }
+
+    // Normal scout behavior
     let nearE=null,nearD=Infinity;
     S.enemies.forEach(e=>{if(!e.dead){const d=Math.sqrt((e.x-sc.x)*(e.x-sc.x)+(e.y-sc.y)*(e.y-sc.y));if(d<nearD){nearD=d;nearE=e;}}});
-    const dcx=sc.x-S.cx,dcy=sc.y-S.cy;
-    const distCmd=Math.sqrt(dcx*dcx+dcy*dcy);
-    if(nearE&&nearD<75){
+
+    if(nearE&&nearD<80){
+      // Flee from nearby enemy
       const ax=sc.x-nearE.x,ay=sc.y-nearE.y;const al=Math.sqrt(ax*ax+ay*ay)||1;
       const ts=terrainSpeed(sc.x,sc.y);
       sc.x+=ax/al*sc.speed*ts*1.1*dt;sc.y+=ay/al*sc.speed*ts*1.1*dt;
-    }else if(distCmd<200){
+    }else{
+      // Advance in scout direction
       const ts=terrainSpeed(sc.x,sc.y);
-      sc.x+=Math.cos(sc.scoutFacing)*sc.speed*ts*0.7*dt;
-      sc.y+=Math.sin(sc.scoutFacing)*sc.speed*ts*0.7*dt;
+      sc.x+=Math.cos(sc.scoutFacing)*sc.speed*ts*0.6*dt;
+      sc.y+=Math.sin(sc.scoutFacing)*sc.speed*ts*0.6*dt;
     }
     sc.x=Math.max(4,Math.min(MAP.w-4,sc.x));
     sc.y=Math.max(4,Math.min(MAP.h-4,sc.y));
+  });
+
+  // Auto-recall: walk near a scout to pick them up
+  S.scouts.forEach(sc=>{
+    if(sc.dead||sc.returning)return;
+    const d=Math.sqrt((sc.x-S.cx)*(sc.x-S.cx)+(sc.y-S.cy)*(sc.y-S.cy));
+    if(d<25)sc.returning=true;
   });
 
   updateVision(dt);
@@ -708,6 +854,7 @@ function update(dt){
   S.camY=Math.max(0,Math.min(MAP.h-H,S.cy-H/2));
 
   // Cleanup
+  S.soldiers.forEach(s=>{if(s.dead)S.deadSoldiers++;});
   S.soldiers=S.soldiers.filter(s=>!s.dead);
   S.scouts=S.scouts.filter(s=>!s.dead);
   S.allies=S.allies.filter(a=>!a.dead);
@@ -759,7 +906,6 @@ function doCombat(atk,def,dt){
     def.hp-=dmg;def.morale-=8;
     if(def.hp<=0){
       def.dead=true;
-      if(def.team==='nephite')S.nephiteDead++;else S.lamaniteDead++;
       const allies=def.team==='nephite'?S.soldiers.concat(S.allies):S.enemies;
       allies.forEach(a=>{if(!a.dead){const d=Math.sqrt((a.x-def.x)*(a.x-def.x)+(a.y-def.y)*(a.y-def.y));if(d<40)a.morale-=10;}});
     }
@@ -770,28 +916,84 @@ function doCombat(atk,def,dt){
     S.soldiers.concat(S.allies).forEach(s=>{if(!s.dead&&Math.abs(s.x-def.x)<30&&Math.abs(s.y-def.y)<30)n++;});
     S.enemies.forEach(e=>{if(!e.dead&&Math.abs(e.x-def.x)<30&&Math.abs(e.y-def.y)<30)l++;});
     if(n>l*1.5)def.morale-=5;
-    // Ambush morale shock
     if(S.ambushReady&&!def._ambushShocked){def._ambushShocked=true;def.morale-=25;}
   }
 }
 
 // ══════════════════════════════════════
-// HTML HUD
+// HUD
 // ══════════════════════════════════════
 function updateHtmlHud(){
   document.getElementById('faith-fill').style.width=S.faith+'%';
   const ac=S.soldiers.filter(s=>!s.dead).length;
-  let txt=ac+' soldiers';
-  if(S.scouts.length)txt+=' · '+S.scouts.filter(s=>!s.dead).length+' scouts';
-  if(S.allies.length)txt+=' · '+S.allies.filter(a=>!a.dead).length+' allies';
-  document.getElementById('army-count').textContent=txt;
+  document.getElementById('army-count').textContent=ac+' soldiers';
+
+  const scEl=document.getElementById('scout-count');
+  const scAlive=S.scouts.filter(s=>!s.dead).length;
+  if(scAlive>0){scEl.style.display='block';scEl.textContent='🔭 '+scAlive+' scouts';}else{scEl.style.display='none';}
+
+  const alEl=document.getElementById('ally-count');
+  const alAlive=S.allies.filter(a=>!a.dead).length;
+  if(alAlive>0){alEl.style.display='block';alEl.textContent='⚔ '+alAlive+' allies (Lehi)';}else if(S.lehiAttacking){alEl.style.display='block';alEl.textContent='⚔ Lehi\'s force: wiped';}else{alEl.style.display='none';}
+
   const t=terrainName(S.cx,S.cy);
   const tn=document.getElementById('terrain-name');
-  tn.textContent=t.name;tn.style.color=t.color;
-  // Concealment indicator
+  tn.textContent=t.icon+' '+t.name;tn.style.color=t.color;
+
+  const cs=document.getElementById('concealment-status');
   if(S.phase==='position'||S.phase==='wait'){
-    tn.textContent+=S.playerConcealed?' · 👁 HIDDEN':' · ⚠ EXPOSED';
+    cs.style.display='block';
+    if(S.playerConcealed){cs.textContent='👁 HIDDEN';cs.style.color='#4a8a3a';}
+    else{cs.textContent='⚠ EXPOSED';cs.style.color='#aa6a30';}
+  }else{cs.style.display='none';}
+}
+
+// ══════════════════════════════════════
+// RESULTS
+// ══════════════════════════════════════
+function showResults(){
+  running=false;
+  const r=document.getElementById('results');r.style.display='flex';
+  const nephiteLost=S.deadSoldiers;
+  const enemyDead=S.enemies.filter(e=>e.dead).length;
+  const enemyRouted=S.enemies.filter(e=>!e.dead&&e.state==='rout').length;
+  const ambushText=S.ambushReady?'The ambush was perfect — they never saw you coming.':'They spotted your forces. The element of surprise was lost.';
+
+  document.getElementById('results-title').textContent='The Lamanites Are Surrounded';
+  document.getElementById('results-stats').innerHTML=
+    `<div class="stat">${ambushText}</div>`+
+    `<div class="stat">Nephite fallen: ${nephiteLost} of ${S.soldierCount}</div>`+
+    `<div class="stat">Lehi's losses: ${S.deadAllies} of 30</div>`+
+    `<div class="stat">Lamanite dead: ${enemyDead} of ${S.totalLamanites}</div>`+
+    `<div class="stat">Lamanite routed: ${enemyRouted}</div>`;
+  document.getElementById('mercy-choice').style.display='flex';
+}
+
+function chooseMercy(mercy){
+  document.getElementById('mercy-choice').style.display='none';
+  const ep=document.getElementById('epilogue');ep.style.display='block';
+  if(mercy){
+    ep.innerHTML='Moroni stopped the battle and offered Zerahemnah terms: surrender your weapons and covenant to never fight again.<br><br>'+
+      'Zerahemnah refused. He attacked Moroni, and a soldier struck off his scalp upon the sword. Many Lamanites saw this and were frightened, and came forward to make the covenant.<br><br>'+
+      'Eventually Zerahemnah himself surrendered. The Nephites let the survivors depart into the wilderness.<br><br>'+
+      '<span style="color:#5a5238;font-size:0.7rem;font-style:italic">— Alma 44:1–24</span>';
+  }else{
+    ep.innerHTML='The fighting continued. Many more fell on both sides. The Lamanites, surrounded and terrified, eventually threw down their weapons and begged for mercy.<br><br>'+
+      'The cost was heavy. More Nephites died than needed to.<br><br>'+
+      '<span style="color:#5a5238;font-size:0.7rem;font-style:italic">"Now Moroni was a man whose soul did joy in the liberty and the freedom of his country" — Alma 48:11</span>';
   }
+}
+
+function showDefeat(){
+  running=false;
+  const r=document.getElementById('results');r.style.display='flex';
+  document.getElementById('results-title').textContent='Defeat';
+  document.getElementById('results-stats').innerHTML=
+    '<div class="stat">Your army was destroyed.</div>'+
+    '<div class="stat">The Lamanites march on Manti unopposed.</div>';
+  document.getElementById('epilogue').style.display='block';
+  document.getElementById('epilogue').innerHTML='Perhaps next time, use the terrain. Hide behind the hill. Wait for the crossing. Spring the trap.<br><br>'+
+    '<span style="color:#4a4230;font-size:0.65rem">Hint: Send scouts first (E), then move to the southeast behind Hill Riplah. Stay in the trees. Wait.</span>';
 }
 
 // ══════════════════════════════════════
@@ -815,13 +1017,12 @@ function render(){
     if(d.a<0.5&&d.a>0.05){ctx.fillStyle=`rgba(200,100,60,${d.a})`;ctx.fillRect(Math.floor(d.x),Math.floor(d.y-6),1,2);ctx.fillRect(Math.floor(d.x),Math.floor(d.y-3),1,1);}
   });
 
-  // Allies (Lehi's force — blue-gold tint)
+  // Allies
   S.allies.forEach(a=>{
     if(a.dead)return;
-    ctx.fillStyle='rgba(100,120,140,0.7)';
+    ctx.fillStyle='rgba(100,130,160,0.75)';
     ctx.fillRect(Math.floor(a.x-1),Math.floor(a.y-1),2,3);
-    ctx.fillStyle='rgba(160,180,200,0.25)';
-    ctx.fillRect(Math.floor(a.x),Math.floor(a.y-2),1,1);
+    if(a.armored){ctx.fillStyle='rgba(150,170,200,0.25)';ctx.fillRect(Math.floor(a.x),Math.floor(a.y-2),1,1);}
   });
 
   // Player soldiers
@@ -838,9 +1039,11 @@ function render(){
   // Scouts
   S.scouts.forEach(sc=>{
     if(sc.dead)return;
-    ctx.fillStyle='rgba(120,160,80,0.8)';ctx.fillRect(Math.floor(sc.x-1),Math.floor(sc.y-1),2,3);
+    ctx.fillStyle=sc.returning?'rgba(160,180,80,0.8)':'rgba(120,160,80,0.8)';
+    ctx.fillRect(Math.floor(sc.x-1),Math.floor(sc.y-1),2,3);
     ctx.fillStyle='rgba(180,200,120,0.5)';ctx.fillRect(Math.floor(sc.x),Math.floor(sc.y-4),1,1);
-    ctx.strokeStyle='rgba(120,160,80,0.06)';ctx.lineWidth=0.3;ctx.beginPath();ctx.arc(sc.x,sc.y,VISION_RANGE*1.5,0,Math.PI*2);ctx.stroke();
+    if(sc.returning){ctx.fillStyle='rgba(200,200,100,0.4)';ctx.fillRect(Math.floor(sc.x-1),Math.floor(sc.y-6),1,1);ctx.fillRect(Math.floor(sc.x+1),Math.floor(sc.y-6),1,1);}
+    ctx.strokeStyle='rgba(120,160,80,0.04)';ctx.lineWidth=0.3;ctx.beginPath();ctx.arc(sc.x,sc.y,VISION_RANGE*1.8,0,Math.PI*2);ctx.stroke();
   });
 
   // Commander
@@ -857,25 +1060,40 @@ function render(){
     ctx.strokeStyle=`rgba(200,160,64,${p})`;ctx.lineWidth=0.5;
     const rr=22+Math.sin(S.time*3)*5;
     ctx.beginPath();ctx.arc(S.cx,S.cy,rr,0,Math.PI*2);ctx.stroke();
-    ctx.strokeStyle=`rgba(200,160,64,${p*0.6})`;ctx.beginPath();ctx.arc(S.cx,S.cy,rr*0.6,0,Math.PI*2);ctx.stroke();
     ctx.fillStyle=`rgba(200,160,64,${p+0.2})`;ctx.fillRect(cx-1,cy-12,2,9);
     ctx.fillStyle=`rgba(180,140,50,${p+0.2})`;ctx.fillRect(cx+1,cy-12,5,3);
   }
 
-  // Sparks
+  // Combat sparks
   [...S.soldiers,...S.allies].forEach(s=>{if(!s.dead&&s.attackCd>0.6){ctx.fillStyle='rgba(255,220,120,0.5)';ctx.fillRect(Math.floor(s.x+Math.random()*4-2),Math.floor(s.y+Math.random()*4-2),1,1);}});
   S.enemies.forEach(e=>{if(!e.dead&&e.attackCd>0.6&&getEnemyDisp(e)){ctx.fillStyle='rgba(255,100,60,0.5)';ctx.fillRect(Math.floor(e.x+Math.random()*4-2),Math.floor(e.y+Math.random()*4-2),1,1);}});
 
   // Lehi label
   if(S.allies.length>0){
-    const ax=S.allies.reduce((s,a)=>s+(a.dead?0:a.x),0)/(S.allies.filter(a=>!a.dead).length||1);
-    const ay=S.allies.reduce((s,a)=>s+(a.dead?0:a.y),0)/(S.allies.filter(a=>!a.dead).length||1);
-    ctx.fillStyle='rgba(100,140,180,0.4)';ctx.font='4px Inter';ctx.fillText('Lehi',ax-6,ay-15);
+    const al=S.allies.filter(a=>!a.dead);
+    if(al.length>0){
+      const ax=al.reduce((s,a)=>s+a.x,0)/al.length;
+      const ay=al.reduce((s,a)=>s+a.y,0)/al.length;
+      ctx.fillStyle='rgba(100,140,180,0.4)';ctx.font='4px Inter';ctx.fillText('Lehi',ax-6,ay-15);
+    }
   }
 
   drawTerrainZoneHints();
   ctx.restore();
   drawMinimap();
+
+  // Objective arrow (points toward Hill Riplah during position phase)
+  if(S.phase==='position'&&!S._inPosition){
+    const hx=HILL.x-S.cx,hy=HILL.y-S.cy;
+    const ha=Math.atan2(hy,hx);
+    const ax=W/2+Math.cos(ha)*50,ay=H/2+Math.sin(ha)*50;
+    ctx.fillStyle='rgba(200,160,64,0.3)';
+    ctx.beginPath();ctx.moveTo(ax+Math.cos(ha)*6,ay+Math.sin(ha)*6);
+    ctx.lineTo(ax+Math.cos(ha+2.5)*4,ay+Math.sin(ha+2.5)*4);
+    ctx.lineTo(ax+Math.cos(ha-2.5)*4,ay+Math.sin(ha-2.5)*4);
+    ctx.fill();
+  }
+
   ctx.restore();
 }
 
@@ -895,8 +1113,7 @@ function drawTerrain(){
   // River
   ctx.fillStyle='#1a2a3a';ctx.beginPath();
   for(let y=0;y<=MAP.h;y+=4){const rx=riverX(y);if(y===0)ctx.moveTo(rx-RIVER_HALF_W,y);ctx.lineTo(rx-RIVER_HALF_W,y);}
-  for(let y=MAP.h;y>=0;y-=4){ctx.lineTo(riverX(y)+RIVER_HALF_W,y);}
-  ctx.fill();
+  for(let y=MAP.h;y>=0;y-=4){ctx.lineTo(riverX(y)+RIVER_HALF_W,y);}ctx.fill();
   ctx.fillStyle='rgba(40,80,120,0.12)';
   for(let y=0;y<MAP.h;y+=10){const rx=riverX(y);ctx.fillRect(rx-8+Math.sin(S.time*2+y*0.1)*3,y,5,2);}
   // Ford
@@ -934,15 +1151,14 @@ function drawMinimap(){
   ROADS.forEach(r=>{ctx.beginPath();ctx.moveTo(mx+r.x1*sx,my+r.y1*sy);ctx.lineTo(mx+r.x2*sx,my+r.y2*sy);ctx.stroke();});
   ctx.fillStyle='rgba(30,60,90,0.4)';ctx.fillRect(mx+600*sx-1,my,2,mh);
   ctx.fillStyle='rgba(80,70,40,0.25)';ctx.beginPath();ctx.arc(mx+HILL.x*sx,my+HILL.y*sy,3,0,Math.PI*2);ctx.fill();
-  // Enemies
   S.enemies.forEach(e=>{if(e.dead)return;const d=getEnemyDisp(e);if(!d||d.a<0.05)return;const ex=mx+d.x*sx,ey=my+d.y*sy;if(ex<mx||ex>mx+mw||ey<my||ey>my+mh)return;ctx.fillStyle=`rgba(200,60,40,${d.a*0.7})`;ctx.fillRect(ex,ey,1,1);});
-  // Allies
   ctx.fillStyle='rgba(100,140,200,0.5)';S.allies.forEach(a=>{if(!a.dead)ctx.fillRect(mx+a.x*sx,my+a.y*sy,1,1);});
-  // Soldiers
   ctx.fillStyle='rgba(160,140,80,0.6)';S.soldiers.forEach(s=>{if(!s.dead)ctx.fillRect(mx+s.x*sx,my+s.y*sy,1,1);});
   ctx.fillStyle='rgba(120,200,80,0.7)';S.scouts.forEach(sc=>{if(!sc.dead)ctx.fillRect(mx+sc.x*sx,my+sc.y*sy,1,1);});
   ctx.fillStyle='#c8a040';ctx.fillRect(mx+S.cx*sx-1,my+S.cy*sy-1,2,2);
   ctx.strokeStyle='rgba(200,160,64,0.25)';ctx.lineWidth=0.5;ctx.strokeRect(mx+S.camX*sx,my+S.camY*sy,W*sx,H*sy);
+  // Hill label on minimap
+  ctx.fillStyle='rgba(140,130,90,0.25)';ctx.font='3px Inter';ctx.fillText('Hill',mx+HILL.x*sx-4,my+HILL.y*sy-4);
 }
 
 // ══════════════════════════════════════
@@ -951,13 +1167,18 @@ function drawMinimap(){
 function handleKey(k){
   if(!running)return;
   if(k===' '){S.rallying=true;S.rallyTimer=3;}
+  if(k==='q'){doRecallAll();}
+  if(k==='h'){doHeadcount();}
   if(k==='e'){
     const alive=S.soldiers.filter(s=>!s.dead);
     if(alive.length>5){
       const sc=alive[alive.length-1];
       S.soldiers=S.soldiers.filter(s=>s!==sc);
-      sc.scoutFacing=S.facing;sc.speed=60;sc.armored=false;
+      sc.scoutFacing=S.facing;sc.speed=60;sc.armored=false;sc.returning=false;
       S.scouts.push(sc);
+      showCallout('Scout deployed!',2);
+    }else{
+      showCallout('Not enough soldiers to spare a scout.',2);
     }
   }
   const fk={'1':'circle','2':'wedge','3':'column','4':'line','5':'travel'};
@@ -985,12 +1206,13 @@ function gameLoop(t){
   requestAnimationFrame(gameLoop);
 }
 
-function beginMission(){
+function beginMission(idx){
+  if(idx!==0)return; // only mission 1 playable
   document.getElementById('title-screen').style.display='none';
   document.getElementById('hud').style.display='block';
   document.getElementById('formation-bar').style.display='block';
   document.getElementById('terrain-indicator').style.display='block';
-  document.getElementById('armor-label').style.display='block';
+  document.getElementById('sidebar-cmds').style.display='block';
   document.getElementById('mission-text').style.display='block';
   initSoldiers();
   spawnLehi();
