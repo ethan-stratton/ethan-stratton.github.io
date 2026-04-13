@@ -249,7 +249,7 @@ const CHARACTERS=[
 
 // ── STATE ──
 const S={
-  day:1, maxDays:10, phase:'dawn',
+  day:1, maxDays:20, phase:'dawn',
   food:70, mat:60, ppl:40, mor:65,
   mark:0,
   trustRowan:60, trustLira:60, trustEdric:60,
@@ -263,8 +263,8 @@ const S={
 function clamp(v,lo=0,hi=100){return Math.max(lo,Math.min(hi,v))}
 
 function getChar(id){return CHARACTERS.find(c=>c.id===id)}
-function setStatus(id,status){const c=getChar(id);if(c){c.status=status;c.visible=true;}renderRoster();}
-function setMultiStatus(updates){updates.forEach(([id,st])=>{const c=getChar(id);if(c){c.status=st;c.visible=true;}});renderRoster();}
+function setStatus(id,status){const c=getChar(id);if(c){c.status=status;c.visible=true;if(status==='dead')S.flags._last_death_day=S.day;}renderRoster();}
+function setMultiStatus(updates){updates.forEach(([id,st])=>{const c=getChar(id);if(c){c.status=st;c.visible=true;if(st==='dead')S.flags._last_death_day=S.day;}});renderRoster();}
 function revealChars(ids){ids.forEach(id=>{const c=getChar(id);if(c)c.visible=true;});renderRoster();}
 
 // ══════════════════════════════════════
@@ -343,7 +343,9 @@ const PETITIONS=[
     {text:'Counter-offer: ten percent, and he can resupply and rest overnight.',cost:'Food −7. Materials +12.',effects:{food:-7,mat:12,mor:2,mark:0},flag:'trader_counter',
      roster:[['marsh','gone']]},
     {text:'Seize the cart. He\'s one man.',cost:'Materials +25. Morale −10. Word will spread.',effects:{mat:25,mor:-10,mark:2},flag:'trader_seize',
-     roster:[['marsh','dead']]},
+     roster:[['marsh','dead']],
+     delayed:[{days:3,text:'Word has spread about the trader. A merchant caravan passes Brannhaven without stopping. They saw Marsh\'s cart inside the walls.',effects:{mor:-5},flag:'_trader_reputation'},
+              {days:5,text:'No traders have come since Marsh. The road south is empty. People are starting to notice.',effects:{mor:-3}}]},
     {text:'Decline. We\'ll manage without.',cost:'No change. Marsh leaves.',effects:{mark:-0.3},flag:'trader_decline',
      roster:[['marsh','gone']]}
   ]},
@@ -377,7 +379,9 @@ const PETITIONS=[
     {text:'Forgive him — and fix the ration system. Why isn\'t his daughter getting enough?',cost:'Food −2. Materials −1. Systemic fix.',effects:{food:-2,mat:-1,mor:2,mark:-0.6,trustLira:8},flag:'thief_fix',
      roster:[['declan','well'],['declan_daughter','recovering']]},
     {text:'Exile him. Theft from the granary threatens everyone.',cost:'People −1. A child loses her father.',effects:{ppl:-1,mor:-2,mark:1.5},flag:'thief_exile',
-     roster:[['declan','exiled'],['declan_daughter','dying']]}
+     roster:[['declan','exiled'],['declan_daughter','dying']],
+     delayed:[{days:2,text:'Declan\'s daughter stopped eating. She sits by the south gate, watching the road. She thinks he\'s coming back.',effects:{mor:-3},wrenLine:'"She\'s been sitting there since morning. She doesn\'t even cry anymore."'},
+              {days:4,text:'Word from outside the wall. Declan\'s daughter didn\'t survive the road. She followed him.',effects:{ppl:-1,mor:-5},roster:[['declan_daughter','dead']],flag:'_mira_dead',wrenLine:'"I brought her flowers yesterday. She said they smelled like outside."'}]}
   ]},
 
 {id:'elif',minDay:5,maxDay:7,
@@ -393,7 +397,8 @@ const PETITIONS=[
     {text:'Let them camp outside the wall. Bring food out daily.',cost:'Food −3. Limbo.',effects:{food:-3,mor:-2,mark:0.1},flag:'elif_outside',
      roster:[['elif','outside'],['elif_boy','outside'],['elif_girl','outside'],['avi','outside']]},
     {text:'Deny them. Close the gate.',cost:'Food stable. Morale −2.',effects:{mor:-2,trustRowan:5,mark:0.3},flag:'elif_deny',
-     roster:[['elif','denied'],['elif_boy','denied'],['elif_girl','denied'],['avi','denied']]}
+     roster:[['elif','denied'],['elif_boy','denied'],['elif_girl','denied'],['avi','denied']],
+     delayed:[{days:3,text:'A guard found something by the east gate this morning. A child\'s shoe. Small. Worn through at the sole. The refugees are gone. Nobody knows where.',effects:{mor:-4},wrenLine:'"I saw the little girl. Before you closed the gate. She waved at me."'}]}
   ]},
 
 {id:'kael',minDay:6,maxDay:8,
@@ -403,7 +408,9 @@ const PETITIONS=[
   recs:{rowan:'"Shut him down. Arrest him if he won\'t stop. Agitators get people killed."',lira:'"He\'s saying what people feel. Silencing him will make it worse."',edric:'"He has no standing to speak. He\'s not on the council."'},
   choices:[
     {text:'Arrest Kael. Public speech without council approval is destabilizing.',cost:'Morale −8. His followers go underground.',effects:{mor:-8,trustRowan:10,mark:1.5},flag:'kael_arrest',
-     roster:[['kael','arrested']]},
+     roster:[['kael','arrested']],
+     delayed:[{days:2,text:'Someone painted words on the granary wall overnight. "WHO WATCHES THE LEADER?" The guards can\'t find who did it.',effects:{mor:-3}},
+              {days:4,text:'Three families have stopped coming to assemblies. They eat separately. Speak quietly. Rowan calls them "the sulkers." Edric calls them "the beginning of something."',effects:{mor:-4},flag:'_kael_resistance'}]},
     {text:'Invite him to speak at the council. Publicly. Let people hear both sides.',cost:'Morale +2. Risky — but fair.',effects:{mor:2,mark:-0.5,trustEdric:-5},flag:'kael_council',
      roster:[['kael','speaking']]},
     {text:'Ignore him. He\'ll burn out.',cost:'No immediate change. Crowd keeps growing.',effects:{mark:-0.4},flag:'kael_ignore',
@@ -420,13 +427,15 @@ const PETITIONS=[
   choices:[
     {text:'Double the guard. Fortify the farms.',cost:'People −4 to guard. Food halved. Walls hold.',effects:{food:-8,ppl:-4,mor:3,mat:-5,mark:0.6,trustRowan:10},flag:'raid_fortify'},
     {text:'Retaliatory strike. Hit their forward camp.',cost:'People −3 casualties. If successful: Reach backs off.',effects:{ppl:-3,mat:-4,mor:5,mark:1.8,trustRowan:15},flag:'raid_strike',
-     roster:[['envoy','unknown']]},
+     roster:[['envoy','unknown']],
+     delayed:[{days:2,text:'The strike team returned. They hit the camp — tents burning, supplies destroyed. But Rowan is quiet. He won\'t say how many they killed. One of your people didn\'t come back.',effects:{ppl:-1,mor:-3},wrenLine:'"Rowan won\'t look at me today. He always looks at me."'},
+              {days:4,text:'Smoke on the northern horizon. The Warden is mobilizing. Your strike bought time. Or it bought a war.',effects:{mor:-5},flag:'_reach_mobilizing'}]},
     {text:'Rebuild the farm. Treat the injured. No escalation.',cost:'Food −4. Morale −5. No escalation.',effects:{food:-4,mor:-5,trustRowan:-10,trustLira:5,mark:-0.6},flag:'raid_rebuild'},
     {text:'Send Lira to the Reach camp with a white flag.',cost:'Risky — she might not come back.',effects:{mor:-3,mark:-0.8,trustLira:5,trustRowan:-10},flag:'raid_talk',
      roster:[['envoy','unknown']]}
   ]},
 
-{id:'deserter',minDay:8,maxDay:10,
+{id:'deserter',minDay:8,maxDay:12,
   reveal:['nath'],
   speaker:'ROWAN, Captain of the Guard',
   text:`Found a man collapsed at the south gate. Reach uniform, stripped of insignia. Beaten badly. Says his name is Nath.\n\nHe deserted because the Warden ordered his unit to burn a settlement that surrendered peacefully. Women, children. He couldn't do it.\n\nHe knows patrol routes, troop numbers, supply lines. Everything we need.\n\nOr he's a spy.`,
@@ -442,7 +451,7 @@ const PETITIONS=[
      roster:[['nath','admitted']]}
   ]},
 
-{id:'pacifists',minDay:9,maxDay:10,
+{id:'pacifists',minDay:10,maxDay:14,
   reveal:['pacifists'],
   speaker:'ROWAN, Captain of the Guard',
   text:`Six more arrived. Families, not soldiers. From a Reach settlement called Thornfield.\n\nWhen the Warden ordered militia training, these families refused. They buried their weapons. Literally. Dug a pit, laid their swords in it, covered it with earth, and walked away.\n\nThey will work. Farm, build, cook, heal. They will not fight. Not to defend themselves. Not to defend Brannhaven. They say violence is a cycle and they won't continue it.\n\nRowan is incandescent.`,
@@ -456,6 +465,90 @@ const PETITIONS=[
      roster:[['pacifists','denied']]},
     {text:'Let the community vote.',cost:'Delayed. Community is split.',effects:{mor:-2,mark:-0.3},flag:'pacifist_vote',
      roster:[['pacifists','unknown']]}
+  ]},
+
+{id:'envoy',minDay:12,maxDay:15,
+  reveal:['envoy'],
+  speaker:'ROWAN, Captain of the Guard',
+  text:`A rider under a white flag. Alone. Unarmed. Well-dressed — too well-dressed for the road.\n\nHe says he is an envoy from the Warden. He speaks politely. He uses your name. He knows things about Brannhaven he shouldn't — how many people, how much food, the crack in the west wall.\n\nHe offers terms: join the Reach Confederation voluntarily. Keep your walls, your people, your title. Contribute twenty percent of harvest and ten soldiers per season. Refuse, and the Warden "cannot guarantee your safety."\n\nHe'll wait one day for your answer.`,
+  recs:{rowan:'"This is a threat dressed in silk. Send him back with steel."',lira:'"Twenty percent and ten soldiers is survival. Pride doesn\'t feed children."',edric:'"Hear him out. Get everything in writing. Negotiate."'},
+  choices:[
+    {text:'Refuse. Send him away. Brannhaven doesn\'t kneel.',cost:'Morale +5. The Reach won\'t forget.',effects:{mor:5,mark:0.8,trustRowan:10},flag:'envoy_refuse',
+     roster:[['envoy','gone']]},
+    {text:'Negotiate. Counter with ten percent harvest and no soldiers.',cost:'Buys time. May anger the Warden.',effects:{mark:-0.2,trustEdric:8},flag:'envoy_negotiate',
+     roster:[['envoy','waiting']]},
+    {text:'Accept the terms. Survival isn\'t surrender.',cost:'Food −8/season. People −8. Peace... maybe.',effects:{food:-8,ppl:-8,mor:-5,mark:0.5},flag:'envoy_accept',
+     roster:[['envoy','ally']]},
+    {text:'Let the community decide. This affects everyone.',cost:'Delayed. People argue for days.',effects:{mor:-3,mark:-0.6},flag:'envoy_vote',
+     roster:[['envoy','waiting']]}
+  ]},
+
+{id:'water_rights',minDay:11,maxDay:13,
+  speaker:'EDRIC, Elder of the Council',
+  text:`The river is lower this season. Two settlements upstream are damming the flow for irrigation.\n\nOur fields are drying. Lira says the herb garden will fail in a week without water. The livestock are already thin.\n\nEdric found an old agreement — a water-sharing pact from before the collapse. It has no enforcement mechanism. It's just paper.`,
+  recs:{rowan:'"Send men upstream. Tear down the dam. Paper means nothing without steel."',lira:'"Visit them. Talk. We need the water but they need something too."',edric:'"The agreement is binding. Present it formally. Precedent matters."'},
+  choices:[
+    {text:'Send a team to destroy the upstream dam.',cost:'Water restored. War with neighbors.',effects:{food:4,mat:-3,mor:3,mark:1.5,trustRowan:10},flag:'dam_destroy'},
+    {text:'Send Lira to negotiate a water-sharing schedule.',cost:'Partial water. A fragile peace.',effects:{food:2,mor:2,mark:-0.4,trustLira:8},flag:'dam_negotiate'},
+    {text:'Dig a new well inside the walls.',cost:'Materials −8. People −4 for two days. Permanent fix.',effects:{mat:-8,ppl:-4,mark:0},flag:'dam_well'},
+    {text:'Ration water. Prioritize drinking over irrigation.',cost:'Food production halved for 3 days. People survive.',effects:{food:-6,mor:-4,mark:0.2},flag:'dam_ration'}
+  ]},
+
+{id:'school',minDay:12,maxDay:16,
+  speaker:'LIRA, Healer',
+  text:`There are nine children in Brannhaven now. Maybe more, depending on who you let in.\n\nThey roam. They play siege. They watch the adults argue. Nobody is teaching them anything.\n\nLira wants to start a school. Avi offered to help — he taught children in the east, before. It would cost two workers and a building.\n\nRowan says every person counts. Edric says children are a long-term investment. Lira says children are children.`,
+  recs:{rowan:'"We can\'t spare the people. When the walls are safe, then school."',lira:'"They\'re learning anyway. Right now they\'re learning fear and violence. Choose better."',edric:'"An educated population is a productive population. In three years."'},
+  choices:[
+    {text:'Open the school. Assign two people and convert the store room.',cost:'People −2. Materials −3. Morale +4.',effects:{ppl:-2,mat:-3,mor:4,mark:-0.3,trustLira:10},flag:'school_open'},
+    {text:'Let Avi teach informally. No building, no official assignment.',cost:'Morale +1. Cheaper. Less effective.',effects:{mor:1,mark:-0.1},flag:'school_informal'},
+    {text:'Not now. Survival first.',cost:'Morale −2. Children keep roaming.',effects:{mor:-2,mark:0.3,trustRowan:5},flag:'school_deny'},
+    {text:'Have the children apprentice with workers. They learn by doing.',cost:'Morale +2. Children work the fields.',effects:{mor:2,food:1,mark:0.4},flag:'school_labor'}
+  ]},
+
+{id:'trial',minDay:14,maxDay:17,requires:()=>S.flags.kael_council,
+  reveal:[],
+  speaker:'KAEL',
+  text:`Kael has a proposal. He's been talking to people — not agitating, listening. He brings it to the council:\n\n"When someone is accused, there should be a trial. Not your judgment alone. A panel of five, chosen by lot. The accused speaks. Witnesses speak. Then the panel decides."\n\nHe looks at you. "This isn't about you. This is about whoever comes after you."`,
+  recs:{rowan:'"Trials slow everything down. In a crisis, you need one voice."',lira:'"He\'s right. One person shouldn\'t decide another person\'s fate."',edric:'"The old codes had trial provisions. We abandoned them for efficiency. Perhaps unwisely."'},
+  choices:[
+    {text:'Accept. Establish trial by panel for all accusations.',cost:'Slower justice. Fairer justice.',effects:{mor:4,mark:-0.8,trustEdric:8,trustRowan:-8},flag:'trial_accept'},
+    {text:'Accept for serious cases only. Day-to-day decisions stay with you.',cost:'Compromise. Kael frowns but nods.',effects:{mor:2,mark:-0.3},flag:'trial_partial'},
+    {text:'Reject. You were chosen to lead. This undermines that.',cost:'Morale −3. Kael goes quiet.',effects:{mor:-3,mark:1.0,trustRowan:8},flag:'trial_reject'},
+    {text:'"You\'re right. And I should be the first one tried." Offer to face a panel reviewing your leadership.',cost:'Shocking. Morale +6. Mark shifts dramatically.',effects:{mor:6,mark:-1.5,trustLira:10,trustEdric:10,trustRowan:-5},flag:'trial_self'}
+  ]},
+
+{id:'winter',minDay:15,maxDay:18,
+  speaker:'EDRIC, Elder of the Council',
+  text:`Edric opens the ledger. The numbers are simple: at current consumption, the granary empties before the first thaw. Three months of winter. Two months of food.\n\n"Someone has to eat less. The question is who."\n\nRowan says the guards need full rations or the wall falls. Lira says the sick and elderly can't survive on half portions. Edric says equal cuts, no exceptions.`,
+  recs:{rowan:'"Guards eat full. Everyone else adjusts. If the wall falls, rations don\'t matter."',lira:'"Protect the vulnerable. The strong can survive on less."',edric:'"Across-the-board cuts. Twenty percent. No exceptions. Fair is fair."'},
+  choices:[
+    {text:'Equal cuts across the board. Twenty percent reduction.',cost:'Food consumption −20%. Morale −3. Fair.',effects:{food:6,mor:-3,mark:0.1,trustEdric:10},flag:'winter_equal'},
+    {text:'Guards and workers eat full. Others take thirty percent cuts.',cost:'Wall holds. The old and young suffer.',effects:{food:8,mor:-6,mark:0.8,trustRowan:10},flag:'winter_guard'},
+    {text:'Protect the sick, elderly, and children. Workers take the cut.',cost:'Food saved less. Morale +2. Slower everything.',effects:{food:3,mor:2,mark:-0.5,trustLira:10,trustRowan:-8},flag:'winter_protect'},
+    {text:'Open the granary. Let people take what they need. Trust them.',cost:'Food may vanish in days. Or people may surprise you.',effects:{mor:5,mark:-0.8},flag:'winter_open'}
+  ]},
+
+{id:'power',minDay:17,maxDay:19,
+  speaker:'YOU',
+  text:`You're sitting alone in the Hearthhouse. The fire is low. Outside, Brannhaven sleeps.\n\nEdric's ledger is open on the table. Rowan's patrol map pinned to the wall. Lira's herb inventory in a neat stack. All of them waiting for you to decide.\n\nYou could keep going. Nobody would stop you. The people trust you — or fear you — enough to let you continue.\n\nOr you could do what the old leader never did. What Benjamin of the old stories never did.\n\nYou could give it back.`,
+  recs:{rowan:'"Don\'t. Not now. The Reach is still out there."',lira:'"...Do you mean it?"',edric:'"If you do this — do it properly. Write the charter. Make it last."'},
+  choices:[
+    {text:'Dissolve your authority. Establish a council of five, elected by the community.',cost:'You are no longer leader. Brannhaven governs itself.',effects:{mor:8,mark:-2.0,trustLira:15,trustEdric:15},flag:'power_dissolve'},
+    {text:'Share power. Establish a council but keep a seat at the table.',cost:'Compromise. Power diluted, not gone.',effects:{mor:4,mark:-0.8,trustEdric:10},flag:'power_share'},
+    {text:'Not yet. When the Reach threat passes.',cost:'Reasonable. Or is it? When does the threat pass?',effects:{mor:-2,mark:0.5,trustRowan:5},flag:'power_keep'},
+    {text:'Hold a public assembly. Ask the people what they want.',cost:'Democracy is messy. But it\'s theirs.',effects:{mor:3,mark:-1.2},flag:'power_assembly'}
+  ]},
+
+{id:'final_raid',minDay:18,maxDay:20,requires:()=>S.flags.envoy_refuse||S.flags.envoy_negotiate,
+  speaker:'ROWAN, Captain of the Guard',
+  text:`They came at dawn. Not four riders this time. Forty. The Warden's full western company.\n\nThe wall holds — for now. But the south gate is burning and there are wounded in the square. This isn't a raid. This is a siege.\n\nRowan is bleeding from the shoulder but still standing. "We have hours, not days. What do we do?"`,
+  recs:{rowan:'"Fight. Every soul on the wall. This is what we built it for."',lira:'"Open the gate. Negotiate. People are dying."',edric:'"Send runners to neighboring settlements. We need allies."'},
+  choices:[
+    {text:'Full defense. Everyone on the wall. Hold until they break.',cost:'Casualties guaranteed. But walls don\'t kneel.',effects:{ppl:-5,mor:5,mat:-10,mark:1.0,trustRowan:15},flag:'siege_fight'},
+    {text:'Open the south gate. Offer to negotiate under flag.',cost:'Surrender? Or strategy?',effects:{mor:-5,mark:-0.5,trustRowan:-15,trustLira:10},flag:'siege_negotiate'},
+    {text:'Evacuate through the river tunnel. Save who you can.',cost:'Brannhaven falls. Your people survive.',effects:{ppl:-10,food:-10,mat:-20,mor:-8,mark:-0.3},flag:'siege_flee'},
+    {text:'Send the Thornfield families out under white flag. They won\'t be harmed — they\'re from the Reach.',cost:'If they\'re willing. If the Warden honors it.',effects:{mor:-3,mark:-0.6},flag:'siege_pacifist',
+     requires:()=>S.flags.pacifist_accept}
   ]}
 ];
 
@@ -487,42 +580,42 @@ const AMBIENTS=[
   {id:'senna_soup_2',minDay:4,maxDay:7,requires:()=>S.ambientsSeen.has('senna_soup')&&!S.flags._senna_dead,
    text:'The broth is there again this morning. Same bowl. Same place. You realize she\'s been doing this every day.',
    mood:'warmth'},
-  {id:'senna_soup_gone',minDay:7,maxDay:10,requires:()=>S.ambientsSeen.has('senna_soup_2')&&(S.flags._senna_dead||S.flags._senna_collapsed),
+  {id:'senna_soup_gone',minDay:7,maxDay:20,requires:()=>S.ambientsSeen.has('senna_soup_2')&&(S.flags._senna_dead||S.flags._senna_collapsed),
    text:'No bowl this morning. The step is bare. You stand there longer than makes sense.',
    mood:'loss'},
   {id:'elif_daughter_drawing',minDay:6,maxDay:9,requires:()=>S.flags.elif_in,
    text:'Elif\'s daughter is drawing on a flat stone with charcoal. A house with a triangle roof. Flowers taller than the door. A sun with a face. She holds it up to show you and says a word you don\'t understand. Elif translates: "Home."',
    mood:'warmth'},
-  {id:'elif_girl_wall',minDay:8,maxDay:10,requires:()=>S.flags.elif_in&&S.ambientsSeen.has('elif_daughter_drawing'),
+  {id:'elif_girl_wall',minDay:8,maxDay:20,requires:()=>S.flags.elif_in&&S.ambientsSeen.has('elif_daughter_drawing'),
    text:'Elif\'s daughter drew another picture. This one has walls around the house. And tiny stick figures on the walls. Guards. She\'s learning what home means here.',
    mood:'quiet'},
-  {id:'nath_whittling',minDay:9,maxDay:10,requires:()=>S.flags.nath_citizen||S.flags.nath_treat,
+  {id:'nath_whittling',minDay:9,maxDay:20,requires:()=>S.flags.nath_citizen||S.flags.nath_treat,
    text:'Nath sits by the river, whittling. He\'s making a small bird. His hands shake — they always shake now. But the bird is careful. Detailed. He sets it on the wall by the east gate, facing outward. Toward where he came from.',
    mood:'quiet'},
   {id:'kael_quiet',minDay:7,maxDay:9,requires:()=>S.flags.kael_council,
    text:'Kael is in the square, but he\'s not speaking. He\'s listening to an old woman talk about her cellar flooding. Takes notes on a scrap of hide. He sees you watching. Nods once. Goes back to listening.',
    mood:'peace'},
-  {id:'avi_praying',minDay:6,maxDay:10,requires:()=>S.flags.elif_in,
+  {id:'avi_praying',minDay:6,maxDay:20,requires:()=>S.flags.elif_in,
    text:'Old Avi kneels by the river at dawn. His prayer is in a language that predates Brannhaven, maybe predates the collapse. A few people have started pausing to listen, even though they don\'t understand a word.',
    mood:'peace'},
-  {id:'rowan_elif_girl',minDay:7,maxDay:10,requires:()=>S.flags.elif_in&&S.ambientsSeen.has('elif_daughter_drawing'),
+  {id:'rowan_elif_girl',minDay:7,maxDay:20,requires:()=>S.flags.elif_in&&S.ambientsSeen.has('elif_daughter_drawing'),
    text:'You see Rowan standing near Elif\'s daughter. She\'s drawing again. He watches for a long time. Then walks away without a word. That evening, he comes to you: "I watched the girl drawing today. I hate that I wanted to turn her away."',
    mood:'growth'},
 
   // Crisis-dependent
-  {id:'empty_chair',requires:()=>CHARACTERS.some(c=>c.status==='dead'&&c.visible),minDay:3,maxDay:10,
+  {id:'empty_chair',requires:()=>CHARACTERS.some(c=>c.status==='dead'&&c.visible),minDay:3,maxDay:20,
    text:'At the evening meal, there\'s an empty seat. No one sits in it. No one moves it. It stays there, untouched, like a held breath.',
    mood:'loss'},
-  {id:'tools_wall',requires:()=>S.flags._senna_collapsed||S.flags._senna_dead,minDay:8,maxDay:10,
+  {id:'tools_wall',requires:()=>S.flags._senna_collapsed||S.flags._senna_dead,minDay:8,maxDay:20,
    text:'Senna\'s trowel is still leaning against the east wall. Where she left it. No one has moved it. Rain is starting to rust the blade.',
    mood:'loss'},
-  {id:'pacifist_garden',minDay:10,maxDay:10,requires:()=>S.flags.pacifist_accept,
+  {id:'pacifist_garden',minDay:10,maxDay:20,requires:()=>S.flags.pacifist_accept,
    text:'The Thornfield families planted something by the south wall. Too early to tell what. "It won\'t bloom for a year," one of them says. "That\'s the point." They tend it every morning anyway.',
    mood:'hope'},
-  {id:'hunger_morning',requires:()=>S.food<15,minDay:3,maxDay:10,
+  {id:'hunger_morning',requires:()=>S.food<15,minDay:3,maxDay:20,
    text:'A boy stands at the granary door, watching the lock. He doesn\'t try to open it. Just stands there. His ribs show through his shirt.',
    mood:'dread'},
-  {id:'morale_low',requires:()=>S.mor<25,minDay:4,maxDay:10,
+  {id:'morale_low',requires:()=>S.mor<25,minDay:4,maxDay:20,
    text:'Nobody talks at breakfast. The sound of spoons scraping bowls is the loudest thing in Brannhaven.',
    mood:'dread'},
 
@@ -560,7 +653,7 @@ const AMBIENTS=[
   {id:'edric_reading',minDay:4,maxDay:8,requires:()=>S.trustEdric>=40,
    text:'You find Edric reading something that isn\'t a ledger. A slim book, hand-copied, fragile. He sees you and holds it up: "Poetry. From before. My wife\'s favorite." He reads a line aloud: "We are not given the world; we are given each other." Then closes it, carefully, and goes back to his numbers.',
    mood:'quiet'},
-  {id:'stars',minDay:2,maxDay:10,
+  {id:'stars',minDay:2,maxDay:20,
    text:'The stars are impossibly clear tonight. No light for miles except Brannhaven\'s fires. A guard on the wall is pointing out constellations to someone. "That one\'s the Shepherd," she says. "He watches the flock all night." You stand in the dark and look up.',
    mood:'peace'},
 
@@ -589,7 +682,7 @@ const AMBIENTS=[
   {id:'maren_sick',minDay:7,maxDay:9,requires:()=>S.food<25||S.mor<30,
    text:'Maren is coughing. She waves you off. "It\'s nothing. Old lungs." But she\'s thinner than last week. She\'s been giving away her rations — you\'re sure of it. When you confront her: "I\'ve had sixty years of meals. That boy in the east quarter has had six."',
    mood:'dread'},
-  {id:'maren_last',minDay:9,maxDay:10,
+  {id:'maren_last',minDay:18,maxDay:20,
    text:'Maren takes your hand. Her fingers are cold. "Whatever happens — you did your best. I know that. He would\'ve known that." She squeezes once. "Now go. They\'re waiting for you."',
    mood:'quiet'},
 
@@ -604,22 +697,22 @@ const AMBIENTS=[
   {id:'absence_forager',minDay:4,maxDay:8,requires:()=>S.flags._forager_died,
    text:'Someone left wildflowers at the south gate. No name. No marker. Just flowers where a forager walked out and didn\'t walk back.',
    mood:'loss'},
-  {id:'absence_meal',minDay:5,maxDay:10,requires:()=>CHARACTERS.filter(c=>c.status==='dead'&&c.visible).length>=2,
+  {id:'absence_meal',minDay:5,maxDay:20,requires:()=>CHARACTERS.filter(c=>c.status==='dead'&&c.visible).length>=2,
    text:'The evening meal is quieter now. Not the words — the space. Tables that used to be full have gaps. Nobody rearranges the benches. The gaps stay.',
    mood:'loss'},
-  {id:'absence_name',minDay:6,maxDay:10,requires:()=>{const d=CHARACTERS.find(c=>c.status==='dead'&&c.visible&&c.group==='brannhaven');return d&&d.id!=='corwin'&&d.id!=='hale';},
+  {id:'absence_name',minDay:6,maxDay:20,requires:()=>{const d=CHARACTERS.find(c=>c.status==='dead'&&c.visible&&c.group==='brannhaven');return d&&d.id!=='corwin'&&d.id!=='hale';},
    text:()=>{const d=CHARACTERS.find(c=>c.status==='dead'&&c.visible&&c.group==='brannhaven'&&c.id!=='corwin'&&c.id!=='hale');return `A child asks where ${d.name} went. The mother says "away." The child asks when ${d.name} is coming back. The mother doesn't answer.`;},
    mood:'loss'},
-  {id:'absence_senna_tools',minDay:8,maxDay:10,requires:()=>S.flags._senna_dead,
+  {id:'absence_senna_tools',minDay:8,maxDay:20,requires:()=>S.flags._senna_dead,
    text:'Someone finally moved Senna\'s trowel. It was leaning against the east wall for days. They put it in the tool shed. That shouldn\'t feel like a second death, but it does.',
    mood:'loss'},
-  {id:'absence_senna_bowl',minDay:8,maxDay:10,requires:()=>S.flags._senna_dead&&S.ambientsSeen.has('senna_soup_gone'),
+  {id:'absence_senna_bowl',minDay:8,maxDay:20,requires:()=>S.flags._senna_dead&&S.ambientsSeen.has('senna_soup_gone'),
    text:'You find Senna\'s bowl in the Hearthhouse. Cleaned. Put away on the shelf with the others. You take it down. Hold it. Put it back. You don\'t know what you expected.',
    mood:'loss'},
-  {id:'absence_mira',minDay:8,maxDay:10,requires:()=>S.flags._mira_dead||S.flags._mira_dead_plague,
+  {id:'absence_mira',minDay:8,maxDay:20,requires:()=>S.flags._mira_dead||S.flags._mira_dead_plague,
    text:'Declan doesn\'t come to the morning assembly anymore. Lira says he works his shift and goes straight back to their room. The drawings Mira made are still on the wall. He hasn\'t taken them down.',
    mood:'loss'},
-  {id:'absence_quiet_night',minDay:6,maxDay:10,requires:()=>CHARACTERS.filter(c=>c.status==='dead'&&c.visible).length>=3,
+  {id:'absence_quiet_night',minDay:6,maxDay:20,requires:()=>CHARACTERS.filter(c=>c.status==='dead'&&c.visible).length>=3,
    text:'You walk the wall at night. It\'s quieter than it used to be. Not fewer sounds — fewer voices. The settlement is the same size but it feels emptier. Like a house after someone moves out. The furniture is all there. Something isn\'t.',
    mood:'loss'},
 ];
@@ -633,7 +726,15 @@ function getAmbient(){
     return true;
   });
   if(!available.length)return null;
-  // Prioritize: loss/dread > growth > warmth > quiet > peace
+  
+  // Death override: if someone died in the last 2 days, force loss/dread moments
+  const recentDeath=S.flags._last_death_day&&(S.day-S.flags._last_death_day)<=1;
+  if(recentDeath){
+    const lossOnly=available.filter(a=>a.mood==='loss'||a.mood==='dread');
+    if(lossOnly.length)return lossOnly[Math.floor(Math.random()*Math.min(2,lossOnly.length))];
+  }
+  
+  // Normal priority: loss/dread > growth > warmth > quiet > peace
   const priority={loss:5,dread:4,growth:3,warmth:2,quiet:1,peace:0,hope:3};
   available.sort((a,b)=>(priority[b.mood]||0)-(priority[a.mood]||0));
   const pick=available[Math.floor(Math.random()*Math.min(3,available.length))];
@@ -812,6 +913,28 @@ function generateDuskEvents(){
   if(S.mor<20)ev.push('Morale dangerously low. A family is packing to leave.');
   if(S.mor<10){S.ppl=clamp(S.ppl-2);ev.push('Two families left in the night.');}
 
+  // ── Maren collapse arc (#6 payoff) ──
+  // She's been giving away rations. This isn't a choice. It just happens.
+  if(S.day>=12&&S.food<20&&!S.flags._maren_collapsed&&!S.flags._maren_dead){
+    S.flags._maren_collapsed=true;
+    ev.push('Maren wasn\'t at the gate this evening. You find her in the Hearthhouse, sitting on the floor. She can\'t stand. "I\'m fine," she says. She is not fine.');
+    setStatus('maren','sick');
+    queueDelayed(S.day+2,
+      'Lira meets you at dawn. Her face tells you before her words do. "Maren passed in the night. Peacefully." She hands you something — the river stone. "She wanted you to have this."',
+      {mor:-8},
+      [['maren','dead']],
+      '_maren_dead',
+      '"She waited at the gate every night. Every single night. Who\'s going to wait for you now?"');
+  }
+  // If food recovers quickly, Maren can be saved
+  if(S.flags._maren_collapsed&&!S.flags._maren_dead&&S.food>=30){
+    // Cancel the pending death
+    S.pendingEvents=S.pendingEvents.filter(e=>e.flag!=='_maren_dead');
+    S.flags._maren_recovered=true;
+    ev.push('Maren is sitting up. Eating. Lira says the fever broke overnight. "Stubborn old woman," Lira says, but she\'s smiling. Maren catches your eye from across the room. Mouths: "Told you I was fine."');
+    setStatus('maren','well');
+  }
+
   // ── Senna arc (the soup mechanic payoff) ──
   if(S.day>=7&&S.ambientsSeen.has('senna_soup_2')&&!S.flags._senna_collapsed&&!S.flags._senna_dead){
     if(S.food<25||S.mor<30){
@@ -838,11 +961,7 @@ function generateDuskEvents(){
       '_mira_dead_plague',
       '"I brought her flowers yesterday. She said they smelled like outside."');
   }
-  if(S.flags.thief_exile&&S.day>=7&&!S.flags._mira_dead){
-    S.flags._mira_dead=true;
-    ev.push('Word from outside the wall. Declan\'s daughter didn\'t survive the road.');
-    setStatus('declan_daughter','dead');
-  }
+  // Thief exile consequence now handled by delayed system on petition choice
 
   // Sickness herbs — delayed good outcome
   if(S.flags.sick_herbs&&S.day>=5&&!S.flags._herbs_arrived){
@@ -855,7 +974,7 @@ function generateDuskEvents(){
   }
 
   // Nath — delayed trust payoff
-  if(S.flags.nath_citizen&&S.day>=10&&!S.flags._nath_payoff){
+  if(S.flags.nath_citizen&&S.day>=12&&!S.flags._nath_payoff){
     S.flags._nath_payoff=true;
     queueDelayed(S.day+1,'Nath wakes you before dawn. "Reach patrol, south ridge, two hours." His intel is exact. The guards are ready when they come.',
       {mor:3,trustRowan:5},null,'_nath_proved');
@@ -1006,6 +1125,10 @@ function choosePetition(idx){
   if(ef.trustEdric)S.trustEdric=clamp(S.trustEdric+ef.trustEdric);
   if(ch.flag)S.flags[ch.flag]=true;
   if(ch.roster)setMultiStatus(ch.roster);
+  // Delayed consequences — queue follow-up events
+  if(ch.delayed){
+    ch.delayed.forEach(d=>queueDelayed(S.day+(d.days||2),d.text,d.effects||{},d.roster||[],d.flag||null,d.wrenLine||null));
+  }
   logEvent(ch.text);
   updateHud();endMidday();
 }
