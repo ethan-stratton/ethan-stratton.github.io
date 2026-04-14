@@ -685,7 +685,7 @@ const S={
   time:0,camX:0,camY:0,
   enemies:[],scouts:[],allies:[],messengers:[],
   deadSoldiers:0,deadAllies:0,totalLamanites:0,
-  mantiHP:100,_mantiWarning:false,_mantiFallen:false,_campAnim:null,
+  mantiHP:100,_mantiWarning:false,_mantiFallen:false,_mantiApproachWarning:false,_campAnim:null,
   knownEnemies:new Map(),nextId:0,
   // Mission phases: briefing → scout → position → wait → battle → surround → results
   phase:'briefing',phaseTimer:0,
@@ -1214,6 +1214,13 @@ function updateMission(dt){
     if(crossed>5&&!S._crossNote1){S._crossNote1=true;showCallout('The Lamanites are beginning to cross the river...',4);}
     if(crossed>30&&!S._crossNote2){S._crossNote2=true;showCallout('Most of their force is across. Almost time...',4);}
 
+    // Manti approach warning
+    if(!S._mantiApproachWarning){
+      let approaching=false;
+      S.enemies.forEach(e=>{if(!e.dead&&e.x>700&&e.state==='march')approaching=true;});
+      if(approaching){S._mantiApproachWarning=true;showCallout('The Lamanites approach Manti! They\'ll reach the city soon!',5);}
+    }
+
     // Trigger battle when enough have crossed
     if(crossed>40&&!S._crossingDone){
       S._crossingDone=true;
@@ -1261,7 +1268,7 @@ function updateMission(dt){
       S.mantiHP-=dt*mantiAttackers*0.5;
       if(!S._mantiWarning){S._mantiWarning=true;showCallout('⚠ Lamanites are attacking Manti! Stop them before the settlement falls!',5);}
     }
-    if(S.mantiHP<=0&&!S._mantiFallen){S._mantiFallen=true;showCallout('Manti has fallen...',4);}
+    if(S.mantiHP<=0&&!S._mantiFallen){S._mantiFallen=true;showCallout('Manti has fallen! The city is lost!',5);setTimeout(()=>{S.phase='defeat';showDefeat();},3000);}
 
     // Lehi urgency — remind player to signal if they haven't
     if(!S.lehiAttacking){
@@ -1352,8 +1359,8 @@ function updateMission(dt){
           if(d<20){
             z._atkCd=(z._atkCd||0)-dt;
             if(z._atkCd<=0){
-              z._atkCd=0.8;
-              target.hp-=1.2;target._hitFlash=0.1;spawnBlood(target.x,target.y,2);SND.swordHit();
+              z._atkCd=1.0;
+              target.hp-=1.0;target._hitFlash=0.1;spawnBlood(target.x,target.y,2);SND.swordHit();
               if(target.hp<=0){target.dead=true;spawnDeathParticles(target.x,target.y);SND.death();S.casualties.push(target._name);S._lastDeathTime=S.time;}
             }
           }else{moveToward(z,target.x,target.y,50,dt);}
@@ -1605,10 +1612,9 @@ function beginFinalBattle(){
   S.enemies.forEach(e=>{
     if(!e.dead&&e.state==='retreat_confront'){
       e.state='fight';
-      e.morale=80+Math.random()*20;
-      e.speed=Math.min(60,e.speed*1.4);
-      e.hp=Math.min(e.maxHp,e.hp+1);
-      e._dmgMult=1.5;
+      e.morale=60+Math.random()*20;
+      e.speed=Math.min(50,e.speed*1.2);
+      e._dmgMult=1.15;
     }
   });
   // Zerahemnah fights
@@ -2022,9 +2028,16 @@ function update(dt){
     if(e.state==='march'){
       const wp=MARCH_PATH[e.waypointIdx];
       if(!wp){
-        // Keep marching east (toward Manti) — they never reach it
-        e.x += e.speed * dt * 0.8;
-        e.facing = 0; // facing east
+        // March directly toward Manti at full speed
+        const mx=870, my=340; // Manti gate position
+        const ddx=mx-e.x, ddy=my-e.y;
+        const d=Math.sqrt(ddx*ddx+ddy*ddy);
+        if(d>5){
+          const ts=terrainSpeed(e.x,e.y);
+          e.x+=ddx/d*e.speed*ts*dt;
+          e.y+=ddy/d*e.speed*ts*dt;
+          e.facing=Math.atan2(ddy,ddx);
+        }
         return;
       }
       const ddx=wp.x-e.x+((e.id%7)-3)*2,ddy=wp.y-e.y+((e.id%5)-2)*2;
@@ -3782,9 +3795,9 @@ function updateEstablishing(dt){
       {t:0,x:MAP.w-W/2,y:MAP.h/2-H/2,label:'The Wilderness East of Sidon'},
       {t:2.5,x:rx-W/2,y:300-H/2,label:'The River Sidon'},
       {t:5,x:HILL.x-W/2,y:HILL.y-H/2,label:'Hill Riplah'},
-      {t:5.5,x:600-W/2,y:130-H/2,label:"Lehi's Forces"},
-      {t:6.5,x:MAP.w-W,y:320-H/2,label:'The Settlement of Manti'},
-      {t:8.5,x:S.cx-W/2,y:S.cy-H/2,label:null},
+      {t:7,x:600-W/2,y:130-H/2,label:"Lehi's Forces"},
+      {t:9.5,x:MAP.w-W,y:320-H/2,label:'The Settlement of Manti'},
+      {t:12,x:S.cx-W/2,y:S.cy-H/2,label:null},
     ];
     S._targetLetterbox=1;
   }
@@ -3906,7 +3919,7 @@ function beginMission(idx){
   S._zNearlyKilled=false;S._combatPaused=false;
   S._prayerActive=false;S._prayerDone=false;
   S._campPray=false;S.campArmor=false;S.campIntel=false;
-  S._campAnim=null;S.mantiHP=100;S._mantiWarning=false;S._mantiFallen=false;
+  S._campAnim=null;S.mantiHP=100;S._mantiWarning=false;S._mantiFallen=false;S._mantiApproachWarning=false;
   S._crossNote1=false;S._crossNote2=false;S._crossingDone=false;
   S._enemiesSpawned=false;S._scoutedEnemy=false;
   S._scoutSilentLost=false;S._scoutSilentAlerted=false;
