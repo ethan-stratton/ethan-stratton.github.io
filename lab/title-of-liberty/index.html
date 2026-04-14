@@ -205,7 +205,6 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
   <div id="hud-cmds" style="pointer-events:auto">
     <button class="cmd-btn" onclick="doHeadcount()">📋 Headcount <span class="hotkey">[H]</span></button>
     <button class="cmd-btn" onclick="doSendRetriever()">📯 Retrieve Scout <span class="hotkey">[Q]</span></button>
-  </div>
   <div class="sep"></div>
   <div class="label" style="color:#8a7a50">⚔ Orders</div>
   <div class="bar-group" id="battle-bar">
@@ -227,6 +226,14 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
     <div class="bar-opt active" id="lo-hold" onclick="lehiOrder('hold')">Hold</div>
     <div class="bar-opt" id="lo-charge" onclick="lehiOrder('charge')">Charge</div>
     <div class="bar-opt" id="lo-flank" onclick="lehiOrder('flank')">Flank</div>
+  </div>
+  <div class="sep"></div>
+  <div class="label" style="color:#6a8a50">🔭 Scout Orders</div>
+  <div class="bar-group" id="scout-bar">
+    <div class="bar-opt active" id="so-safe" onclick="setScoutMode('safe')">🌿 Watch from cover</div>
+    <div class="bar-opt" id="so-close" onclick="setScoutMode('close')">👁 Get closer (risky)</div>
+    <div class="bar-opt" id="so-deep" onclick="setScoutMode('deep')">💀 Deep recon (deadly)</div>
+  </div>
   </div>
 </div>
 
@@ -570,6 +577,8 @@ const S={
   battleCmd:'follow', // follow|hold|charge|fallback
   lehiOrder:'hold',
   lehiMessengers:[],
+  scoutMode:'safe', // safe|close|deep
+  scoutIntelLevel:0, // 0=none, 1=spotted, 2=accurate count, 3=deep recon (positions+movement)
   _inspireTimer:0,_inspireX:0,_inspireY:0,
   _shieldTimer:0,
   _revealTimer:0,
@@ -1047,9 +1056,29 @@ function doSendRetriever(){
 }
 
 // ══════════════════════════════════════
+// SCOUT RISK SYSTEM
+// ══════════════════════════════════════
+function setScoutMode(mode){
+  S.scoutMode=mode;
+  document.querySelectorAll('#scout-bar .bar-opt').forEach(el=>el.classList.remove('active'));
+  const el=document.getElementById('so-'+mode);if(el)el.classList.add('active');
+  
+  if(mode==='safe'){
+    showCallout('Scouts: stay in the trees. Watch from cover.',3);
+  }else if(mode==='close'){
+    showCallout('Scouts: get close enough to count their numbers. Be careful.',3);
+  }else if(mode==='deep'){
+    showCallout('Scouts: infiltrate their formation. Get us everything — positions, leaders, movement. High risk.',4);
+  }
+}
+
+// ══════════════════════════════════════
 // BATTLE COMMANDS
 // ══════════════════════════════════════
 function battleCmd(cmd){
+  if(cmd!=='follow'&&S.scoutIntelLevel<1){
+    showCallout('Send scouts first! You need intelligence before issuing battle orders.',3);return;
+  }
   S.battleCmd=cmd;
   document.querySelectorAll('#battle-bar .bar-opt').forEach(el=>el.classList.remove('active'));
   const el=document.getElementById('bo-'+cmd);if(el)el.classList.add('active');
@@ -1124,6 +1153,7 @@ function faithAbility(type){
 // ══════════════════════════════════════
 function lehiOrder(order){
   if(S.allies.length===0){showCallout('Lehi\'s force is not yet deployed.',2);return;}
+  if(S.scoutIntelLevel<1&&order!=='hold'){showCallout('You need scout intel before coordinating with Lehi.',3);return;}
   const alive=S.soldiers.filter(s=>!s.dead);
   if(alive.length<=5&&order!=='hold'){showCallout('Too few soldiers to send a messenger.',2);return;}
   
@@ -1133,12 +1163,12 @@ function lehiOrder(order){
   S.lehiOrder=order;
   
   // Spawn visible messenger running to Lehi
-  if(order!=='hold'||!S._lehiMessengerSent){
-    const lehiPos=S.allies[0];
+  if(order!=='hold'){
+    const lehiPos=S.allies.find(a=>!a.dead);
+    if(!lehiPos){showCallout('Lehi\'s force has been wiped out.',2);return;}
     const msg={cx:S.cx,cy:S.cy,tx:lehiPos.x,ty:lehiPos.y,speed:80,done:false,order};
     S.lehiMessengers=S.lehiMessengers||[];
     S.lehiMessengers.push(msg);
-    S._lehiMessengerSent=true;
   }
   
   if(order==='hold'){
@@ -1283,7 +1313,7 @@ function update(dt){
           showCallout('Lehi\'s force moves to flank!',3);
         }
       }else{
-        m.cx+=dx/d*m.speed*(1/60);m.cy+=dy/d*m.speed*(1/60);
+        m.cx+=dx/d*m.speed*dt;m.cy+=dy/d*m.speed*dt;
       }
     });
     S.lehiMessengers=S.lehiMessengers.filter(m=>!m.done);
@@ -1417,9 +1447,47 @@ function update(dt){
       setTimeout(()=>{if(!sc.dead)sc.returning=true;},1500);
     }
 
-    if(nearE&&nearD<80){
+    // Scout enemy avoidance with cooldown to prevent jitter
+    const fleeRange=S.scoutMode==='safe'?100:S.scoutMode==='close'?50:25;
+    const captureRange=S.scoutMode==='deep'?30:S.scoutMode==='close'?15:0;
+    
+    // Scout capture check — if too close, risk being caught
+    if(nearE&&nearD<captureRange&&!sc._fleeTimer){
+      // Caught! Scout is killed, enemy army goes on alert
+      sc.dead=true;sc.hp=0;
+      S._scoutCaught=true;
+      S.enemies.forEach(e=>{if(!e.dead){e.aggroRange=100;e.speed=Math.min(55,e.speed*1.15);}});
+      showCallout('💀 Scout captured! The Lamanites are alerted — they know we\'re here!',5);
+      SND.death();addTrauma(0.15);
+      return;
+    }
+    
+    // Intel gathering based on proximity
+    if(nearE&&nearD<fleeRange&&!sc._fleeTimer){
+      if(S.scoutMode==='safe'&&S.scoutIntelLevel<1){
+        S.scoutIntelLevel=1;
+        showCallout('Scout report: Enemy army spotted west of the river.',3);
+      }
+      if(S.scoutMode==='close'&&nearD<60&&S.scoutIntelLevel<2){
+        S.scoutIntelLevel=2;
+        showCallout('Scout report: ~'+S.totalLamanites+' Lamanite warriors. No armor. Swords and cimeters.',4);
+      }
+      if(S.scoutMode==='deep'&&nearD<35&&S.scoutIntelLevel<3){
+        S.scoutIntelLevel=3;
+        showCallout('Scout report: Detailed positions acquired. Zerahemnah leads from the center. Moving east toward the ford.',5);
+        // Reveal all enemies
+        S.enemies.forEach(e=>{if(!e.dead){e.spotted=true;S.knownEnemies.set(e.id,{x:e.x,y:e.y,lastSeen:S.time,conf:1,alive:true});}});
+      }
+    }
+    
+    if(nearE&&nearD<fleeRange){
+      sc._fleeTimer=2;
       const ax=sc.x-nearE.x,ay=sc.y-nearE.y;const al=Math.sqrt(ax*ax+ay*ay)||1;
       moveToward(sc,sc.x+ax/al*50,sc.y+ay/al*50,sc.speed*1.1,dt);
+    }else if(sc._fleeTimer>0){
+      sc._fleeTimer-=dt;
+      // Keep moving away from last known threat
+      moveToward(sc,sc.x+Math.cos(sc.scoutFacing)*30,sc.y+Math.sin(sc.scoutFacing)*30,sc.speed*0.8,dt);
     }else if(sc.scoutWaypoints&&sc.scoutWpIdx<sc.scoutWaypoints.length){
       const wp=sc.scoutWaypoints[sc.scoutWpIdx];
       const d=Math.sqrt((wp.x-sc.x)*(wp.x-sc.x)+(wp.y-sc.y)*(wp.y-sc.y));
@@ -1687,6 +1755,21 @@ function showResults(){
   const starColor=stars===3?'#c8a040':stars===2?'#8a8a6a':'#5a4a3a';
   const ratingName=['','Pyrrhic Victory','Tactical Victory','Divine Victory'][stars];
 
+  // Flavor text based on casualties
+  let flavorText='';
+  const lossRate=nephiteLost/S.soldierCount;
+  if(lossRate>0.6){
+    flavorText='<div class="stat" style="color:#6a4a3a;font-style:italic;margin-top:8px">The price of victory weighs heavy. Wives will wait at doors that never open. Children will grow without fathers. You won — but at what cost?</div>';
+  }else if(lossRate>0.35){
+    flavorText='<div class="stat" style="color:#6a5a3a;font-style:italic;margin-top:8px">Too many good men lie on this field. Their families will mourn. The victory is yours, but the cost will echo for generations.</div>';
+  }else if(lossRate>0.1){
+    flavorText='<div class="stat" style="color:#7a7a5a;font-style:italic;margin-top:8px">Some will not return home. But their sacrifice preserved a nation. Remember their names.</div>';
+  }else if(nephiteLost>0){
+    flavorText='<div class="stat" style="color:#8a8a6a;font-style:italic;margin-top:8px">A few brave souls fell today. Their sacrifice was not in vain.</div>';
+  }else{
+    flavorText='<div class="stat" style="color:#a8a060;font-style:italic;margin-top:8px">"And there was not one soul among them who had not received many wounds." Yet all lived. A miracle. (Alma 57:25)</div>';
+  }
+
   let casualtyText='';
   if(S.casualties.length>0){
     const unique=[...new Set(S.casualties)];
@@ -1701,7 +1784,8 @@ function showResults(){
     `<div class="stat">Lehi's losses: ${S.deadAllies} of 30</div>`+
     `<div class="stat">Lamanite dead: ${enemyDead} of ${S.totalLamanites}</div>`+
     `<div class="stat">Lamanite routed: ${enemyRouted}</div>`+
-    casualtyText;
+    casualtyText+
+    flavorText;
   document.getElementById('mercy-choice').style.display='flex';
 }
 
