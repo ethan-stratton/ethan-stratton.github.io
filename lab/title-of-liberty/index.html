@@ -275,12 +275,12 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 
 <div id="camp-overlay">
   <h2>⛺ Camp</h2>
-  <div class="camp-sub">Prepare your forces before the mission</div>
-  <button class="camp-btn" id="camp-armor" onclick="campArmor()">🛡 Equip Armor<div class="camp-flavor" id="camp-armor-flavor"></div></button>
-  <button class="camp-btn" id="camp-pray" onclick="campPray()">🙏 Pray &amp; Preach<div class="camp-flavor" id="camp-pray-flavor"></div></button>
-  <button class="camp-btn" id="camp-intel" onclick="campIntel()">🔭 Review Intelligence<div class="camp-flavor" id="camp-intel-flavor"></div></button>
-  <button class="camp-btn" id="camp-council" onclick="campCouncil()">⚔ War Council<div class="camp-flavor" id="camp-council-flavor"></div></button>
-  <button class="camp-btn" style="margin-top:16px;text-align:center;color:#c8a040;border-color:rgba(200,160,64,0.3)" onclick="campBegin()">▸ Begin Mission</button>
+  <div class="camp-sub">Choose <strong>2</strong> preparations — you cannot do everything</div>
+  <button class="camp-btn" id="camp-armor" onclick="campChoice('armor')">🛡 Equip Armor<div class="camp-flavor" id="camp-armor-flavor"></div></button>
+  <button class="camp-btn" id="camp-pray" onclick="campChoice('pray')">🙏 Pray &amp; Preach<div class="camp-flavor" id="camp-pray-flavor"></div></button>
+  <button class="camp-btn" id="camp-intel" onclick="campChoice('intel')">🔭 Review Intelligence<div class="camp-flavor" id="camp-intel-flavor"></div></button>
+  <button class="camp-btn" id="camp-council" onclick="campChoice('council')">⚔ War Council<div class="camp-flavor" id="camp-council-flavor"></div></button>
+  <button class="camp-btn" id="camp-go" style="margin-top:16px;text-align:center;color:#c8a040;border-color:rgba(200,160,64,0.3);display:none" onclick="campBegin()">▸ Begin Mission</button>
 </div>
 
 <script>
@@ -573,6 +573,11 @@ const S={
   _inspireTimer:0,_inspireX:0,_inspireY:0,
   _shieldTimer:0,
   _revealTimer:0,
+  _concealmentBroken:false,
+  campIntel:false,
+  campCouncil:false,
+  _chargeStartTime:0,
+  _faithRegenTimer:0,
 };
 
 // ══════════════════════════════════════
@@ -771,18 +776,19 @@ function fmtToWorld(ft,facing,cx,cy){
 // ══════════════════════════════════════
 // VISION
 // ══════════════════════════════════════
-const VISION_RANGE=120,FOG_DECAY=0.15;
+const BASE_VISION=120,FOG_DECAY=0.15;
+const VISION_RANGE=()=>S.campIntel?BASE_VISION*1.4:BASE_VISION;
 
 function updateVision(dt){
   const fr=[{x:S.cx,y:S.cy}];
   S.soldiers.forEach(s=>{if(!s.dead)fr.push({x:s.x,y:s.y});});
-  S.scouts.forEach(sc=>{if(!sc.dead)fr.push({x:sc.x,y:sc.y,r:VISION_RANGE*1.8});});
+  S.scouts.forEach(sc=>{if(!sc.dead)fr.push({x:sc.x,y:sc.y,r:VISION_RANGE()*1.8});});
   S.allies.forEach(a=>{if(!a.dead)fr.push({x:a.x,y:a.y});});
 
   S.enemies.forEach(e=>{
     if(e.dead)return;
     let vis=false;
-    for(const f of fr){const d=Math.sqrt((f.x-e.x)*(f.x-e.x)+(f.y-e.y)*(f.y-e.y));if(d<(f.r||VISION_RANGE)){vis=true;break;}}
+    for(const f of fr){const d=Math.sqrt((f.x-e.x)*(f.x-e.x)+(f.y-e.y)*(f.y-e.y));if(d<(f.r||VISION_RANGE())){vis=true;break;}}
     const kn=S.knownEnemies.get(e.id);
     if(vis){
       e.spotted=true;
@@ -805,11 +811,18 @@ function getEnemyDisp(e){
 // CONCEALMENT
 // ══════════════════════════════════════
 function checkConcealment(){
-  // Commander must be concealed, and >70% of soldiers must be concealed
-  if(!isConcealed(S.cx,S.cy)){S.playerConcealed=false;return false;}
-  let hidden=0,total=0;
-  S.soldiers.forEach(s=>{if(!s.dead){total++;if(isConcealed(s.x,s.y))hidden++;}});
-  S.playerConcealed=total===0||hidden/total>0.7;
+  const wasCon=S.playerConcealed;
+  if(!isConcealed(S.cx,S.cy)){S.playerConcealed=false;}else{
+    let hidden=0,total=0;
+    S.soldiers.forEach(s=>{if(!s.dead){total++;if(isConcealed(s.x,s.y))hidden++;}});
+    S.playerConcealed=total===0||hidden/total>0.7;
+  }
+  // Concealment BREAK — enemies go on alert
+  if(wasCon&&!S.playerConcealed&&!S._concealmentBroken){
+    S._concealmentBroken=true;
+    S.enemies.forEach(e=>{if(!e.dead){e.aggroRange=100;e.speed=Math.min(55,e.speed*1.2);}});
+    showCallout('⚠ CONCEALMENT BROKEN! The enemy is alerted — they move faster and fight harder!',5);
+  }
   return S.playerConcealed;
 }
 
@@ -914,18 +927,18 @@ function updateMission(dt){
 
       if(S.playerConcealed){
         S.ambushReady=true;SND.ambush();addTrauma(0.2);
-        setObjective('ATTACK NOW! Close the pincer from the south!');
+        setObjective('CHARGE! Signal Lehi when ready! (📨 Lehi → Charge)');
         setPhaseLabel('Phase 4 of 4 — THE AMBUSH');
-        showCallout('They have crossed! Lehi strikes from the north — CHARGE!',6);
-        triggerLehiAttack();
+        showCallout('They have crossed! Spring the trap — signal Lehi to charge!',6);
+        // Lehi does NOT auto-attack — player must order him
         S.soldiers.forEach(s=>{s.morale=100;});
         S.faith=Math.min(100,S.faith+20);
       }else{
         S.ambushReady=false;
-        setObjective('They spotted us! Fight without surprise — this will be costly!');
+        setObjective('They spotted us! Signal Lehi to help! (📨 Lehi → Charge)');
         setPhaseLabel('Phase 4 of 4 — BATTLE');
-        showCallout('No ambush — they saw us! Fight hard!',5);
-        triggerLehiAttack();
+        showCallout('No ambush — they saw us! Signal Lehi for support!',5);
+        // Lehi does NOT auto-attack
         S.enemies.forEach(e=>{e.aggroRange=120;});
       }
     }
@@ -935,16 +948,29 @@ function updateMission(dt){
       S._crossingDone=true;
       S.phase='battle';
       S.ambushReady=S.playerConcealed;
-      setObjective(S.ambushReady?'ATTACK!':'Fight!');
+      setObjective('Engage! Signal Lehi when ready!');
       setPhaseLabel('Phase 4 of 4 — BATTLE');
-      showCallout('Engage!',4);
-      triggerLehiAttack();
+      showCallout('Engage! Signal Lehi to attack!',4);
     }
   }
 
   // ── Phase: BATTLE ──
   if(S.phase==='battle'){
     S.enemies.forEach(e=>{if(!e.dead&&e.state==='march')e.state='fight';});
+
+    // Lehi urgency — remind player to signal if they haven't
+    if(!S.lehiAttacking){
+      S._lehiWaitTimer=(S._lehiWaitTimer||0)+dt;
+      if(S._lehiWaitTimer>10&&!S._lehiReminder1){
+        S._lehiReminder1=true;
+        showCallout('Lehi awaits your signal! Use 📨 Lehi → Charge to close the pincer!',5);
+      }
+      if(S._lehiWaitTimer>25&&!S._lehiReminder2){
+        S._lehiReminder2=true;
+        showCallout('Your men are dying alone! Signal Lehi NOW!',4);
+        S.soldiers.forEach(s=>{if(!s.dead)s.morale=Math.max(0,s.morale-10);});
+      }
+    }
 
     const alive=S.enemies.filter(e=>!e.dead&&e.state!=='rout');
     if(alive.length<S.totalLamanites*0.3&&!S._surrenderOffered){
@@ -1038,16 +1064,18 @@ function battleCmd(cmd){
   }
   const alive=S.soldiers.filter(s=>!s.dead);
   if(cmd==='hold'){
-    alive.forEach(s=>{s._holdPos={x:s.x,y:s.y};});
-    showCallout('HOLD GROUND! Stand firm, brothers!',3);
+    alive.forEach(s=>{s._holdPos={x:s.x,y:s.y};s._holdDefBonus=true;});
+    showCallout('HOLD GROUND! Brace for impact!',3);
     SND.tone(330,0.15,'square',0.1);
   }else if(cmd==='charge'){
-    alive.forEach(s=>{s._holdPos=null;s.morale=Math.min(100,s.morale+10);});
+    alive.forEach(s=>{s._holdPos=null;s._holdDefBonus=false;s.morale=Math.min(100,s.morale+10);});
+    // Charge costs morale over time (exhaustion) — handled in update
+    S._chargeStartTime=S.time;
     S.faith=Math.max(0,S.faith-5);
     showCallout('CHARGE! For our families!',3);
     SND.rallyHorn();addTrauma(0.08);
   }else if(cmd==='fallback'){
-    alive.forEach(s=>{s._holdPos=null;});
+    alive.forEach(s=>{s._holdPos=null;s._holdDefBonus=false;s.morale=Math.max(0,s.morale-5);});
     showCallout('Fall back! Regroup behind me!',3);
     SND.tone(180,0.2,'sine',0.1);
   }
@@ -1170,7 +1198,7 @@ function update(dt){
 
   if(S.rallying){S.rallyTimer-=dt;if(S.rallyTimer<=0)S.rallying=false;
     S.soldiers.forEach(s=>{if(!s.dead){s.morale=Math.min(100,Math.max(s.morale,40));s.fleeing=false;s.state='idle';}});
-    S.faith=Math.min(100,S.faith+dt*2);
+    S.faith=Math.min(100,S.faith+dt*0.5);
   }
 
   // Travel scatter recovery
@@ -1205,6 +1233,30 @@ function update(dt){
   if(S._inspireTimer>0)S._inspireTimer-=dt;
   if(S._shieldTimer>0)S._shieldTimer-=dt;
   if(S._revealTimer>0)S._revealTimer-=dt;
+
+  // ── Charge exhaustion: morale drains while charging ──
+  if(S.battleCmd==='charge'&&S._chargeStartTime){
+    const elapsed=S.time-S._chargeStartTime;
+    if(elapsed>3){// After 3s, exhaustion kicks in
+      S.soldiers.forEach(s=>{if(!s.dead)s.morale=Math.max(5,s.morale-dt*4);});
+    }
+  }
+
+  // ── Faith regen: only from low casualties, not passive ──
+  // Earn 1 faith every 5 seconds if no deaths in that window
+  S._faithRegenTimer=(S._faithRegenTimer||0)+dt;
+  if(S._faithRegenTimer>=5){
+    S._faithRegenTimer=0;
+    if(S._lastDeathTime===undefined||S.time-S._lastDeathTime>5){
+      S.faith=Math.min(100,S.faith+2);
+    }
+  }
+
+  // ── Intel camp bonus: spot enemies further ──
+  const spotRange=S.campIntel?100:60;
+
+  // ── Council camp bonus: tighter formations ──
+  // (applied via S.campCouncil flag in formation combat bonuses)
 
   // ── Lehi messengers ──
   if(S.lehiMessengers){
@@ -1490,7 +1542,7 @@ function doCombat(atk,def,dt){
   // ── Formation Combat Bonuses ──
   if(def.team==='nephite'&&!def.isLehi){
     const fm=S.formation;
-    if(fm==='circle'){defMult*=0.6;} // circle: no facing weakness override
+    if(fm==='circle'){defMult*=0.6;if(S.campCouncil)defMult*=0.9;} // circle: no facing weakness override
     if(fm==='wedge'&&flankZone!=='front')defMult*=1.3;
     if(fm==='line'){
       // front row = lower index soldiers
@@ -1533,6 +1585,8 @@ function doCombat(atk,def,dt){
   const blocked=def.armored&&Math.random()<0.3;
   // Shield of Faith
   if(def._shielded>0){defMult*=0.3;}
+  // Hold ground defense bonus
+  if(def._holdDefBonus){defMult*=0.7;}
   if(!blocked){
     def.hp-=dmg*defMult;def.morale-=8;
     def._hitFlash=0.1;
@@ -1550,7 +1604,7 @@ function doCombat(atk,def,dt){
       spawnDeathParticles(def.x,def.y);
       SND.death();
       addTrauma(0.12,def.x,def.y);
-      if(def.team==='nephite'&&def._name){S.casualties.push(def._name);}
+      if(def.team==='nephite'&&def._name){S.casualties.push(def._name);S._lastDeathTime=S.time;}
       const allies=def.team==='nephite'?S.soldiers.concat(S.allies):S.enemies;
       allies.forEach(a=>{if(!a.dead){const d=Math.sqrt((a.x-def.x)*(a.x-def.x)+(a.y-def.y)*(a.y-def.y));if(d<40)a.morale-=10;}});
     }
@@ -1620,14 +1674,28 @@ function showResults(){
   const enemyRouted=S.enemies.filter(e=>!e.dead&&e.state==='rout').length;
   const ambushText=S.ambushReady?'The ambush was perfect — they never saw you coming.':'They spotted your forces. The element of surprise was lost.';
 
+  // ── Star Rating ──
+  let stars=0;
+  // Star 1: Won (always, since this function = victory)
+  stars++;
+  // Star 2: Ambush succeeded
+  if(S.ambushReady)stars++;
+  // Star 3: Low casualties (<25% of starting force)
+  if(nephiteLost<=S.soldierCount*0.25)stars++;
+  
+  const starText='★'.repeat(stars)+'☆'.repeat(3-stars);
+  const starColor=stars===3?'#c8a040':stars===2?'#8a8a6a':'#5a4a3a';
+  const ratingName=['','Pyrrhic Victory','Tactical Victory','Divine Victory'][stars];
+
   let casualtyText='';
   if(S.casualties.length>0){
     const unique=[...new Set(S.casualties)];
     casualtyText=`<div class="stat" style="color:#8a5a3a;margin-top:6px">Fallen: ${unique.join(', ')}</div>`;
   }
 
-  document.getElementById('results-title').textContent='The Lamanites Are Surrounded';
+  document.getElementById('results-title').textContent=ratingName;
   document.getElementById('results-stats').innerHTML=
+    `<div class="stat" style="font-size:2rem;color:${starColor};letter-spacing:8px;margin-bottom:8px">${starText}</div>`+
     `<div class="stat">${ambushText}</div>`+
     `<div class="stat">Nephite fallen: ${nephiteLost} of ${S.soldierCount}</div>`+
     `<div class="stat">Lehi's losses: ${S.deadAllies} of 30</div>`+
@@ -1834,7 +1902,7 @@ function render(){
       ctx.fillStyle='rgba(180,200,120,0.5)';ctx.fillRect(Math.floor(sc.x),Math.floor(sc.y-4),1,1);
       if(sc.returning){ctx.fillStyle='rgba(200,200,100,0.4)';ctx.fillRect(Math.floor(sc.x-1),Math.floor(sc.y-6),1,1);ctx.fillRect(Math.floor(sc.x+1),Math.floor(sc.y-6),1,1);}
     }
-    ctx.strokeStyle='rgba(120,160,80,0.04)';ctx.lineWidth=0.3;ctx.beginPath();ctx.arc(sc.x,sc.y,VISION_RANGE*1.8,0,Math.PI*2);ctx.stroke();
+    ctx.strokeStyle='rgba(120,160,80,0.04)';ctx.lineWidth=0.3;ctx.beginPath();ctx.arc(sc.x,sc.y,VISION_RANGE()*1.8,0,Math.PI*2);ctx.stroke();
   });
 
   // Messengers (small gold dots running along column)
@@ -2091,24 +2159,41 @@ function gameLoop(t){
 // ══════════════════════════════════════
 // CAMP
 // ══════════════════════════════════════
+let campPicks=0;
+function campChoice(type){
+  if(campPicks>=2)return;
+  if(type==='armor')campArmor();
+  else if(type==='pray')campPray();
+  else if(type==='intel')campIntel();
+  else if(type==='council')campCouncil();
+  campPicks++;
+  document.getElementById('camp-'+type).disabled=true;
+  document.getElementById('camp-'+type).style.opacity='0.4';
+  if(campPicks>=2){
+    // Disable remaining
+    ['armor','pray','intel','council'].forEach(t=>{
+      const el=document.getElementById('camp-'+t);
+      if(!el.disabled){el.disabled=true;el.style.opacity='0.2';el.style.textDecoration='line-through';}
+    });
+    document.getElementById('camp-go').style.display='block';
+  }
+}
 function campArmor(){
   S.campArmor=true;
   document.getElementById('camp-armor-flavor').textContent='Your men don their breastplates, arm-shields, and head-plates. (Alma 43:19)';
-  document.getElementById('camp-armor').disabled=true;document.getElementById('camp-armor').style.opacity='0.4';
 }
 function campPray(){
-  S.faith=Math.min(100,S.faith+15);
-  S.soldiers.forEach(s=>{if(!s.dead)s.morale=Math.min(100,s.morale+10);});
-  document.getElementById('camp-pray-flavor').textContent='You gather the men and pray. Their faith strengthens. (+15 Faith, +10 Morale)';
-  document.getElementById('camp-pray').disabled=true;document.getElementById('camp-pray').style.opacity='0.4';
+  S.faith=Math.min(100,S.faith+25);
+  S.soldiers.forEach(s=>{if(!s.dead)s.morale=Math.min(100,s.morale+15);});
+  document.getElementById('camp-pray-flavor').textContent='You gather the men and pray. Their faith burns bright. (+25 Faith, +15 Morale)';
 }
 function campIntel(){
-  document.getElementById('camp-intel-flavor').textContent='Scouts report ~80 Lamanite warriors west of the river, moving east. Led by Zerahemnah. They carry no armor — only swords and scimitars.';
-  document.getElementById('camp-intel').disabled=true;document.getElementById('camp-intel').style.opacity='0.4';
+  S.campIntel=true;
+  document.getElementById('camp-intel-flavor').textContent='Scouts report ~80 Lamanite warriors west of the river. Led by Zerahemnah. No armor — swords and scimitars only. You\'ll spot enemies sooner.';
 }
 function campCouncil(){
-  document.getElementById('camp-council-flavor').textContent='Captain Lehi nods. "My men will hold the northern wilderness. When you spring the trap, we\'ll cut off their retreat." He clasps your arm. "God be with you, brother."';
-  document.getElementById('camp-council').disabled=true;document.getElementById('camp-council').style.opacity='0.4';
+  S.campCouncil=true;
+  document.getElementById('camp-council-flavor').textContent='Lehi clasps your arm. "When you spring the trap, we\'ll cut off their retreat." Your formations are tighter. (+10% formation bonuses)';
 }
 function campBegin(){
   document.getElementById('camp-overlay').style.display='none';
