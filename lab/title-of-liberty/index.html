@@ -30,7 +30,8 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 .controls-hint{margin-top:20px;font-size:0.65rem;color:#3a3220;letter-spacing:0.06em;text-align:center;line-height:1.6}
 
 /* ── HUD ── */
-#hud{position:fixed;top:12px;left:12px;z-index:5;pointer-events:none}
+#hud{position:fixed;top:12px;left:12px;z-index:5;pointer-events:none;max-height:calc(100vh - 80px);overflow-y:auto;scrollbar-width:none}
+#hud::-webkit-scrollbar{display:none}
 #hud div{font-size:0.7rem;color:#a89868;margin-bottom:3px;font-family:'Inter',sans-serif}
 #hud .label{color:#5a5238;font-size:0.55rem;letter-spacing:0.06em;text-transform:uppercase}
 #hud .sep{height:1px;background:rgba(200,160,64,0.08);margin:6px 0;width:120px}
@@ -83,10 +84,12 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 #camp-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,6,0.95);z-index:18;display:none;flex-direction:column;align-items:center;justify-content:center}
 #camp-overlay h2{font-family:'Cinzel',serif;font-size:1.5rem;color:#c8a040;letter-spacing:0.1em;margin-bottom:8px}
 #camp-overlay .camp-sub{font-size:0.65rem;color:#5a5238;margin-bottom:20px;font-style:italic}
-.camp-btn{display:block;width:320px;text-align:left;font-size:0.7rem;padding:8px 12px;margin:4px 0;border:1px solid rgba(200,160,64,0.15);background:rgba(20,20,12,0.8);color:#a89868;font-family:'Inter',sans-serif;cursor:pointer;border-radius:2px;transition:all 0.2s}
+.camp-row{display:flex;align-items:flex-start;gap:16px;margin:6px 0;width:580px;max-width:90vw}
+.camp-btn{flex:0 0 180px;text-align:left;font-size:0.75rem;padding:10px 14px;border:1px solid rgba(200,160,64,0.15);background:rgba(20,20,12,0.8);color:#a89868;font-family:'Inter',sans-serif;cursor:pointer;border-radius:2px;transition:all 0.2s}
 .camp-btn:hover{border-color:rgba(200,160,64,0.4);background:rgba(200,160,64,0.05)}
 .camp-btn:disabled{opacity:0.4;cursor:default}
-.camp-btn .camp-flavor{font-size:0.55rem;color:#5a5238;margin-top:4px;font-style:italic}
+.camp-btn .camp-flavor{display:none}
+.camp-desc-panel{flex:1;font-family:'Cinzel',serif;font-size:0.9rem;color:#a89868;line-height:1.6;padding:8px 0;min-height:40px}
 
 /* ── Morale bar ── */
 #morale-bar-wrap{width:120px;height:6px;background:#2a2a1a;border:1px solid #4a4230;border-radius:2px;margin-bottom:2px;margin-top:2px}
@@ -288,11 +291,23 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 <div id="camp-overlay">
   <h2>⛺ Camp</h2>
   <div class="camp-sub">Choose <strong>2</strong> preparations — you cannot do everything</div>
-  <button class="camp-btn" id="camp-armor" onclick="campChoice('armor')">🛡 Equip Armor<div class="camp-flavor" id="camp-armor-flavor"></div></button>
-  <button class="camp-btn" id="camp-pray" onclick="campChoice('pray')">🙏 Pray &amp; Preach<div class="camp-flavor" id="camp-pray-flavor"></div></button>
-  <button class="camp-btn" id="camp-intel" onclick="campChoice('intel')">🔭 Review Intelligence<div class="camp-flavor" id="camp-intel-flavor"></div></button>
-  <button class="camp-btn" id="camp-council" onclick="campChoice('council')">⚔ War Council<div class="camp-flavor" id="camp-council-flavor"></div></button>
-  <button class="camp-btn" id="camp-go" style="margin-top:16px;text-align:center;color:#c8a040;border-color:rgba(200,160,64,0.3);display:none" onclick="campBegin()">▸ Begin Mission</button>
+  <div class="camp-row">
+    <button class="camp-btn" id="camp-armor" onclick="campChoice('armor')">🛡 Equip Armor</button>
+    <div class="camp-desc-panel" id="camp-armor-desc">Breastplates, arm-shields, and head-plates. Your men will be far harder to kill — but armor traps heat. Watch the heat gauge in the jungle.</div>
+  </div>
+  <div class="camp-row">
+    <button class="camp-btn" id="camp-pray" onclick="campChoice('pray')">🙏 Pray &amp; Preach</button>
+    <div class="camp-desc-panel" id="camp-pray-desc">Gather the men in prayer. "They did pray mightily that God would strengthen them." +25 Faith, +15 Morale.</div>
+  </div>
+  <div class="camp-row">
+    <button class="camp-btn" id="camp-intel" onclick="campChoice('intel')">🔭 Review Intelligence</button>
+    <div class="camp-desc-panel" id="camp-intel-desc">Study the terrain and enemy patterns. Your scouts will see 40% further during the mission.</div>
+  </div>
+  <div class="camp-row">
+    <button class="camp-btn" id="camp-council" onclick="campChoice('council')">⚔ War Council</button>
+    <div class="camp-desc-panel" id="camp-council-desc">Plan with your captains. Circle formation gains a 10% defense bonus in battle.</div>
+  </div>
+  <button class="camp-btn" id="camp-go" style="margin-top:16px;text-align:center;color:#c8a040;border-color:rgba(200,160,64,0.3);display:none;width:200px" onclick="campBegin()">▸ Begin Mission</button>
 </div>
 
 <script>
@@ -1088,14 +1103,16 @@ function doHeadcount(){
   const allyAlive=S.allies.filter(a=>!a.dead).length;
   const missing=S.deadSoldiers;
   const enemySpotted=S.enemies.filter(e=>e.spotted&&!e.dead).length;
-  const enemyDead=S.enemies.filter(e=>e.dead).length;
+  const enemyDead=S.enemies.filter(e=>e.dead&&e.state!=='captured').length;
+  const enemyCaptured=S._capturedLamanites||0;
 
   let html=`<div class="hc-row">Soldiers present: <span>${alive}</span></div>`;
   html+=`<div class="hc-row">Scouts deployed: <span>${scouts}</span></div>`;
   if(missing>0)html+=`<div class="hc-row" style="color:#8a5a3a">Fallen (unrecovered): <span>${missing}</span></div>`;
   if(allyAlive>0)html+=`<div class="hc-row">Lehi's force: <span>~${allyAlive}</span></div>`;
   html+=`<div class="hc-row" style="margin-top:6px">Enemy spotted: <span>${enemySpotted>0?'~'+enemySpotted:'unknown'}</span></div>`;
-  if(enemyDead>0)html+=`<div class="hc-row">Enemy dead: <span>${enemyDead}</span></div>`;
+  if(enemyDead>0)html+=`<div class="hc-row">Enemy slain: <span>${enemyDead}</span></div>`;
+  if(enemyCaptured>0)html+=`<div class="hc-row">Enemy captured: <span>${enemyCaptured}</span></div>`;
   const alive2=S.soldiers.filter(s=>!s.dead);
   const avgMorale2=alive2.length?alive2.reduce((s,u)=>s+u.morale,0)/alive2.length:0;
   let vibe='';
@@ -1968,7 +1985,7 @@ function showResults(){
   running=false;SND.stopAmbient();SND.victory();
   const r=document.getElementById('results');r.style.display='flex';
   const nephiteLost=S.deadSoldiers;
-  const enemyDead=S.enemies.filter(e=>e.dead).length;
+  const enemyDead=S.enemies.filter(e=>e.dead&&e.state!=='captured').length;
   const enemyRouted=S.enemies.filter(e=>!e.dead&&e.state==='rout').length;
   const ambushText=S.ambushReady?'The ambush was perfect — they never saw you coming.':'They spotted your forces. The element of surprise was lost.';
 
@@ -2618,33 +2635,37 @@ function campChoice(type){
   else if(type==='council')campCouncil();
   campPicks++;
   document.getElementById('camp-'+type).disabled=true;
-  document.getElementById('camp-'+type).style.opacity='0.4';
+  document.getElementById('camp-'+type).style.borderColor='rgba(200,160,64,0.5)';
+  document.getElementById('camp-'+type).style.background='rgba(200,160,64,0.08)';
+  const descEl=document.getElementById('camp-'+type+'-desc');
+  if(descEl){descEl.style.color='#c8a040';descEl.style.fontSize='1rem';}
   if(campPicks>=2){
     // Disable remaining
     ['armor','pray','intel','council'].forEach(t=>{
       const el=document.getElementById('camp-'+t);
-      if(!el.disabled){el.disabled=true;el.style.opacity='0.2';el.style.textDecoration='line-through';}
+      if(!el.disabled){el.disabled=true;el.style.opacity='0.25';el.style.textDecoration='line-through';}
+      const d=document.getElementById('camp-'+t+'-desc');
+      if(d&&!d.style.fontSize.includes('1')){d.style.opacity='0.25';d.style.textDecoration='line-through';}
     });
     document.getElementById('camp-go').style.display='block';
   }
 }
 function campArmor(){
   S.campArmor=true;
-  document.getElementById('camp-armor-flavor').textContent='Your men don their breastplates, arm-shields, and head-plates. (Alma 43:19)';
 }
 function campPray(){
   S.faith=Math.min(100,S.faith+25);
   S.soldiers.forEach(s=>{if(!s.dead)s.morale=Math.min(100,s.morale+15);});
   S._campPray=true;
-  document.getElementById('camp-pray-flavor').textContent='You gather the men and pray. Their faith burns bright. (+25 Faith, +15 Morale)';
+  
 }
 function campIntel(){
   S.campIntel=true;
-  document.getElementById('camp-intel-flavor').textContent='Scouts report ~80 Lamanite warriors west of the river. Led by Zerahemnah. No armor — swords and scimitars only. You\'ll spot enemies sooner.';
+  
 }
 function campCouncil(){
   S.campCouncil=true;
-  document.getElementById('camp-council-flavor').textContent='Lehi clasps your arm. "When you spring the trap, we\'ll cut off their retreat." Your formations are tighter. (+10% formation bonuses)';
+  
 }
 function campBegin(){
   document.getElementById('camp-overlay').style.display='none';
