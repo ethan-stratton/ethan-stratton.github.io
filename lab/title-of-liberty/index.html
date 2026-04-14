@@ -317,11 +317,24 @@ const SCALE=3,W=320,H=240;
 canvas.width=W*SCALE;canvas.height=H*SCALE;
 ctx.imageSmoothingEnabled=false;
 
+// Dialog click handler
+canvas.addEventListener('click',function(evt){
+  if(!S._dialog||!S._dialog._choiceRects||!S._dialog.onChoice)return;
+  const rect=canvas.getBoundingClientRect();
+  const scaleX=canvas.width/rect.width,scaleY=canvas.height/rect.height;
+  const mx=(evt.clientX-rect.left)*scaleX,my=(evt.clientY-rect.top)*scaleY;
+  for(const r of S._dialog._choiceRects){
+    if(mx>=r.x&&mx<=r.x+r.w&&my>=r.y&&my<=r.y+r.h){
+      S._dialog.onChoice(r.idx);
+      return;
+    }
+  }
+});
+
 let running=false,lastTime=0;
 const keys={};
 window.addEventListener('keydown',e=>{
   if(e.key==='Escape'){if(running)togglePause();return;}
-  if(S._cutscenes&&S._cutsceneIdx<S._cutscenes.length){advanceCutscene();return;}
   keys[e.key.toLowerCase()]=true;
   handleKey(e.key.toLowerCase());
   if(['arrowup','arrowdown','arrowleft','arrowright',' ','f1','f2','f3'].includes(e.key.toLowerCase()||e.key))e.preventDefault();
@@ -682,6 +695,17 @@ const S={
   _prayerTimer:0,
   _prayerActive:false,
   _campPray:false,
+  // Alma 44 confront system
+  zerahemnah:null,
+  _dialog:null,
+  _confrontPhase:null,
+  _confrontTimer:0,
+  _scalper:null,
+  _surrenderedCount:0,
+  _flashTimer:0,
+  _scalpDisplayTimer:0,
+  _lehiUsedWell:false,
+  _mercySkipped:false,
   // Scout silent capture
   _scoutLostTimer:0,
   _scoutSilentLost:false,
@@ -1081,16 +1105,71 @@ function updateMission(dt){
       }
     }
 
-    const alive=S.enemies.filter(e=>!e.dead&&e.state!=='rout');
+    const alive=S.enemies.filter(e=>!e.dead&&e.state!=='rout'&&e.state!=='surrendered');
     if(alive.length<S.totalLamanites*0.3&&!S._surrenderOffered){
       S._surrenderOffered=true;
-      S.phase='surround';
-      setObjective('Pursue and capture the routing Lamanites! Use Circle formation to surround them.');
-      setPhaseLabel('Phase 5 — Pursue & Capture');
-      showCallout('The Lamanites are breaking! Chase them down — don\'t let them escape!',5);
-      setTimeout(()=>{if(S.phase==='surround')showResults();},15000);
+      beginConfront();
     }
 
+    if(S.soldiers.filter(s=>!s.dead).length===0&&S.allies.filter(a=>!a.dead).length===0){
+      S.phase='defeat';showDefeat();
+    }
+  }
+
+  // ── Phase: CONFRONT (Alma 44 interactive sequence) ──
+  if(S.phase==='confront'){
+    S._confrontTimer+=dt;
+    updateConfrontPhase(dt);
+  }
+
+  // ── Phase: FINAL_BATTLE ──
+  if(S.phase==='final_battle'){
+    // Check if Lehi was used well for blocking retreat
+    if(!S._lehiBlockChecked){
+      S._lehiBlockChecked=true;
+      const lehiAlive=S.allies.filter(a=>!a.dead).length;
+      S._lehiUsedWell=(S.lehiOrder==='charge'||S.lehiOrder==='flank')&&lehiAlive>15;
+      if(S._lehiUsedWell){
+        showCallout("Lehi's men cut off the retreat!",4);
+        // Block north exit — Lehi's men move to block
+        S.allies.forEach(a=>{if(!a.dead){a.tx=500+Math.random()*100;a.ty=30+Math.random()*40;}});
+      }else{
+        showCallout("The Lamanites flee north — with no one to stop them!",4);
+      }
+    }
+
+    // Resume combat for remaining Lamanites
+    S.enemies.forEach(e=>{
+      if(!e.dead&&e.state==='fight'){
+        // If Lehi doesn't block and they're near north edge, let them flee
+        if(!S._lehiUsedWell&&e.y<40){
+          e.dead=true;S._routedEscaped++;
+        }
+      }
+    });
+
+    // Zerahemnah fights
+    if(S.zerahemnah&&!S.zerahemnah.dead){
+      const z=S.zerahemnah;
+      const target=findNearest(z.x,z.y,150,S.soldiers);
+      if(target){
+        const ddx=target.x-z.x,ddy=target.y-z.y,d=Math.sqrt(ddx*ddx+ddy*ddy);
+        if(d<20){
+          z._atkCd=(z._atkCd||0)-dt;
+          if(z._atkCd<=0){
+            z._atkCd=1.2;
+            target.hp-=0.8;target._hitFlash=0.1;spawnBlood(target.x,target.y,2);SND.swordHit();
+            if(target.hp<=0){target.dead=true;spawnDeathParticles(target.x,target.y);SND.death();S.casualties.push(target._name);S._lastDeathTime=S.time;}
+          }
+        }else{moveToward(z,target.x,target.y,50,dt);}
+      }
+    }
+
+    const aliveEnemies=S.enemies.filter(e=>!e.dead&&e.state==='fight');
+    const aliveZ=S.zerahemnah&&!S.zerahemnah.dead?1:0;
+    if(aliveEnemies.length+aliveZ<5){
+      beginFinalSurrender();
+    }
     if(S.soldiers.filter(s=>!s.dead).length===0&&S.allies.filter(a=>!a.dead).length===0){
       S.phase='defeat';showDefeat();
     }
@@ -1131,6 +1210,177 @@ function doHeadcount(){
   document.getElementById('hc-body').innerHTML=html;
 }
 document.getElementById('headcount-overlay').addEventListener('click',()=>{doHeadcount();});
+
+// ══════════════════════════════════════
+// ALMA 44 — INTERACTIVE CONFRONT SYSTEM
+// ══════════════════════════════════════
+function showInGameDialog(speaker,text,choices,onChoice){
+  S._dialog={speaker,text,choices,onChoice,alpha:0,t:0};
+}
+function clearInGameDialog(){S._dialog=null;}
+
+function beginConfront(){
+  S.phase='confront';S._confrontPhase='retreat';S._confrontTimer=0;
+  setPhaseLabel('Alma 44 — The Confrontation');
+  setObjective('The Lamanites are breaking...');
+  // All remaining Lamanites retreat toward river center
+  const riverCenter={x:riverX(350),y:350};
+  S.enemies.forEach(e=>{
+    if(!e.dead&&e.state!=='surrendered'){
+      e.state='retreat_confront';
+      e.tx=riverCenter.x+40+Math.random()*40;
+      e.ty=riverCenter.y-30+Math.random()*60;
+    }
+  });
+}
+
+function updateConfrontPhase(dt){
+  const phase=S._confrontPhase;
+
+  // Move retreating Lamanites toward center
+  if(phase==='retreat'){
+    S.enemies.forEach(e=>{
+      if(!e.dead&&e.state==='retreat_confront'){
+        moveToward(e,e.tx,e.ty,e.speed*0.8,dt);
+      }
+    });
+    if(S._confrontTimer>2){
+      S._confrontPhase='spawn_z';S._confrontTimer=0;
+    }
+  }
+
+  if(phase==='spawn_z'){
+    // Find center of Lamanite cluster
+    const alive=S.enemies.filter(e=>!e.dead&&e.state==='retreat_confront');
+    const cx=alive.reduce((s,e)=>s+e.x,0)/(alive.length||1);
+    const cy=alive.reduce((s,e)=>s+e.y,0)/(alive.length||1);
+    S.zerahemnah={x:cx,y:cy,hp:5,maxHp:5,dead:false,_atkCd:0};
+    showCallout('"Zerahemnah comes forward. Moroni speaks:"',4);
+    S._confrontPhase='demand_wait';S._confrontTimer=0;
+  }
+
+  if(phase==='demand_wait'&&S._confrontTimer>3){
+    showInGameDialog('Moroni','"Deliver up your weapons and covenant you will not return to war." (Alma 44:6)',[
+      'Deliver the demand'
+    ],function(idx){
+      clearInGameDialog();
+      S._confrontPhase='refuse';S._confrontTimer=0;
+    });
+    S._confrontPhase='demand_choice';
+  }
+
+  if(phase==='refuse'&&S._confrontTimer>0.5){
+    showCallout('"We will surrender our weapons, but we will NOT make an oath we know we will break." (Alma 44:8)',5);
+    S._confrontPhase='refuse_wait';S._confrontTimer=0;
+  }
+
+  if(phase==='refuse_wait'&&S._confrontTimer>3){
+    showInGameDialog('Moroni','Zerahemnah refuses the covenant. What say you?',[
+      '"Then we shall end this."',
+      '"Very well. Take your weapons and go."'
+    ],function(idx){
+      clearInGameDialog();
+      if(idx===0){
+        S._confrontPhase='scalp_charge';S._confrontTimer=0;
+      }else{
+        S._mercySkipped=true;
+        beginFinalBattle();
+      }
+    });
+    S._confrontPhase='refuse_choice';
+  }
+
+  // SCALP phase: Zerahemnah charges commander
+  if(phase==='scalp_charge'){
+    const z=S.zerahemnah;
+    moveToward(z,S.cx,S.cy,80,dt);
+    const d=Math.sqrt((z.x-S.cx)**2+(z.y-S.cy)**2);
+    if(d<20){
+      // Soldier intercepts
+      const nearby=S.soldiers.filter(s=>!s.dead).sort((a,b)=>{
+        const da=Math.sqrt((a.x-z.x)**2+(a.y-z.y)**2);
+        const db=Math.sqrt((b.x-z.x)**2+(b.y-z.y)**2);
+        return da-db;
+      });
+      S._scalper=nearby[0]||null;
+      S._flashTimer=0.3;
+      spawnBlood(z.x,z.y,8);
+      z.hp=2;
+      addTrauma(0.3,z.x,z.y);
+      SND.swordHit();SND.swordHit();
+      showCallout('"A soldier smote off Zerahemnah\'s scalp upon his sword!" (Alma 44:12)',5);
+      if(S._scalper){
+        S._scalper.tx=z.x+5;S._scalper.ty=z.y-5;
+      }
+      S._scalpDisplayTimer=5;
+      S._confrontPhase='scalp_display';S._confrontTimer=0;
+    }
+  }
+
+  if(phase==='scalp_display'){
+    S._scalpDisplayTimer-=dt;
+    if(S._scalpDisplayTimer<=0&&S._confrontTimer>3){
+      showCallout('"Even as this scalp has fallen to the earth — so shall ye fall unless ye deliver up your weapons with a covenant of peace!" (Alma 44:14)',6);
+      S._confrontPhase='mass_surrender_wait';S._confrontTimer=0;
+    }
+  }
+
+  if(phase==='mass_surrender_wait'&&S._confrontTimer>3){
+    // Calculate surrender percentage
+    const surrenderPct=0.3+(S.ambushReady?0.2:0)+(S.deadSoldiers<S.soldierCount*0.15?0.2:0);
+    const alive=S.enemies.filter(e=>!e.dead&&e.state==='retreat_confront');
+    const surrenderCount=Math.floor(alive.length*surrenderPct);
+    // Shuffle and surrender
+    const shuffled=alive.sort(()=>Math.random()-0.5);
+    for(let i=0;i<surrenderCount&&i<shuffled.length;i++){
+      shuffled[i].state='surrendered';
+      S._capturedLamanites++;
+      S._surrenderedCount++;
+    }
+    showCallout('"Many Lamanites cast their weapons at the feet of Moroni." (Alma 44:15)',5);
+    S._confrontPhase='mass_surrender_show';S._confrontTimer=0;
+  }
+
+  if(phase==='mass_surrender_show'&&S._confrontTimer>3){
+    beginFinalBattle();
+  }
+}
+
+function beginFinalBattle(){
+  S.phase='final_battle';
+  S._confrontPhase='final_battle';
+  S._lehiBlockChecked=false;
+  showCallout('"Zerahemnah stirs the remainder to fight more powerfully!" (Alma 44:16)',5);
+  setPhaseLabel('Phase 5 — Final Battle');
+  setObjective('Destroy or capture the remaining Lamanites!');
+  // Remaining non-surrendered Lamanites fight
+  S.enemies.forEach(e=>{
+    if(!e.dead&&e.state==='retreat_confront'){
+      e.state='fight';
+      e.morale=60+Math.random()*30;
+      e.speed=Math.min(55,e.speed*1.2);
+    }
+  });
+  // Zerahemnah fights
+  if(S.zerahemnah&&!S.zerahemnah.dead){
+    S.zerahemnah._fighting=true;
+  }
+}
+
+function beginFinalSurrender(){
+  S.phase='final_surrender';
+  setPhaseLabel('Alma 44 — Surrender');
+  if(S.zerahemnah&&!S.zerahemnah.dead){
+    S.zerahemnah.dead=true;
+    showCallout('"Zerahemnah at last cast his weapons and entered the covenant." (Alma 44:22)',5);
+  }
+  setTimeout(()=>{
+    showCallout('"The dead were cast into the waters of Sidon." (Alma 44:22)',4);
+  },2000);
+  setTimeout(()=>{
+    showResults();
+  },5000);
+}
 
 // ══════════════════════════════════════
 // SCOUT RETRIEVAL (realistic)
@@ -1191,7 +1441,7 @@ function battleCmd(cmd){
     showCallout('Follow me!',2);
     return;
   }
-  if(S.phase!=='battle'&&S.phase!=='surround'&&S.phase!=='wait'){
+  if(S.phase!=='battle'&&S.phase!=='surround'&&S.phase!=='wait'&&S.phase!=='final_battle'){
     showCallout('No battle to command.',2);return;
   }
   const alive=S.soldiers.filter(s=>!s.dead);
@@ -1551,6 +1801,7 @@ function update(dt){
       return;
     }
     if(e.state==='idle')return; // waiting for march order
+    if(e.state==='retreat_confront'||e.state==='surrendered')return; // handled by confront system
     // fight
     const target=findNearest(e.x,e.y,120,S.soldiers.concat(S.allies));
     if(target){
@@ -1734,7 +1985,7 @@ function update(dt){
   S.enemies.forEach(e=>{if(e.dead){const kn=S.knownEnemies.get(e.id);if(kn)kn.alive=false;}});
 
   // Ambient volume + environmental sounds
-  const inCombat=S.phase==='battle'||S.phase==='surround';
+  const inCombat=S.phase==='battle'||S.phase==='surround'||S.phase==='final_battle'||S.phase==='confront';
   SND.setAmbientVol(inCombat?0.06:0.03);
   // Env sounds based on commander position
   SND.updateEnv(S.cx,S.cy,dt);
@@ -2043,82 +2294,29 @@ function showResults(){
     `<div class="stat">Lamanites escaped: ${S._routedEscaped}</div>`+
     casualtyText+
     flavorText;
-  document.getElementById('mercy-choice').style.display='flex';
-}
-
-function chooseMercy(mercy){
+  // Mercy was already handled in-game via Alma 44 sequence
   document.getElementById('mercy-choice').style.display='none';
-  S._mercyChoice=mercy;
-  // Start cutscene sequence instead of static epilogue
-  S._cutsceneIdx=0;
-  S._cutscenes=mercy?[
-    {speaker:'Moroni',text:'Behold, Zerahemnah — I command you in the name of that all-powerful God to surrender your weapons. Covenant that you will not return to war against us, and we will spare your lives.',ref:'Alma 44:6',bg:'battlefield'},
-    {speaker:'Zerahemnah',text:'We will give up our weapons, but we will not make an oath which we know we will break. We are not of your faith.',ref:'Alma 44:8',bg:'battlefield'},
-    {speaker:'Moroni',text:'Then the battle shall resume.',ref:'Alma 44:9',bg:'battlefield'},
-    {speaker:'',text:'Zerahemnah rushed forward to strike Moroni — but a soldier stepped in and smote off his scalp upon the sword.',ref:'Alma 44:12',bg:'scalp'},
-    {speaker:'',text:'The soldier raised the scalp on the point of his sword and cried to the Lamanites with a loud voice:',ref:'Alma 44:13',bg:'scalp'},
-    {speaker:'Soldier',text:'Even as this scalp has fallen, so shall ye fall unless you deliver up your weapons and depart with a covenant of peace!',ref:'Alma 44:14',bg:'scalp'},
-    {speaker:'',text:'Many Lamanites came forward and cast their weapons at the feet of Moroni, entering into a covenant of peace. They were suffered to depart into the wilderness.',ref:'Alma 44:15',bg:'peace'},
-    {speaker:'',text:'Zerahemnah was exceedingly angry and stirred up the remainder to fight more powerfully.',ref:'Alma 44:16',bg:'battlefield'},
-    {speaker:'',text:'When Moroni saw their determination, he commanded his men to stop. He spoke once more of the covenant.',ref:'Alma 44:19',bg:'peace'},
-    {speaker:'',text:'Zerahemnah himself at last surrendered his weapons and entered into the covenant. The dead were cast into the waters of Sidon, and their bones are in the depths of the sea.',ref:'Alma 44:22',bg:'river'},
-  ]:[
-    {speaker:'',text:'The fighting continued without mercy. Many more fell on both sides — the river ran thick with blood.',ref:'Alma 44:17–18',bg:'battlefield'},
-    {speaker:'',text:'Zerahemnah rallied his men again and again, but they were hemmed in on every side.',ref:'Alma 44:16',bg:'battlefield'},
-    {speaker:'',text:'At last, seeing their utter destruction, the surviving Lamanites threw down their weapons. They were compelled to enter into the covenant.',ref:'Alma 44:19',bg:'peace'},
-    {speaker:'',text:'The cost was heavy. More Nephites fell than needed to. The dead were cast into the River Sidon.',ref:'Alma 44:22',bg:'river'},
-    {speaker:'Moroni',text:'"Now Moroni was a man whose soul did joy in the liberty and the freedom of his country."',ref:'Alma 48:11',bg:'peace'},
-  ];
-  showCutsceneSlide();
+  document.getElementById('return-btn').style.display='inline-block';
+  document.getElementById('epilogue').style.display='block';
+  const mercy=!S._mercySkipped;
+  document.getElementById('epilogue').innerHTML=(mercy?
+    'The Nephites returned to their homes in peace. Moroni\'s strategy at the River Sidon became legendary — an ambush so complete it ended the war in a single day.':
+    'The victory was total, but the fields were stained. Moroni wept for the fallen — both Nephite and Lamanite. This was not the war he wanted.')+
+    '<br><br><span style="color:#5a5238;font-size:0.7rem;font-style:italic">Nephite fallen: '+nephiteLost+' of '+S.soldierCount+'</span>';
 }
 
-function showCutsceneSlide(){
-  const scenes=S._cutscenes;
-  if(S._cutsceneIdx>=scenes.length){
-    // Done — show final stats
-    const ep=document.getElementById('epilogue');ep.style.display='block';
-    const nephiteLost=S.deadSoldiers;
-    const mercy=S._mercyChoice;
-    ep.innerHTML=(mercy?
-      'The Nephites returned to their homes in peace. Moroni\'s strategy at the River Sidon became legendary — an ambush so complete it ended the war in a single day.':
-      'The victory was total, but the fields were stained. Moroni wept for the fallen — both Nephite and Lamanite. This was not the war he wanted.')+
-      '<br><br><span style="color:#5a5238;font-size:0.7rem;font-style:italic">Nephite fallen: '+nephiteLost+' of '+S.soldierCount+'</span>';
-    document.getElementById('return-btn').style.display='inline-block';
-    return;
+function chooseMercy(mercy){}
+
+function showCutsceneSlide(){}
+
+function advanceCutscene(){}
+
+// Click handler for in-game dialog
+document.addEventListener('click',function(evt){
+  if(S._dialog&&S._dialog.choices){
+    // Check if click is on a choice button (handled via canvas click below)
   }
-  const sc=scenes[S._cutsceneIdx];
-  const ep=document.getElementById('epilogue');ep.style.display='block';
-  
-  // Build cutscene HTML with speaker portrait and text
-  let bgColor='#1a1610';
-  if(sc.bg==='scalp')bgColor='#2a1410';
-  if(sc.bg==='river')bgColor='#101a20';
-  if(sc.bg==='peace')bgColor='#1a1a10';
-  
-  let portraitColor='#c8a040';
-  if(sc.speaker==='Zerahemnah')portraitColor='#c04040';
-  if(sc.speaker==='Soldier')portraitColor='#80a060';
-  
-  ep.innerHTML=
-    (sc.speaker?`<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">`+
-      `<div style="width:28px;height:28px;border-radius:50%;background:${portraitColor};display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:#1a1610;font-weight:bold">${sc.speaker[0]}</div>`+
-      `<span style="color:${portraitColor};font-family:'Cinzel',serif;font-size:0.85rem">${sc.speaker}</span>`+
-    `</div>`:'')+
-    `<div style="color:#a89868;line-height:1.8;font-size:0.85rem;font-family:'Cinzel',serif">${sc.text}</div>`+
-    (sc.ref?`<div style="color:#4a4230;font-size:0.6rem;margin-top:8px;font-style:italic">${sc.ref}</div>`:'')+
-    `<div style="color:#5a5238;font-size:0.55rem;margin-top:14px;cursor:pointer" onclick="advanceCutscene()">▸ Click or press any key to continue</div>`;
-  
-  document.body.style.background=bgColor;
-}
-
-function advanceCutscene(){
-  if(!S._cutscenes)return;
-  S._cutsceneIdx++;
-  showCutsceneSlide();
-}
-
-// Allow click to advance cutscene
-document.addEventListener('click',()=>{if(S._cutscenes&&S._cutsceneIdx<S._cutscenes.length)advanceCutscene();});
+});
 
 function showDefeat(){
   running=false;SND.stopAmbient();SND.defeat();
@@ -2142,7 +2340,7 @@ function togglePause(){
 
 function returnToTimeline(){
   running=false;paused=false;
-  S._cutscenes=null;S._cutsceneIdx=0;
+  S._dialog=null;S.zerahemnah=null;S._confrontPhase=null;
   document.body.style.background='#1a1610';
   document.getElementById('results').style.display='none';
   document.getElementById('epilogue').style.display='none';
@@ -2344,6 +2542,46 @@ function render(){
     }
   }
 
+  // Draw Zerahemnah — larger, distinct
+  if(S.zerahemnah&&!S.zerahemnah.dead){
+    const z=S.zerahemnah;
+    ctx.fillStyle='#8a2020';
+    ctx.fillRect(Math.floor(z.x-2),Math.floor(z.y-3),5,6);
+    ctx.fillStyle='#aa4020';
+    ctx.fillRect(Math.floor(z.x-1),Math.floor(z.y-4),3,1);
+    if(z.hp<z.maxHp){
+      ctx.fillStyle='rgba(200,50,30,0.7)';
+      ctx.fillRect(Math.floor(z.x-2),Math.floor(z.y-6),Math.ceil(5*(z.hp/z.maxHp)),1);
+    }
+    ctx.fillStyle='rgba(200,80,40,0.6)';ctx.font='3px Inter';
+    ctx.fillText('Zerahemnah',Math.floor(z.x-12),Math.floor(z.y-8));
+  }
+
+  // Draw surrendered Lamanites (kneeling — 1px shorter)
+  S.enemies.forEach(e=>{
+    if(!e.dead&&e.state==='surrendered'){
+      const d=getEnemyDisp(e);if(!d)return;
+      ctx.fillStyle='rgba(120,80,50,0.5)';
+      ctx.fillRect(Math.floor(d.x-1),Math.floor(d.y-1),2,3); // shorter
+    }
+  });
+
+  // Scalp display on intercepting soldier
+  if(S._scalpDisplayTimer>0&&S._scalper&&!S._scalper.dead){
+    const sc=S._scalper;
+    ctx.fillStyle='#c8a040';
+    ctx.fillRect(Math.floor(sc.x),Math.floor(sc.y-10),1,5); // sword raised
+    ctx.fillStyle='#8a2020';
+    ctx.fillRect(Math.floor(sc.x-1),Math.floor(sc.y-12),2,2); // scalp on sword
+  }
+
+  // Screen flash effect
+  if(S._flashTimer>0){
+    S._flashTimer-=1/60;
+    ctx.fillStyle=`rgba(255,255,255,${S._flashTimer})`;
+    ctx.fillRect(S.camX,S.camY,W,H);
+  }
+
   drawTerrainZoneHints();
 
   // Tree canopy overlay — drawn ON TOP of units so characters are partially obscured
@@ -2396,6 +2634,46 @@ function render(){
     ctx.lineTo(ax+Math.cos(ha+2.5)*4,ay+Math.sin(ha+2.5)*4);
     ctx.lineTo(ax+Math.cos(ha-2.5)*4,ay+Math.sin(ha-2.5)*4);
     ctx.fill();
+  }
+
+  // ── In-game dialog panel (screen space) ──
+  if(S._dialog){
+    const dlg=S._dialog;
+    dlg.alpha=Math.min(1,dlg.alpha+1/60/0.5);
+    dlg.t=(dlg.t||0)+1/60;
+    ctx.fillStyle=`rgba(10,10,6,${0.85*dlg.alpha})`;
+    ctx.fillRect(0,H-45,W,45);
+    ctx.strokeStyle=`rgba(200,160,64,${0.3*dlg.alpha})`;ctx.lineWidth=0.5;
+    ctx.beginPath();ctx.moveTo(0,H-45);ctx.lineTo(W,H-45);ctx.stroke();
+    if(dlg.speaker){
+      ctx.fillStyle=`rgba(200,160,64,${dlg.alpha})`;ctx.font="bold 5px 'Cinzel',serif";
+      ctx.fillText(dlg.speaker,8,H-36);
+    }
+    ctx.fillStyle=`rgba(168,152,104,${dlg.alpha})`;ctx.font="4px 'Inter',sans-serif";
+    // Simple word wrap
+    const words=dlg.text.split(' ');let line='';let ly=H-28;
+    words.forEach(w=>{
+      const test=line?line+' '+w:w;
+      if(ctx.measureText(test).width>W-16){ctx.fillText(line,8,ly);ly+=6;line=w;}
+      else{line=test;}
+    });
+    if(line)ctx.fillText(line,8,ly);
+    // Choices
+    if(dlg.choices&&dlg.alpha>0.8){
+      dlg._choiceRects=[];
+      const totalW=dlg.choices.reduce((s,c)=>s+ctx.measureText(c).width+16,0);
+      let cx=W/2-totalW/2;
+      dlg.choices.forEach((c,i)=>{
+        const tw=ctx.measureText(c).width;
+        const bx=cx,by=H-12,bw=tw+12,bh=9;
+        dlg._choiceRects.push({x:bx*SCALE,y:by*SCALE,w:bw*SCALE,h:bh*SCALE,idx:i});
+        ctx.fillStyle='rgba(200,160,64,0.12)';ctx.fillRect(bx,by,bw,bh);
+        ctx.strokeStyle='rgba(200,160,64,0.4)';ctx.lineWidth=0.3;ctx.strokeRect(bx,by,bw,bh);
+        ctx.fillStyle='rgba(200,160,64,0.9)';ctx.font="3.5px 'Cinzel',serif";
+        ctx.fillText(c,bx+6,by+6);
+        cx+=bw+6;
+      });
+    }
   }
 
   ctx.restore();
