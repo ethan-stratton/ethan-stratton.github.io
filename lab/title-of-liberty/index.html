@@ -1870,7 +1870,7 @@ function render(){
     // Flanked bark
     if(s._flankedTimer>0){s._flankedTimer-=1/60;const fa=Math.min(1,s._flankedTimer);ctx.fillStyle=`rgba(255,80,40,${fa})`;ctx.font='3px Inter';ctx.fillText('⚔',Math.floor(s.x-3),Math.floor(s.y-8));}
     // Morale visual tells
-    if(s.morale>80&&Math.random()<0.003){s.barkTimer=0.8;}
+    if(s.morale>80&&Math.random()<0.0005){s.barkTimer=0.8;}
     if(s.morale<30&&s.barkTimer<=0&&Math.random()<0.005){ctx.fillStyle='rgba(180,160,120,0.5)';ctx.font='3px Inter';ctx.fillText('…',Math.floor(s.x-2),Math.floor(s.y-6));}
     if(s.morale<50&&s.morale>30){const shake=Math.sin(S.time*15+s.bobPhase)*0.3;ctx.fillStyle=`rgb(${b},${g},${bl})`;ctx.fillRect(Math.floor(s.x-1+shake),Math.floor(s.y),1,1);}
     // Sweat droplet — only when wading through river
@@ -2139,7 +2139,7 @@ function handleKey(k){
       const ft=getFormationTarget(s,i,alive.length,S.formation);
       const wp=fmtToWorld(ft,S.facing,S.cx,S.cy);
       const dist=Math.sqrt((wp.x-s.x)*(wp.x-s.x)+(wp.y-s.y)*(wp.y-s.y));
-      if(dist>25)s.barkTimer=1.2;
+      if(dist>50)s.barkTimer=1.2;
     });
     document.querySelectorAll('.fmt-slot').forEach(el=>el.classList.remove('active'));
     document.getElementById('fmt-'+k).classList.add('active');
