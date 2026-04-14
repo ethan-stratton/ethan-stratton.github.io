@@ -678,7 +678,7 @@ function assignName(s){
 
 // ══════════════════════════════════════
 const S={
-  cx:600,cy:350,speed:55,facing:Math.PI,moving:false,
+  cx:810,cy:320,speed:55,facing:Math.PI,moving:false,
   soldiers:[],soldierCount:40,
   formation:'circle',faith:70,
   rallying:false,rallyTimer:0,
@@ -953,11 +953,12 @@ function makeUnit(x,y,team){
 
 function initSoldiers(){
   S.soldiers=[];S.casualties=[];
+  // Start soldiers inside Manti gate, stacked for march-out
+  const gateX=835,gateY=320;
   for(let i=0;i<S.soldierCount;i++){
-    const ring=Math.floor(i/10),pos=i%10,inRing=Math.min(10,S.soldierCount-ring*10);
-    const angle=(pos/inRing)*Math.PI*2,r=12+ring*8;
-    const s=makeUnit(S.cx+Math.cos(angle)*r,S.cy+Math.sin(angle)*r,'nephite');
-    s.circleAngle=angle;s.circleRing=ring;
+    const row=Math.floor(i/4),col=i%4;
+    const s=makeUnit(gateX+row*3+Math.random()*2,gateY-4+col*3+Math.random()*2,'nephite');
+    s.circleAngle=(i/S.soldierCount)*Math.PI*2;s.circleRing=Math.floor(i/10);
     assignName(s);
     S.soldiers.push(s);
   }
@@ -3657,6 +3658,14 @@ function gameLoop(t){
   // Event log fade
   const logEl=document.getElementById('event-log');
   if(logEl){for(let i=0;i<logEl.children.length;i++){const e=logEl.children[i];const age=(performance.now()-e._born)/1000;if(age>0){e.style.opacity=Math.max(0,0.8*(1-age/45)).toFixed(2);if(age>=45){logEl.removeChild(e);i--;}}}}
+  // Deploy phase update
+  if(S.phase==='deploy'){
+    updateDeployment(realDt);
+    // Update soldier positions (formation following)
+    const dt=realDt;
+    S.soldiers.forEach(s=>{if(!s.dead){const tgt=getFormationTarget(s);if(tgt){const ddx=tgt.x-s.x,ddy=tgt.y-s.y,d=Math.sqrt(ddx*ddx+ddy*ddy);if(d>3){const spd=Math.min(s.speed*terrainSpeed(s.x,s.y),d*3);s.x+=ddx/d*spd*dt;s.y+=ddy/d*spd*dt;}}}});
+    render();requestAnimationFrame(gameLoop);return;
+  }
   // Establishing shot update
   if(S.phase==='establishing'){
     updateEstablishing(realDt);render();requestAnimationFrame(gameLoop);return;
@@ -3775,13 +3784,51 @@ function campBegin(){
     showCallout('"And they did pray mightily that God would strengthen them." (Alma 43:49)',4);
     setTimeout(()=>{
       S._prayerActive=false;S._prayerDone=true;
-      // Now start establishing shot
-      S.phase='establishing';S._estTimer=0;S._estKeypoints=null;
+      startDeployment();
     },3000);
     return;
   }
-  // Now start establishing shot
-  S.phase='establishing';S._estTimer=0;S._estKeypoints=null;
+  startDeployment();
+}
+
+function startDeployment(){
+  S.phase='deploy';S._deployTimer=0;
+  S._targetLetterbox=1;
+  // Commander starts at gate, will march west
+  S.cx=830;S.cy=320;S.facing=Math.PI;
+  S.camX=S.cx-W/2;S.camY=S.cy-H/2;
+  showCallout('Moroni leads his forces out from Manti.',4);
+  if(!running){running=true;lastTime=performance.now();requestAnimationFrame(gameLoop);}
+}
+
+function updateDeployment(dt){
+  S._deployTimer+=dt;
+  const t=S._deployTimer;
+  // Commander marches west out of gate
+  const deploySpeed=40;
+  const targetX=680,targetY=350;
+  if(t<4){
+    // March west
+    const dx=targetX-S.cx,dy=targetY-S.cy;
+    const d=Math.sqrt(dx*dx+dy*dy);
+    if(d>5){
+      S.cx+=dx/d*deploySpeed*dt;S.cy+=dy/d*deploySpeed*dt;
+      S.facing=Math.atan2(dy,dx);
+    }
+    // Soldiers follow in column (they'll use normal formation logic)
+    S.formation=3; // column
+    // Camera follows
+    S.camX+=(S.cx-W/2-S.camX)*3*dt;S.camY+=(S.cy-H/2-S.camY)*3*dt;
+  }else if(t<5){
+    // Arrive, form up in circle
+    S.formation=1; // circle
+  }else{
+    // Done deploying — start establishing shot
+    S._targetLetterbox=0;
+    S.phase='establishing';S._estTimer=0;S._estKeypoints=null;
+  }
+  S.camX=Math.max(0,Math.min(MAP.w-W,S.camX));
+  S.camY=Math.max(0,Math.min(MAP.h-H,S.camY));
 }
 
 function startLehiScout(){
@@ -3830,7 +3877,7 @@ function beginMission(idx){
   S.heat=0;S.faith=70;
   S.lehiAttacking=false;S.lehiOrder=null;S.battleCmd=null;
   S.scoutMode='safe';S.scoutIntelLevel=0;
-  S._estTimer=0;S._estKeypoints=null;
+  S._estTimer=0;S._estKeypoints=null;S._deployTimer=0;
   // Reset camp overlay UI
   ['armor','pray','intel','council'].forEach(t=>{
     const el=document.getElementById('camp-'+t);
