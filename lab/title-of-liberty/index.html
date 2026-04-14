@@ -345,13 +345,19 @@ const HILL={x:680,y:520,r:65};
 const TREES=[];
 (function(){
   // Wilderness around Hill Riplah (player concealment)
-  for(let i=0;i<90;i++)TREES.push({x:600+Math.random()*200,y:440+Math.random()*260,s:5+Math.random()*4});
+  for(let i=0;i<90;i++)TREES.push({x:600+Math.random()*200,y:440+Math.random()*260,s:6+Math.random()*5});
+  // Giant trees in south wilderness
+  for(let i=0;i<12;i++)TREES.push({x:580+Math.random()*250,y:450+Math.random()*230,s:11+Math.random()*6});
   // Northern wilderness (Lehi concealment)
-  for(let i=0;i<70;i++)TREES.push({x:520+Math.random()*250,y:50+Math.random()*200,s:5+Math.random()*4});
+  for(let i=0;i<70;i++)TREES.push({x:520+Math.random()*250,y:50+Math.random()*200,s:6+Math.random()*5});
+  // Giant trees in north wilderness
+  for(let i=0;i<8;i++)TREES.push({x:540+Math.random()*220,y:60+Math.random()*180,s:11+Math.random()*6});
   // Eastern scatter
-  for(let i=0;i<30;i++)TREES.push({x:400+Math.random()*400,y:250+Math.random()*200,s:4+Math.random()*3});
+  for(let i=0;i<30;i++)TREES.push({x:400+Math.random()*400,y:250+Math.random()*200,s:5+Math.random()*4});
   // Western (Lamanite side) — sparse
-  for(let i=0;i<20;i++)TREES.push({x:Math.random()*250,y:Math.random()*MAP.h,s:5+Math.random()*3});
+  for(let i=0;i<20;i++)TREES.push({x:Math.random()*250,y:Math.random()*MAP.h,s:6+Math.random()*4});
+  // Giant trees west of river
+  for(let i=0;i<6;i++)TREES.push({x:40+Math.random()*200,y:Math.random()*MAP.h,s:11+Math.random()*5});
 })();
 
 // ══════════════════════════════════════
@@ -2340,6 +2346,9 @@ function render(){
 
   drawTerrainZoneHints();
 
+  // Tree canopy overlay — drawn ON TOP of units so characters are partially obscured
+  drawTreeCanopy();
+
   // Particles (blood + sparks)
   PARTICLES.forEach(p=>{
     const a=p.life/p.maxLife;
@@ -2482,21 +2491,14 @@ function drawTerrain(){
 
   // Trees — visible canopy circles with shade, trunks, undergrowth
   TREES.forEach(t=>{
-    // Ground shade zone
-    ctx.fillStyle='rgba(15,25,10,0.15)';
-    ctx.beginPath();ctx.arc(t.x,t.y+t.s*0.3,t.s*1.2,0,Math.PI*2);ctx.fill();
+    // Ground shade zone — larger, more visible dark circle
+    ctx.fillStyle='rgba(10,18,8,0.2)';
+    ctx.beginPath();ctx.arc(t.x,t.y+t.s*0.3,t.s*1.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(8,15,6,0.12)';
+    ctx.beginPath();ctx.arc(t.x,t.y+t.s*0.3,t.s*1.8,0,Math.PI*2);ctx.fill();
     // Trunk
     ctx.fillStyle='rgba(50,35,20,0.7)';ctx.fillRect(t.x-1,t.y,Math.max(2,t.s*0.3),t.s);
-    // Main canopy
-    ctx.fillStyle='rgba(25,55,18,0.65)';
-    ctx.beginPath();ctx.arc(t.x,t.y-t.s*0.2,t.s*0.8,0,Math.PI*2);ctx.fill();
-    // Lighter highlight
-    ctx.fillStyle='rgba(40,75,25,0.4)';
-    ctx.beginPath();ctx.arc(t.x-t.s*0.2,t.y-t.s*0.4,t.s*0.4,0,Math.PI*2);ctx.fill();
-    // Second canopy blob
-    ctx.fillStyle='rgba(30,60,20,0.5)';
-    ctx.beginPath();ctx.arc(t.x+t.s*0.3,t.y-t.s*0.1,t.s*0.5,0,Math.PI*2);ctx.fill();
-    // Undergrowth ferns
+    // Undergrowth ferns (below canopy, on ground)
     ctx.fillStyle='rgba(25,55,18,0.45)';
     ctx.beginPath();ctx.moveTo(t.x-t.s*0.6,t.y+t.s);ctx.lineTo(t.x-t.s*0.1,t.y+t.s*0.4);ctx.lineTo(t.x+t.s*0.4,t.y+t.s);ctx.fill();
     ctx.fillStyle='rgba(20,50,15,0.4)';
@@ -2516,6 +2518,26 @@ function drawTerrain(){
 function drawTerrainZoneHints(){
   ROADS.forEach(r=>{const dx=r.x2-r.x1,dy=r.y2-r.y1,len=Math.sqrt(dx*dx+dy*dy);const nx=-dy/len,ny=dx/len;ctx.strokeStyle='rgba(100,90,60,0.1)';ctx.lineWidth=0.3;ctx.setLineDash([2,4]);ctx.beginPath();ctx.moveTo(r.x1+nx*r.w/2,r.y1+ny*r.w/2);ctx.lineTo(r.x2+nx*r.w/2,r.y2+ny*r.w/2);ctx.stroke();ctx.beginPath();ctx.moveTo(r.x1-nx*r.w/2,r.y1-ny*r.w/2);ctx.lineTo(r.x2-nx*r.w/2,r.y2-ny*r.w/2);ctx.stroke();ctx.setLineDash([]);});
   ctx.strokeStyle='rgba(100,90,50,0.08)';ctx.lineWidth=0.3;ctx.setLineDash([3,5]);ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+}
+
+function drawTreeCanopy(){
+  TREES.forEach(t=>{
+    // Main canopy — semi-transparent so units are partially visible beneath
+    ctx.fillStyle='rgba(20,50,15,0.55)';
+    ctx.beginPath();ctx.arc(t.x,t.y-t.s*0.2,t.s*0.9,0,Math.PI*2);ctx.fill();
+    // Lighter highlight top-left
+    ctx.fillStyle='rgba(35,70,22,0.35)';
+    ctx.beginPath();ctx.arc(t.x-t.s*0.25,t.y-t.s*0.45,t.s*0.45,0,Math.PI*2);ctx.fill();
+    // Second canopy blob right
+    ctx.fillStyle='rgba(25,55,18,0.4)';
+    ctx.beginPath();ctx.arc(t.x+t.s*0.35,t.y-t.s*0.1,t.s*0.55,0,Math.PI*2);ctx.fill();
+    // Subtle dappled light spots (animated)
+    const dapple=Math.sin(S.time*0.8+t.x*0.1+t.y*0.13);
+    if(dapple>0.3){
+      ctx.fillStyle=`rgba(60,90,40,${0.1+dapple*0.08})`;
+      ctx.beginPath();ctx.arc(t.x+dapple*2,t.y-t.s*0.3,t.s*0.2,0,Math.PI*2);ctx.fill();
+    }
+  });
 }
 
 // ══════════════════════════════════════
