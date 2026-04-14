@@ -1026,8 +1026,14 @@ function triggerLehiAttack(){
 // ══════════════════════════════════════
 function getFormationTarget(soldier,idx,total,formation){
   if(formation==='circle'){
-    const r=16+soldier.circleRing*10;
-    return{x:Math.cos(soldier.circleAngle)*r,y:Math.sin(soldier.circleAngle)*r,ws:true};
+    // Distribute evenly per ring
+    const perRing=10;
+    const ring=Math.floor(idx/perRing);
+    const posInRing=idx%perRing;
+    const countInRing=Math.min(perRing,total-ring*perRing);
+    const angle=(posInRing/countInRing)*Math.PI*2;
+    const r=16+ring*10;
+    return{x:Math.cos(angle)*r,y:Math.sin(angle)*r,ws:true};
   }
   if(formation==='wedge'){
     const row=Math.floor((-1+Math.sqrt(1+8*idx))/2);
@@ -1488,16 +1494,9 @@ function updateConfrontPhase(dt){
   }
 
   if(phase==='refuse_wait'&&S._confrontTimer>0.5){
-    showFEDialog('Moroni','Behold, here are our weapons of war. We will deliver them up unto you, but we will not suffer ourselves to take an oath. Now make your choice.','Alma 44:9',[
-      '"Then behold — we shall end the conflict."',
-      '"Very well. Take your weapons and go."'
-    ],function(idx){
-      if(idx===0){
-        S._confrontPhase='scalp_charge';S._confrontTimer=0;
-      }else{
-        S._mercySkipped=true;
-        beginFinalBattle();
-      }
+    showFEDialog('Moroni','Behold, here are our weapons of war. We will deliver them up unto you, but we will not suffer ourselves to take an oath. Now make your choice.','Alma 44:9',null,function(){
+      // Zerahemnah refuses and charges — no player choice here, this is scripture
+      S._confrontPhase='scalp_charge';S._confrontTimer=0;
     });
     S._confrontPhase='refuse_choice';
   }
