@@ -199,6 +199,11 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
   <div class="label">Morale</div>
   <div id="morale-bar-wrap"><div id="morale-fill"></div></div>
   <div id="morale-desc">Confident</div>
+  <div class="label">🌡 Heat</div>
+  <div style="width:120px;height:6px;background:#2a2a1a;border:1px solid #4a4230;border-radius:2px;margin-bottom:2px;margin-top:2px">
+    <div id="heat-fill" style="width:0%;height:100%;background:#c87030;border-radius:1px;transition:width 0.5s"></div>
+  </div>
+  <div id="heat-desc" style="font-size:0.55rem;color:#6a6248;margin-bottom:4px">Cool</div>
   <div class="sep"></div>
   <div id="concealment-status" style="display:none;font-size:0.6rem"></div>
   <div class="sep"></div>
@@ -420,23 +425,64 @@ const SND={
   setAmbientVol(v){if(this._ambientGain)this._ambientGain.gain.value=Math.max(0,Math.min(0.08,v));},
   // Environmental sounds
   _envTimers:{bird:0,water:0,wind:0},
+  // Jungle ambient sounds
+  howlerMonkey(){
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.type='sawtooth';o.frequency.setValueAtTime(80,AC.currentTime);
+    o.frequency.exponentialRampToValueAtTime(160,AC.currentTime+0.5);
+    o.frequency.exponentialRampToValueAtTime(60,AC.currentTime+1.5);
+    g.gain.setValueAtTime(0.06,AC.currentTime);g.gain.linearRampToValueAtTime(0.1,AC.currentTime+0.3);
+    g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+2);
+    o.connect(g);g.connect(this.masterVol);o.start();o.stop(AC.currentTime+2);
+  },
+  tropicalInsects(vol){
+    const o=AC.createOscillator(),m=AC.createOscillator(),g=AC.createGain();
+    o.type='sine';o.frequency.value=4200+Math.random()*800;
+    m.type='sine';m.frequency.value=40+Math.random()*20;
+    const mg=AC.createGain();mg.gain.value=300;
+    m.connect(mg);mg.connect(o.frequency);
+    g.gain.setValueAtTime(vol,AC.currentTime);g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+0.3);
+    o.connect(g);g.connect(this.masterVol);o.start();m.start();o.stop(AC.currentTime+0.3);m.stop(AC.currentTime+0.3);
+  },
+  distantThunder(){
+    const buf=AC.createBuffer(1,AC.sampleRate*3,AC.sampleRate),d=buf.getChannelData(0);
+    let last=0;for(let i=0;i<d.length;i++){last=(last+0.02*(Math.random()*2-1))/1.02;d[i]=last*3.5;}
+    const n=AC.createBufferSource();n.buffer=buf;
+    const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=100;
+    const g=AC.createGain();g.gain.setValueAtTime(0,AC.currentTime);
+    g.gain.linearRampToValueAtTime(0.12,AC.currentTime+0.5);
+    g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+3);
+    n.connect(f);f.connect(g);g.connect(this.masterVol);n.start();
+  },
+  warCry(){
+    for(let i=0;i<4;i++){
+      const o=AC.createOscillator(),g=AC.createGain();
+      o.type='sawtooth';o.frequency.value=60+i*15+Math.random()*20;
+      g.gain.setValueAtTime(0.08,AC.currentTime+i*0.1);
+      g.gain.exponentialRampToValueAtTime(0.001,AC.currentTime+1.5+i*0.1);
+      o.connect(g);g.connect(this.masterVol);o.start(AC.currentTime+i*0.1);o.stop(AC.currentTime+1.5+i*0.1);
+    }
+    this.noise(1.2,0.12);
+  },
+  splash(){
+    this.noise(0.2,0.08);
+    this.tone(300+Math.random()*200,0.1,'sine',0.04);
+  },
   updateEnv(x,y,dt){
     this._envTimers.bird-=dt;this._envTimers.water-=dt;this._envTimers.wind-=dt;
-    // Bird chirps in/near trees
     const nearTree=TREES.some(t=>Math.abs(x-t.x)<40&&Math.abs(y-t.y)<40);
+    // Tropical insects — continuous chirping near trees
     if(nearTree&&this._envTimers.bird<=0){
-      this._envTimers.bird=2+Math.random()*5;
-      const f=1800+Math.random()*1200;
-      this.tone(f,0.06,'sine',0.04);
-      setTimeout(()=>this.tone(f*1.2,0.05,'sine',0.03),80);
-      setTimeout(()=>this.tone(f*0.9,0.07,'sine',0.03),180);
+      this._envTimers.bird=0.3+Math.random()*0.8;
+      const vol=0.02+Math.random()*0.02;
+      this.tropicalInsects(vol);
     }
-    // Water near river
+    // Water near river — louder, more present
     const rx=riverX(y);const riverDist=Math.abs(x-rx);
-    if(riverDist<50&&this._envTimers.water<=0){
-      this._envTimers.water=0.8+Math.random()*1.5;
-      const vol=Math.max(0.01,0.04*(1-riverDist/50));
-      this.noise(0.15,vol);
+    if(riverDist<80&&this._envTimers.water<=0){
+      this._envTimers.water=0.3+Math.random()*0.6;
+      const vol=Math.max(0.02,0.08*(1-riverDist/80));
+      this.noise(0.25,vol);
     }
     // Wind on hills
     if(onHill(x,y)&&this._envTimers.wind<=0){
@@ -480,7 +526,10 @@ function addBody(x,y,team){
 function updateParticles(dt){
   for(let i=PARTICLES.length-1;i>=0;i--){
     const p=PARTICLES[i];
-    p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=60*dt;p.life-=dt;
+    p.x+=p.vx*dt;p.y+=p.vy*dt;
+    if(p.color==='leaf'){p.vy=8+Math.sin(S.time*2+p.x)*3;p.vx=Math.sin(S.time+p.y*0.1)*4;}
+    else{p.vy+=60*dt;}
+    p.life-=dt;
     if(p.life<=0)PARTICLES.splice(i,1);
   }
   // Stains slowly fade over 60 seconds
@@ -587,6 +636,31 @@ const S={
   campCouncil:false,
   _chargeStartTime:0,
   _faithRegenTimer:0,
+  // Heat system
+  heat:0,
+  _heatCalloutTimer:0,
+  // Jungle ambient timers
+  _monkeyTimer:15+Math.random()*15,
+  _thunderTimer:60+Math.random()*60,
+  _insectGain:null,
+  _warCryDone:false,
+  _warCryPreRally:false,
+  // Terrain storytelling
+  _footprints:[],
+  _footprintIdx:0,
+  _trampledGrass:{},
+  // River blood
+  _riverBlood:0,
+  _riverBloodY:999,
+  // Prayer
+  _prayerDone:false,
+  _prayerTimer:0,
+  _prayerActive:false,
+  _campPray:false,
+  // Scout silent capture
+  _scoutLostTimer:0,
+  _scoutSilentLost:false,
+  _scoutSilentAlerted:false,
 };
 
 // ══════════════════════════════════════
@@ -674,6 +748,7 @@ function makeUnit(x,y,team){
     scoutFacing:0,returning:false,scoutImmunity:0,scoutWaypoints:null,scoutWpIdx:0,
     // Juice
     _hitFlash:0,_deathFade:0,_dead2:false,_name:'',facing:0,
+    heat:0,_wasInRiver:false,
   };
 }
 
@@ -1192,6 +1267,81 @@ function update(dt){
   updateParticles(dt);
   updateMission(dt);
 
+  // ── Jungle ambient: howler monkey ──
+  S._monkeyTimer-=dt;
+  if(S._monkeyTimer<=0){
+    S._monkeyTimer=15+Math.random()*15;
+    if(TREES.some(t=>Math.abs(S.cx-t.x)<60&&Math.abs(S.cy-t.y)<60))SND.howlerMonkey();
+  }
+  // ── Distant thunder ──
+  S._thunderTimer-=dt;
+  if(S._thunderTimer<=0){S._thunderTimer=60+Math.random()*60;SND.distantThunder();}
+
+  // ── Heat/fatigue system ──
+  {
+    const inTree=inTrees(S.cx,S.cy);
+    const onH=onHill(S.cx,S.cy);
+    let heatRate=inTree?0.5:onH?3:2;
+    if(S.campArmor)heatRate+=1.5;
+    if(S.moving)heatRate*=1.5;
+    if(!S.moving&&inTree)heatRate=-3;
+    S.heat=Math.max(0,Math.min(100,S.heat+heatRate*dt));
+    // Effects
+    S._heatCalloutTimer-=dt;
+    if(S.heat>=80&&S._heatCalloutTimer<=0){
+      S._heatCalloutTimer=10;
+      showCallout('Your men are overheating!',3);
+    }
+    if(S.heat>=80){
+      S.soldiers.forEach(s=>{if(!s.dead)s.morale=Math.max(0,s.morale-dt);});
+    }
+  }
+
+  // ── Footprint fading ──
+  S._footprints.forEach(fp=>{fp.alpha-=dt/30;});
+  S._footprints=S._footprints.filter(fp=>fp.alpha>0);
+
+  // ── River blood tracking ──
+  if(S.phase==='battle'||S.phase==='surround'){
+    S.enemies.concat(S.soldiers).forEach(u=>{
+      if(!u.dead&&inRiver(u.x,u.y)&&u.hp<u.maxHp){
+        S._riverBlood=Math.min(30,S._riverBlood+dt*0.5);
+        if(u.y<S._riverBloodY)S._riverBloodY=u.y;
+      }
+    });
+  }
+
+  // ── War cry (when Lamanites spot player during battle) ──
+  if(S.phase==='battle'&&!S._warCryDone){
+    S._warCryDone=true;
+    SND.warCry();addTrauma(0.15);
+    if(!S._warCryPreRally){
+      S.soldiers.forEach(s=>{if(!s.dead)s.morale=Math.max(0,s.morale-10);});
+      showCallout('The Lamanites raise a terrible war cry! Your men flinch.',4);
+    }else{
+      S.soldiers.forEach(s=>{if(!s.dead)s.morale=Math.min(100,s.morale+5);});
+      showCallout('Your rally negates the war cry! Your men stand firm!',4);
+    }
+  }
+
+  // ── Prayer scene ──
+  if(S._prayerActive){
+    S._prayerTimer-=dt;
+    if(S._prayerTimer<=0){
+      S._prayerActive=false;S._prayerDone=true;
+    }
+    return; // freeze game during prayer
+  }
+
+  // ── Scout silent capture tracking ──
+  if(S._scoutSilentLost&&!S._scoutSilentNotified){
+    S._scoutLostTimer+=dt;
+    if(S._scoutLostTimer>=30){
+      S._scoutSilentNotified=true;
+      showCallout("We've lost contact with our scout...",4);
+    }
+  }
+
   // March footstep sounds
   if(S.moving){S._marchSndTimer-=dt;if(S._marchSndTimer<=0){S._marchSndTimer=0.4;SND.march();}}
 
@@ -1291,7 +1441,15 @@ function update(dt){
   // ── Lehi messengers ──
   if(S.lehiMessengers){
     S.lehiMessengers.forEach(m=>{
-      if(m.done)return;
+      if(m.done||m.intercepted)return;
+      // Messenger interception check
+      const intercepted=S.enemies.some(e=>!e.dead&&Math.sqrt((e.x-m.cx)*(e.x-m.cx)+(e.y-m.cy)*(e.y-m.cy))<25);
+      if(intercepted){
+        m.intercepted=true;m.done=true;
+        spawnDeathParticles(m.cx,m.cy);SND.death();
+        showCallout('Your messenger was intercepted! Lehi never received the order!',5);
+        return;
+      }
       const dx=m.tx-m.cx,dy=m.ty-m.cy,d=Math.sqrt(dx*dx+dy*dy);
       if(d<15){
         m.done=true;
@@ -1316,7 +1474,7 @@ function update(dt){
         m.cx+=dx/d*m.speed*dt;m.cy+=dy/d*m.speed*dt;
       }
     });
-    S.lehiMessengers=S.lehiMessengers.filter(m=>!m.done);
+    S.lehiMessengers=S.lehiMessengers.filter(m=>!m.done&&!m.intercepted);
   }
 
   // ── Enemies ──
@@ -1451,14 +1609,18 @@ function update(dt){
     const fleeRange=S.scoutMode==='safe'?100:S.scoutMode==='close'?50:25;
     const captureRange=S.scoutMode==='deep'?30:S.scoutMode==='close'?15:0;
     
-    // Scout capture check — if too close, risk being caught
+    // Scout capture check — silent disappearance
     if(nearE&&nearD<captureRange&&!sc._fleeTimer){
-      // Caught! Scout is killed, enemy army goes on alert
       sc.dead=true;sc.hp=0;
-      S._scoutCaught=true;
-      S.enemies.forEach(e=>{if(!e.dead){e.aggroRange=100;e.speed=Math.min(55,e.speed*1.15);}});
-      showCallout('💀 Scout captured! The Lamanites are alerted — they know we\'re here!',5);
-      SND.death();addTrauma(0.15);
+      spawnDeathParticles(sc.x,sc.y);
+      SND.death();
+      S._scoutSilentLost=true;S._scoutLostTimer=0;
+      // Chance of alerting Lamanites (no callout to player)
+      const alertChance=S.scoutMode==='deep'?0.5:0.2;
+      if(Math.random()<alertChance){
+        S._scoutSilentAlerted=true;
+        S.enemies.forEach(e=>{if(!e.dead){e.aggroRange=100;e.speed=Math.min(55,e.speed*1.15);}});
+      }
       return;
     }
     
@@ -1554,6 +1716,31 @@ function moveSoldierToTarget(s,dt){
   else if(S.formation==='travel')ts*=1.3;
   // Morale speed penalty
   if(s.morale<30)ts*=0.8;
+  // Heat speed penalty
+  if(S.heat>=80)ts*=0.7;
+  else if(S.heat>=60)ts*=0.8;
+  else if(S.heat>=40)ts*=0.9;
+  // Wounded speed penalty
+  if(s.hp<s.maxHp*0.25){ts*=0.2;}
+  else if(s.hp<s.maxHp*0.4){ts*=0.5;}
+  // Footprints near river (mud)
+  const nearRiver=Math.abs(s.x-riverX(s.y))<RIVER_HALF_W+15;
+  if(nearRiver&&Math.random()<0.02&&S._footprints.length<500){
+    S._footprints.push({x:s.x,y:s.y,alpha:0.3});
+  }
+  // Trampled grass
+  const gKey=Math.floor(s.x/6)*6+','+Math.floor(s.y/6)*6;
+  S._trampledGrass[gKey]=true;
+  // Vegetation rustling — leaf particles when moving through trees
+  if(inTrees(s.x,s.y)&&Math.sqrt(s.vx*s.vx+s.vy*s.vy)>10&&Math.random()<0.03){
+    PARTICLES.push({x:s.x+Math.random()*4-2,y:s.y-4,vx:0,vy:0,life:2+Math.random()*2,maxLife:4,color:'leaf'});
+  }
+  // River splash
+  if(inRiver(s.x,s.y)&&!s._wasInRiver){
+    s._wasInRiver=true;SND.splash();
+    for(let i=0;i<3;i++)PARTICLES.push({x:s.x+Math.random()*4-2,y:s.y,vx:(Math.random()-0.5)*20,vy:-Math.random()*20,life:0.3+Math.random()*0.2,maxLife:0.5,color:'splash'});
+  }
+  if(!inRiver(s.x,s.y))s._wasInRiver=false;
   // Morale pre-rout drift
   if(s.morale<15&&!s.fleeing){
     const ne=findNearest(s.x,s.y,80,S.enemies);
@@ -1596,6 +1783,9 @@ function doCombat(atk,def,dt){
   atk.attackCd-=dt;if(atk.attackCd>0)return;
   atk.attackCd=0.8+Math.random()*0.4;
   let dmg=atk.team==='nephite'?1:0.6;
+  // Wounded attacker does less damage
+  if(atk.hp<atk.maxHp*0.25){return;} // critical — can't fight
+  if(atk.hp<atk.maxHp*0.4){dmg*=0.5;} // wounded — half damage
   let defMult=1; // multiplier on damage taken by defender
 
   // ── Flanking & Facing ──
@@ -1673,6 +1863,8 @@ function doCombat(atk,def,dt){
       SND.death();
       addTrauma(0.12,def.x,def.y);
       if(def.team==='nephite'&&def._name){S.casualties.push(def._name);S._lastDeathTime=S.time;}
+      // River blood
+      if(inRiver(def.x,def.y)){S._riverBlood=Math.min(30,S._riverBlood+3);if(def.y<S._riverBloodY)S._riverBloodY=def.y;}
       const allies=def.team==='nephite'?S.soldiers.concat(S.allies):S.enemies;
       allies.forEach(a=>{if(!a.dead){const d=Math.sqrt((a.x-def.x)*(a.x-def.x)+(a.y-def.y)*(a.y-def.y));if(d<40)a.morale-=10;}});
     }
@@ -1711,6 +1903,16 @@ function updateHtmlHud(){
   const mFill=document.getElementById('morale-fill');
   mFill.style.width=Math.max(0,Math.min(100,avgMorale))+'%';
   mFill.style.background=avgMorale>70?'#6a8a3a':avgMorale>40?'#a89840':'#aa4030';
+
+  // Heat bar
+  const hFill=document.getElementById('heat-fill');
+  hFill.style.width=Math.max(0,Math.min(100,S.heat))+'%';
+  hFill.style.background=S.heat>80?'#cc3020':S.heat>60?'#c87030':S.heat>40?'#b8a040':'#6a8a3a';
+  const hDesc=document.getElementById('heat-desc');
+  if(S.heat>=80)hDesc.textContent='Overheating!';
+  else if(S.heat>=60)hDesc.textContent='Hot';
+  else if(S.heat>=40)hDesc.textContent='Warm';
+  else hDesc.textContent='Cool';
   const mDesc=document.getElementById('morale-desc');
   if(avgMorale>90)mDesc.textContent='Zealous';
   else if(avgMorale>70)mDesc.textContent='Confident';
@@ -1928,7 +2130,12 @@ function render(){
     const a=e.state==='rout'?0.3:d.a;
     const eFlash=e._hitFlash>0?(e._hitFlash-=1/60,'rgba(255,255,255,0.9)'):`rgba(140,60,40,${a})`;
     ctx.fillStyle=eFlash;
-    ctx.fillRect(Math.floor(d.x-1),Math.floor(d.y-1),2,3);
+    ctx.fillRect(Math.floor(d.x-1),Math.floor(d.y-2),2,4); // taller (4px vs 3px)
+    // War paint stripes
+    if(d.a>0.5){
+      ctx.fillStyle=`rgba(180,40,30,${a*0.4})`;ctx.fillRect(Math.floor(d.x),Math.floor(d.y-1),1,1);
+      ctx.fillStyle=`rgba(60,60,60,${a*0.3})`;ctx.fillRect(Math.floor(d.x-1),Math.floor(d.y),1,1);
+    }
     if(d.a>0.7&&e.hp<e.maxHp){ctx.fillStyle=`rgba(200,50,30,${a})`;ctx.fillRect(Math.floor(d.x-1),Math.floor(d.y-4),Math.ceil(2*(e.hp/e.maxHp)),1);}
     if(d.a<0.5&&d.a>0.05){ctx.fillStyle=`rgba(200,100,60,${d.a})`;ctx.fillRect(Math.floor(d.x),Math.floor(d.y-6),1,2);ctx.fillRect(Math.floor(d.x),Math.floor(d.y-3),1,1);}
   });
@@ -1948,27 +2155,39 @@ function render(){
     const sFlash=s._hitFlash>0?(s._hitFlash-=1/60,'rgba(255,255,255,0.9)'):`rgb(${b},${g},${bl})`;
     ctx.fillStyle=sFlash;
     ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-1),s.size|0,(s.size+0.5)|0);
-    if(s.armored){ctx.fillStyle='rgba(200,180,120,0.3)';ctx.fillRect(Math.floor(s.x),Math.floor(s.y-2),1,1);}
+    // Armored Nephite distinction: breastplate (lighter chest), head-plate, arm-shield hints
+    if(s.armored){
+      ctx.fillStyle='rgba(220,200,140,0.4)';ctx.fillRect(Math.floor(s.x),Math.floor(s.y-1),1,1); // breastplate
+      ctx.fillStyle='rgba(200,180,120,0.35)';ctx.fillRect(Math.floor(s.x),Math.floor(s.y-3),1,1); // head-plate
+      ctx.fillStyle='rgba(180,160,100,0.2)';ctx.fillRect(Math.floor(s.x-2),Math.floor(s.y),1,1); // arm-shield left
+      ctx.fillStyle='rgba(180,160,100,0.2)';ctx.fillRect(Math.floor(s.x+2),Math.floor(s.y),1,1); // arm-shield right
+    }
     if(s.hp<s.maxHp){ctx.fillStyle='rgba(200,180,60,0.6)';ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-4),Math.ceil(2*(s.hp/s.maxHp)),1);}
+    // Wounded state — red X above head
+    if(s.hp<s.maxHp*0.4){
+      const pulse=0.4+Math.sin(S.time*4)*0.3;
+      ctx.strokeStyle=`rgba(200,30,20,${pulse})`;ctx.lineWidth=0.5;
+      ctx.beginPath();ctx.moveTo(s.x-2,s.y-7);ctx.lineTo(s.x+2,s.y-5);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(s.x+2,s.y-7);ctx.lineTo(s.x-2,s.y-5);ctx.stroke();
+    }
+    // Heat panting dots
+    if(S.heat>=60&&Math.random()<0.02){
+      ctx.fillStyle='rgba(200,200,200,0.4)';
+      ctx.fillRect(Math.floor(s.x+Math.random()*4-2),Math.floor(s.y-6-Math.random()*2),1,1);
+    }
     if(s.barkTimer>0){const bA=Math.min(1,s.barkTimer*2);ctx.fillStyle=`rgba(255,220,80,${bA})`;ctx.fillRect(Math.floor(s.x),Math.floor(s.y-7),1,3);ctx.fillRect(Math.floor(s.x),Math.floor(s.y-3),1,1);}
-    // Flanked bark
     if(s._flankedTimer>0){s._flankedTimer-=1/60;const fa=Math.min(1,s._flankedTimer);ctx.fillStyle=`rgba(255,80,40,${fa})`;ctx.font='3px Inter';ctx.fillText('⚔',Math.floor(s.x-3),Math.floor(s.y-8));}
-    // Morale visual tells
     if(s.morale>80&&Math.random()<0.0005){s.barkTimer=0.8;}
     if(s.morale<30&&s.barkTimer<=0&&Math.random()<0.005){ctx.fillStyle='rgba(180,160,120,0.5)';ctx.font='3px Inter';ctx.fillText('…',Math.floor(s.x-2),Math.floor(s.y-6));}
     if(s.morale<50&&s.morale>30){const shake=Math.sin(S.time*15+s.bobPhase)*0.3;ctx.fillStyle=`rgb(${b},${g},${bl})`;ctx.fillRect(Math.floor(s.x-1+shake),Math.floor(s.y),1,1);}
-    // Sweat droplet — only when wading through river
     if(s.sweatTimer>0&&inRiver(s.x,s.y)){
       const sa=Math.min(1,s.sweatTimer*0.8);
       const blink=Math.sin(S.time*6+s.bobPhase)>-0.3;
       if(blink){
         const drop=Math.abs(Math.sin(S.time*4+s.bobPhase))*1.5;
         const sx=Math.floor(s.x-3),sy0=Math.floor(s.y-9-drop);
-        // Teardrop shape: narrow top, wider bottom
         ctx.fillStyle=`rgba(140,210,255,${sa})`;
-        ctx.fillRect(sx,sy0,1,1);     // top point
-        ctx.fillRect(sx-1,sy0+1,2,1); // wider middle
-        ctx.fillRect(sx,sy0+2,1,1);   // bottom
+        ctx.fillRect(sx,sy0,1,1);ctx.fillRect(sx-1,sy0+1,2,1);ctx.fillRect(sx,sy0+2,1,1);
       }
     }
   });
@@ -2076,6 +2295,10 @@ function render(){
     const a=p.life/p.maxLife;
     if(p.color==='spark'){
       ctx.fillStyle=`rgba(255,220,100,${a})`;
+    }else if(p.color==='leaf'){
+      ctx.fillStyle=`rgba(50,90,30,${a*0.7})`;
+    }else if(p.color==='splash'){
+      ctx.fillStyle=`rgba(200,220,255,${a})`;
     }else{
       ctx.fillStyle=`rgba(160,20,10,${a})`;
     }
@@ -2084,6 +2307,17 @@ function render(){
 
   ctx.restore();
   drawMinimap();
+
+  // Prayer overlay
+  if(S._prayerActive){
+    ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(200,160,64,0.7)';ctx.font='5px Cinzel';ctx.textAlign='center';
+    ctx.fillText('"And they did pray mightily that',W/2,H/2-8);
+    ctx.fillText('God would strengthen them."',W/2,H/2);
+    ctx.fillStyle='rgba(100,80,40,0.5)';ctx.font='3px Inter';
+    ctx.fillText('— Alma 43:49',W/2,H/2+8);
+    ctx.textAlign='start';
+  }
 
   // Objective arrow (points toward Hill Riplah during position phase)
   if(S.phase==='position'&&!S._inPosition){
@@ -2103,32 +2337,90 @@ function render(){
 // ══════════════════════════════════════
 // TERRAIN RENDER
 // ══════════════════════════════════════
+// Seeded random for vegetation
+function seedRand(x,y){let s=x*374761393+y*668265263+1013904223;s=(s^(s>>13))*1274126177;return((s^(s>>16))&0x7fffffff)/0x7fffffff;}
+
 function drawTerrain(){
   ctx.fillStyle='#2a2818';ctx.fillRect(0,0,MAP.w,MAP.h);
   for(let x=0;x<MAP.w;x+=8){for(let y=0;y<MAP.h;y+=8){
     const n=Math.sin(x*0.1+y*0.13)*0.5+Math.sin(x*0.07-y*0.11)*0.5;
     if(n>0.3){ctx.fillStyle='rgba(60,70,30,0.12)';ctx.fillRect(x,y,6,6);}
   }}
+
+  // Tall grass patches (seeded)
+  for(let x=0;x<MAP.w;x+=6){for(let y=0;y<MAP.h;y+=6){
+    const r=seedRand(x,y);
+    if(r>0.7&&!inRiver(x,y)){
+      const nearT=TREES.some(t=>Math.abs(x-t.x)<20&&Math.abs(y-t.y)<20);
+      const dense=nearT?0.5:0.75;
+      if(r>dense){
+        const key=x+','+y;
+        const trampled=S._trampledGrass[key];
+        if(trampled){
+          ctx.fillStyle='rgba(40,50,20,0.15)';
+        }else{
+          ctx.fillStyle='rgba(50,70,25,0.2)';
+        }
+        ctx.fillRect(x,y,1,1+Math.floor(seedRand(x+1,y)*2));
+      }
+    }
+  }}
+
   ctx.strokeStyle='#3a3428';ctx.lineCap='round';
   ROADS.forEach(r=>{ctx.lineWidth=r.w;ctx.beginPath();ctx.moveTo(r.x1,r.y1);ctx.lineTo(r.x2,r.y2);ctx.stroke();});
   ctx.strokeStyle='rgba(70,60,40,0.2)';
   ROADS.forEach(r=>{ctx.lineWidth=r.w*0.3;ctx.beginPath();ctx.moveTo(r.x1,r.y1);ctx.lineTo(r.x2,r.y2);ctx.stroke();});
-  // River
+
+  // River with enhanced visuals
   ctx.fillStyle='#1a2a3a';ctx.beginPath();
   for(let y=0;y<=MAP.h;y+=4){const rx=riverX(y);if(y===0)ctx.moveTo(rx-RIVER_HALF_W,y);ctx.lineTo(rx-RIVER_HALF_W,y);}
   for(let y=MAP.h;y>=0;y-=4){ctx.lineTo(riverX(y)+RIVER_HALF_W,y);}ctx.fill();
-  ctx.fillStyle='rgba(40,80,120,0.12)';
-  for(let y=0;y<MAP.h;y+=10){const rx=riverX(y);ctx.fillRect(rx-8+Math.sin(S.time*2+y*0.1)*3,y,5,2);}
-  // River
+  // River blood tint
+  if(S._riverBlood>0){
+    const bloodAlpha=Math.min(0.3,S._riverBlood*0.01);
+    for(let y=Math.max(0,S._riverBloodY);y<MAP.h;y+=4){
+      const rx=riverX(y);
+      ctx.fillStyle=`rgba(120,20,10,${bloodAlpha*Math.max(0,1-(y-S._riverBloodY)/200)})`;
+      ctx.fillRect(rx-RIVER_HALF_W,y,RIVER_HALF_W*2,4);
+    }
+  }
+  // Animated ripple lines + foam
+  for(let y=0;y<MAP.h;y+=6){
+    const rx=riverX(y);
+    // Ripple
+    ctx.fillStyle='rgba(40,80,120,0.15)';
+    ctx.fillRect(rx-10+Math.sin(S.time*2.5+y*0.08)*5,y,4,1);
+    ctx.fillRect(rx+3+Math.sin(S.time*1.8+y*0.12+2)*4,y,3,1);
+    // Foam near banks
+    if(Math.sin(S.time*1.5+y*0.2)>0.5){
+      ctx.fillStyle='rgba(180,200,220,0.12)';
+      ctx.fillRect(rx-RIVER_HALF_W+1,y,2,1);
+      ctx.fillRect(rx+RIVER_HALF_W-3,y,2,1);
+    }
+  }
+
   // Hill
   ctx.fillStyle='rgba(80,70,40,0.18)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='rgba(90,80,45,0.12)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*0.65,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='rgba(100,90,50,0.08)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*0.3,0,Math.PI*2);ctx.fill();
   ctx.fillStyle='rgba(140,130,90,0.35)';ctx.font='5px Inter';ctx.fillText('Hill Riplah',HILL.x-18,HILL.y-HILL.r+8);
-  // Trees
+
+  // Trees with ferns/undergrowth
   TREES.forEach(t=>{
     ctx.fillStyle='rgba(25,45,18,0.5)';ctx.fillRect(t.x,t.y,t.s*0.4,t.s);
     ctx.fillStyle='rgba(35,55,22,0.4)';ctx.fillRect(t.x-t.s*0.5,t.y-t.s*0.5,t.s*1.5,t.s*0.7);
+    // Ferns at base
+    ctx.fillStyle='rgba(20,50,15,0.3)';
+    ctx.beginPath();ctx.moveTo(t.x-t.s*0.3,t.y+t.s);ctx.lineTo(t.x,t.y+t.s-2);ctx.lineTo(t.x+t.s*0.3,t.y+t.s);ctx.fill();
+    ctx.beginPath();ctx.moveTo(t.x+t.s*0.5,t.y+t.s);ctx.lineTo(t.x+t.s*0.3,t.y+t.s-1.5);ctx.lineTo(t.x+t.s*0.7,t.y+t.s);ctx.fill();
+  });
+
+  // Footprints
+  S._footprints.forEach(fp=>{
+    if(fp.alpha>0){
+      ctx.fillStyle=`rgba(60,45,25,${fp.alpha})`;
+      ctx.fillRect(Math.floor(fp.x),Math.floor(fp.y),1,1);
+    }
   });
 }
 
@@ -2168,6 +2460,8 @@ function handleKey(k){
   if(!running)return;
   if(k===' '){
     S.rallying=true;S.rallyTimer=3;SND.rallyHorn();
+    // War cry counter — if rallying before war cry, negate it
+    if(!S._warCryDone)S._warCryPreRally=true;
     // Hard pull far soldiers toward commander
     S.soldiers.forEach(s=>{
       if(s.dead)return;
@@ -2269,6 +2563,7 @@ function campArmor(){
 function campPray(){
   S.faith=Math.min(100,S.faith+25);
   S.soldiers.forEach(s=>{if(!s.dead)s.morale=Math.min(100,s.morale+15);});
+  S._campPray=true;
   document.getElementById('camp-pray-flavor').textContent='You gather the men and pray. Their faith burns bright. (+25 Faith, +15 Morale)';
 }
 function campIntel(){
@@ -2282,10 +2577,30 @@ function campCouncil(){
 function campBegin(){
   document.getElementById('camp-overlay').style.display='none';
   SND.startAmbient();
+  // Prayer scene if player chose pray
+  if(S._campPray&&!S._prayerDone){
+    S._prayerActive=true;S._prayerTimer=3;
+    running=true;lastTime=performance.now();
+    requestAnimationFrame(gameLoop);
+    showCallout('"And they did pray mightily that God would strengthen them." (Alma 43:49)',4);
+    setTimeout(()=>{
+      S._prayerActive=false;S._prayerDone=true;
+      // Now start scout phase
+      S.phase='scout';S.phaseTimer=0;
+      setObjective('Send scouts west toward the river. We need to find their army. (Press A then E)');
+      setPhaseLabel('Phase 1 of 4 — Scouting');
+      startLehiScout();
+    },3000);
+    return;
+  }
   // Now start scout phase
   S.phase='scout';S.phaseTimer=0;
   setObjective('Send scouts west toward the river. We need to find their army. (Press A then E)');
   setPhaseLabel('Phase 1 of 4 — Scouting');
+  startLehiScout();
+}
+
+function startLehiScout(){
   setTimeout(()=>{
     if(S.allies.length>0){
       const lehi=S.allies[0];
