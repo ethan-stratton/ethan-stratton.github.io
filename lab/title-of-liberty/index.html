@@ -105,6 +105,7 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 /* ── Camp overlay ── */
 /* Sword cursor */
 body,.cmd-btn,.bar-opt,.fmt-slot,.mercy-btn,.camp-btn,button,.tl-node.unlocked,.fe-choice,#story-overlay{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cline x1='4' y1='4' x2='20' y2='20' stroke='%23222' stroke-width='5' stroke-linecap='round'/%3E%3Cline x1='4' y1='4' x2='20' y2='20' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='4' y1='4' x2='10' y2='4' stroke='%23c8a040' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='4' y1='4' x2='4' y2='10' stroke='%23c8a040' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='16' y1='22' x2='22' y2='16' stroke='%23c8a040' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='22' y1='22' x2='28' y2='28' stroke='%236b4226' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='28' cy='28' r='2' fill='%23c8a040'/%3E%3C/svg%3E") 4 4, default}
+body.clicking,body.clicking .cmd-btn,body.clicking .bar-opt,body.clicking .fmt-slot,body.clicking .mercy-btn,body.clicking .camp-btn,body.clicking button,body.clicking .tl-node.unlocked,body.clicking .fe-choice,body.clicking #story-overlay{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cline x1='4' y1='4' x2='20' y2='20' stroke='%23222' stroke-width='5' stroke-linecap='round'/%3E%3Cline x1='4' y1='4' x2='20' y2='20' stroke='%23888888' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='4' y1='4' x2='10' y2='4' stroke='%23c8a040' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='4' y1='4' x2='4' y2='10' stroke='%23c8a040' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='16' y1='22' x2='22' y2='16' stroke='%23c8a040' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='22' y1='22' x2='28' y2='28' stroke='%236b4226' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='28' cy='28' r='2' fill='%23c8a040'/%3E%3C/svg%3E") 4 4, default}
 canvas{cursor:none!important}
 #camp-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,6,0.95);z-index:18;display:none;flex-direction:column;align-items:center;justify-content:center}
 #camp-overlay h2{font-family:'Cinzel',serif;font-size:1.5rem;color:#c8a040;letter-spacing:0.1em;margin-bottom:8px}
@@ -366,6 +367,8 @@ canvas.width=W*SCALE;canvas.height=H*SCALE;
 ctx.imageSmoothingEnabled=false;
 
 // Dialog click handler
+document.addEventListener('mousedown',function(){document.body.classList.add('clicking');});
+document.addEventListener('mouseup',function(){document.body.classList.remove('clicking');});
 canvas.addEventListener('click',function(evt){
   if(!S._dialog||!S._dialog._choiceRects||!S._dialog.onChoice)return;
   const rect=canvas.getBoundingClientRect();
@@ -967,6 +970,7 @@ const MARCH_PATH=[
   {x:360,y:350},{x:400,y:350},{x:450,y:350},               // east bank, continue east
   {x:500,y:370},{x:550,y:400},{x:600,y:430},               // heading toward hill area
   {x:640,y:460},{x:680,y:500},                             // approaching hill
+  {x:720,y:520},{x:760,y:530},{x:800,y:530},{x:850,y:520},{x:900,y:510}, // continue east past hill
 ];
 
 function spawnLamaniteArmy(){
@@ -1969,7 +1973,12 @@ function update(dt){
     if(e.dead)return;
     if(e.state==='march'){
       const wp=MARCH_PATH[e.waypointIdx];
-      if(!wp){e.state='idle';return;}
+      if(!wp){
+        // Keep marching east (toward Manti) — they never reach it
+        e.x += e.speed * dt * 0.8;
+        e.facing = 0; // facing east
+        return;
+      }
       const ddx=wp.x-e.x+((e.id%7)-3)*2,ddy=wp.y-e.y+((e.id%5)-2)*2;
       const d=Math.sqrt(ddx*ddx+ddy*ddy);
       if(d>2)e.facing=Math.atan2(ddy,ddx);
@@ -2142,11 +2151,11 @@ function update(dt){
       return;
     }
     
-    // Intel gathering based on proximity
-    if(nearE&&nearD<fleeRange&&!sc._fleeTimer){
-      if(S.scoutMode==='safe'&&!sc._gatheredIntel){sc._gatheredIntel=1;}
-      if(S.scoutMode==='close'&&nearD<60&&(!sc._gatheredIntel||sc._gatheredIntel<2)){sc._gatheredIntel=2;}
-      if(S.scoutMode==='deep'&&nearD<35&&(!sc._gatheredIntel||sc._gatheredIntel<3)){sc._gatheredIntel=3;}
+    // Intel gathering based on vision range (120px), not flee range
+    if(nearE&&nearD<120){
+      if(!sc._gatheredIntel||sc._gatheredIntel<1)sc._gatheredIntel=1;
+      if(nearD<80&&(!sc._gatheredIntel||sc._gatheredIntel<2))sc._gatheredIntel=2;
+      if(nearD<45&&(!sc._gatheredIntel||sc._gatheredIntel<3))sc._gatheredIntel=3;
     }
     
     if(nearE&&nearD<fleeRange){
@@ -2157,6 +2166,10 @@ function update(dt){
       sc._fleeTimer-=dt;
       // Keep moving away from last known threat
       moveToward(sc,sc.x+Math.cos(sc.scoutFacing)*30,sc.y+Math.sin(sc.scoutFacing)*30,sc.speed*0.8,dt);
+      // After flee timer expires, auto-return if we have intel
+      if(sc._fleeTimer<=0&&sc._gatheredIntel>0&&!sc.returning){
+        sc.returning=true;
+      }
     }else if(sc.scoutWaypoints&&sc.scoutWpIdx<sc.scoutWaypoints.length){
       const wp=sc.scoutWaypoints[sc.scoutWpIdx];
       const d=Math.sqrt((wp.x-sc.x)*(wp.x-sc.x)+(wp.y-sc.y)*(wp.y-sc.y));
@@ -3576,7 +3589,7 @@ function beginMission(idx){
   S._letterbox=0;S._targetLetterbox=0;
   S.heat=0;S.faith=70;
   S.lehiAttacking=false;S.lehiOrder=null;S.battleCmd=null;
-  S.scoutMode=false;S.scoutIntelLevel=0;
+  S.scoutMode='safe';S.scoutIntelLevel=0;
   S._estTimer=0;S._estKeypoints=null;
   // Reset camp overlay UI
   ['armor','pray','intel','council'].forEach(t=>{
