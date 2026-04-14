@@ -256,6 +256,7 @@ canvas{cursor:none!important}
   <div id="heat-desc" style="font-size:0.55rem;color:#6a6248;margin-bottom:4px">Cool</div>
   <div class="sep"></div>
   <div id="concealment-status" style="display:none;font-size:0.6rem"></div>
+  <div id="manti-status" style="display:none;font-size:0.55rem;color:#6a8a3a"></div>
   <div class="sep"></div>
   <div id="hud-cmds" style="pointer-events:auto">
     <button class="cmd-btn" onclick="doHeadcount()">📋 Headcount <span class="hotkey">[H]</span></button>
@@ -684,6 +685,7 @@ const S={
   time:0,camX:0,camY:0,
   enemies:[],scouts:[],allies:[],messengers:[],
   deadSoldiers:0,deadAllies:0,totalLamanites:0,
+  mantiHP:100,_mantiWarning:false,_mantiFallen:false,_campAnim:null,
   knownEnemies:new Map(),nextId:0,
   // Mission phases: briefing → scout → position → wait → battle → surround → results
   phase:'briefing',phaseTimer:0,
@@ -1244,6 +1246,15 @@ function updateMission(dt){
   // ── Phase: BATTLE ──
   if(S.phase==='battle'){
     S.enemies.forEach(e=>{if(!e.dead&&e.state==='march')e.state='fight';});
+
+    // Check Lamanite threat to Manti
+    let mantiAttackers=0;
+    S.enemies.forEach(e=>{if(!e.dead&&e.x>820)mantiAttackers++;});
+    if(mantiAttackers>0&&S.mantiHP>0){
+      S.mantiHP-=dt*mantiAttackers*0.5;
+      if(!S._mantiWarning){S._mantiWarning=true;showCallout('⚠ Lamanites are attacking Manti! Stop them before the settlement falls!',5);}
+    }
+    if(S.mantiHP<=0&&!S._mantiFallen){S._mantiFallen=true;showCallout('Manti has fallen...',4);}
 
     // Lehi urgency — remind player to signal if they haven't
     if(!S.lehiAttacking){
@@ -2455,6 +2466,15 @@ function updateHtmlHud(){
     if(S.playerConcealed){cs.textContent='👁 HIDDEN';cs.style.color='#4a8a3a';}
     else{cs.textContent='⚠ EXPOSED';cs.style.color='#aa6a30';}
   }else{cs.style.display='none';}
+
+  // Manti status
+  const ms=document.getElementById('manti-status');
+  if(S.phase==='battle'||S.phase==='surround'||S.phase==='final_battle'||S.phase==='confront'){
+    ms.style.display='block';
+    if(S.mantiHP<=0){ms.textContent='🏚 Manti: Fallen';ms.style.color='#aa4030';}
+    else if(S._mantiWarning){ms.textContent='⚠ Manti: Under Attack!';ms.style.color='#c87030';}
+    else{ms.textContent='🏘 Manti: Safe';ms.style.color='#6a8a3a';}
+  }else{ms.style.display='none';}
 }
 
 // ══════════════════════════════════════
@@ -2865,6 +2885,131 @@ function render(){
   });
 
   ctx.restore();
+
+  // ── Manti settlement animated elements (smoke, fire, HP bar) ──
+  if(S.phase!=='briefing'){
+    ctx.save();ctx.scale(SCALE,SCALE);ctx.translate(-S.camX,-S.camY);
+    const mx=840,my=350;
+    // Smoke wisps
+    for(let i=0;i<3;i++){
+      const st=S.time*0.8+i*1.3;
+      const sy2=my-8-Math.abs(Math.sin(st)*8);
+      const sx2=mx-4+Math.sin(st*0.7+i)*3;
+      const sa=0.15-Math.abs(Math.sin(st)*0.1);
+      ctx.fillStyle=`rgba(140,140,140,${Math.max(0,sa)})`;
+      ctx.fillRect(Math.floor(sx2),Math.floor(sy2),1,1);
+    }
+    // Fire particles when under attack
+    if(S.mantiHP<100&&S.mantiHP>0){
+      const intensity=1-S.mantiHP/100;
+      for(let i=0;i<Math.floor(intensity*8);i++){
+        const fx=mx-6+Math.random()*20;
+        const fy=my-4-Math.random()*8;
+        const fc=Math.random()>0.4?'rgba(255,120,20,0.6)':'rgba(255,60,10,0.5)';
+        ctx.fillStyle=fc;ctx.fillRect(Math.floor(fx),Math.floor(fy),1,1);
+      }
+    }
+    // HP bar
+    if(S.mantiHP<100){
+      const bw=20,bh=2,bx=mx-5,by=my-16;
+      ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(bx,by,bw,bh);
+      const pct=Math.max(0,S.mantiHP/100);
+      const col=pct>0.5?'rgba(80,180,60,0.8)':pct>0.25?'rgba(200,180,40,0.8)':'rgba(200,40,30,0.8)';
+      ctx.fillStyle=col;ctx.fillRect(bx,by,bw*pct,bh);
+    }
+    ctx.restore();
+  }
+
+  // ── Camp animation overlay ──
+  if(S._campAnim){
+    ctx.save();ctx.setTransform(SCALE,0,0,SCALE,0,0);
+    const ca=S._campAnim;
+    const prog=ca.timer/ca.maxTime;
+    // Dark overlay
+    ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);
+    // Progress bar
+    ctx.fillStyle='rgba(40,35,25,0.8)';ctx.fillRect(W/2-50,H-20,100,4);
+    ctx.fillStyle='rgba(200,160,64,0.8)';ctx.fillRect(W/2-50,H-20,100*prog,4);
+
+    if(ca.type==='armor'){
+      const txt='Equipping armor...';
+      ctx.fillStyle=`rgba(200,160,64,${Math.min(1,ca.timer)})`;ctx.font="bold 7px 'Cinzel',serif";ctx.textAlign='center';
+      ctx.fillText(txt,W/2,25);
+      // Soldiers in formation getting breastplates
+      const total=10;const equipped=Math.floor(ca.timer/0.3);
+      for(let i=0;i<total;i++){
+        const sx=W/2-45+i*10,sy=H/2-10;
+        // Body
+        ctx.fillStyle='rgba(80,70,50,0.8)';ctx.fillRect(sx,sy,4,8);
+        ctx.fillStyle='rgba(60,50,35,0.8)';ctx.fillRect(sx+1,sy-2,2,2);// head
+        if(i<equipped){
+          ctx.fillStyle='rgba(220,180,60,0.9)';ctx.fillRect(sx,sy+1,4,4);// breastplate
+        }
+      }
+      ctx.textAlign='start';
+    }else if(ca.type==='pray'){
+      const txt='The men pray mightily...';
+      ctx.fillStyle=`rgba(200,160,64,${Math.min(1,ca.timer)})`;ctx.font="bold 7px 'Cinzel',serif";ctx.textAlign='center';
+      ctx.fillText(txt,W/2,25);
+      // Kneeling soldiers
+      for(let i=0;i<8;i++){
+        const sx=W/2-35+i*10,sy=H/2+5;
+        ctx.fillStyle='rgba(80,70,50,0.8)';ctx.fillRect(sx,sy,3,4);// kneeling body
+        ctx.fillStyle='rgba(60,50,35,0.8)';ctx.fillRect(sx+0.5,sy-2,2,2);
+      }
+      // Light rays
+      const rayAlpha=0.1+Math.sin(ca.timer*3)*0.06;
+      ctx.strokeStyle=`rgba(255,220,80,${rayAlpha})`;ctx.lineWidth=1;
+      for(let i=0;i<5;i++){
+        const rx=W/2-40+i*20;
+        ctx.beginPath();ctx.moveTo(rx,0);ctx.lineTo(rx+10,H/2+10);ctx.stroke();
+      }
+      ctx.textAlign='start';
+    }else if(ca.type==='intel'){
+      const txt='Studying the terrain...';
+      ctx.fillStyle=`rgba(200,160,64,${Math.min(1,ca.timer)})`;ctx.font="bold 7px 'Cinzel',serif";ctx.textAlign='center';
+      ctx.fillText(txt,W/2,25);
+      // Minimap with fog lifting
+      const mmx=W/2-40,mmy=H/2-30,mmw=80,mmh=60;
+      ctx.fillStyle='rgba(30,40,20,0.8)';ctx.fillRect(mmx,mmy,mmw,mmh);
+      // Terrain features
+      ctx.fillStyle='rgba(40,70,100,0.5)';ctx.fillRect(mmx+20,mmy+5,2,mmh-10);// river
+      ctx.fillStyle='rgba(80,70,45,0.5)';ctx.beginPath();ctx.arc(mmx+45,mmy+30,8,0,Math.PI*2);ctx.fill();// hill
+      // Fog overlay that lifts over time
+      const fogPct=1-prog;
+      if(fogPct>0){
+        ctx.fillStyle=`rgba(20,20,15,${fogPct*0.8})`;ctx.fillRect(mmx,mmy,mmw,mmh);
+      }
+      ctx.strokeStyle='rgba(200,160,64,0.3)';ctx.lineWidth=0.5;ctx.strokeRect(mmx,mmy,mmw,mmh);
+      ctx.textAlign='start';
+    }else if(ca.type==='council'){
+      const txt='Moroni addresses the captains...';
+      ctx.fillStyle=`rgba(200,160,64,${Math.min(1,ca.timer)})`;ctx.font="bold 7px 'Cinzel',serif";ctx.textAlign='center';
+      ctx.fillText(txt,W/2,25);
+      // Moroni image (try to draw, fallback to rectangle)
+      if(window._moroniImg&&window._moroniImg.complete&&window._moroniImg.naturalWidth>0){
+        ctx.drawImage(window._moroniImg,W/2-20,H/2-30,40,60);
+      }else{
+        // Fallback: tall figure
+        ctx.fillStyle='rgba(200,160,64,0.7)';ctx.fillRect(W/2-4,H/2-20,8,25);
+        ctx.fillStyle='rgba(180,140,50,0.8)';ctx.fillRect(W/2-3,H/2-25,6,6);// head
+      }
+      // Soldiers around
+      for(let i=0;i<6;i++){
+        const a2=i/6*Math.PI*2;
+        const sx=W/2+Math.cos(a2)*35,sy=H/2+Math.sin(a2)*20;
+        ctx.fillStyle='rgba(80,70,50,0.7)';ctx.fillRect(sx-1,sy-3,3,6);
+        ctx.fillStyle='rgba(60,50,35,0.7)';ctx.fillRect(sx-0.5,sy-5,2,2);
+      }
+      // Speech bubble dots
+      const dots=Math.floor(ca.timer*3)%4;
+      ctx.fillStyle='rgba(200,160,64,0.8)';ctx.font="6px sans-serif";
+      ctx.fillText('.'.repeat(dots),W/2+15,H/2-25);
+      ctx.textAlign='start';
+    }
+    ctx.restore();
+  }
+
   drawMinimap();
 
   // Prayer overlay
@@ -3068,6 +3213,29 @@ function buildTerrainCache(){
   // Zone hints (static)
   ROADS.forEach(r=>{const dx=r.x2-r.x1,dy=r.y2-r.y1,len=Math.sqrt(dx*dx+dy*dy);const nx=-dy/len,ny=dx/len;tctx.strokeStyle='rgba(100,90,60,0.1)';tctx.lineWidth=0.3;tctx.setLineDash([2,4]);tctx.beginPath();tctx.moveTo(r.x1+nx*r.w/2,r.y1+ny*r.w/2);tctx.lineTo(r.x2+nx*r.w/2,r.y2+ny*r.w/2);tctx.stroke();tctx.beginPath();tctx.moveTo(r.x1-nx*r.w/2,r.y1-ny*r.w/2);tctx.lineTo(r.x2-nx*r.w/2,r.y2-ny*r.w/2);tctx.stroke();tctx.setLineDash([]);});
   tctx.strokeStyle='rgba(100,90,50,0.08)';tctx.lineWidth=0.3;tctx.setLineDash([3,5]);tctx.beginPath();tctx.arc(HILL.x,HILL.y,HILL.r,0,Math.PI*2);tctx.stroke();tctx.setLineDash([]);
+  // ── Settlement of Manti ──
+  const mx=840,my=350;
+  // Crops/fields south of buildings
+  tctx.fillStyle='rgba(60,90,30,0.35)';tctx.fillRect(mx-8,my+12,20,6);
+  tctx.fillStyle='rgba(50,80,25,0.3)';tctx.fillRect(mx-5,my+18,14,4);
+  // Palisade wall
+  tctx.strokeStyle='rgba(100,70,35,0.6)';tctx.lineWidth=0.8;
+  tctx.strokeRect(mx-12,my-10,28,22);
+  // Buildings
+  const buildings=[{x:mx-6,y:my-6},{x:mx+2,y:my-6},{x:mx-2,y:my+2},{x:mx+8,y:my}];
+  buildings.forEach(b=>{
+    tctx.fillStyle='rgba(90,65,35,0.8)';tctx.fillRect(b.x,b.y,4,6);
+    tctx.fillStyle='rgba(60,40,20,0.9)';tctx.fillRect(b.x,b.y,4,1);
+  });
+  // Civilians (tiny tan figures)
+  [[mx-3,my],[mx+5,my+4],[mx+10,my-3]].forEach(c=>{
+    tctx.fillStyle='rgba(180,160,120,0.7)';tctx.fillRect(c[0],c[1],1,2);
+  });
+  // Flag pole
+  tctx.fillStyle='rgba(90,70,40,0.8)';tctx.fillRect(mx+14,my-10,1,12);
+  tctx.fillStyle='rgba(200,160,64,0.7)';tctx.fillRect(mx+15,my-10,2,3);
+  // Label
+  tctx.fillStyle='rgba(160,150,100,0.5)';tctx.font='5px Inter';tctx.fillText('Manti',mx-5,my+30);
   terrainCache=tc;
 }
 
@@ -3411,6 +3579,17 @@ function gameLoop(t){
   if(S._bigText){S._bigTextTimer-=realDt;if(S._bigTextTimer<=0)S._bigText=null;}
   // Transition pause
   if(S._transitionPause>0){S._transitionPause-=realDt;render();requestAnimationFrame(gameLoop);return;}
+  // Camp animation update
+  if(S._campAnim){
+    S._campAnim.timer+=realDt;
+    if(S._campAnim.timer>=S._campAnim.maxTime){
+      const type=S._campAnim.type;
+      S._campAnim=null;
+      document.getElementById('camp-overlay').style.display='flex';
+      finishCampChoice(type);
+    }
+    render();requestAnimationFrame(gameLoop);return;
+  }
   // Typewriter callout update
   if(S._callout){
     const c=S._callout;
@@ -3441,20 +3620,16 @@ function gameLoop(t){
 // CAMP
 // ══════════════════════════════════════
 let campPicks=0;
-function campChoice(type){
-  if(campPicks>=2)return;
-  if(type==='armor')campArmor();
-  else if(type==='pray')campPray();
-  else if(type==='intel')campIntel();
-  else if(type==='council')campCouncil();
-  campPicks++;
+// Preload Moroni image for council animation
+window._moroniImg=new Image();window._moroniImg.src='moroni.png';
+
+function finishCampChoice(type){
   document.getElementById('camp-'+type).disabled=true;
   document.getElementById('camp-'+type).style.borderColor='rgba(200,160,64,0.5)';
   document.getElementById('camp-'+type).style.background='rgba(200,160,64,0.08)';
   const descEl=document.getElementById('camp-'+type+'-desc');
   if(descEl){descEl.style.color='#c8a040';descEl.style.fontSize='1rem';}
   if(campPicks>=2){
-    // Disable remaining
     ['armor','pray','intel','council'].forEach(t=>{
       const el=document.getElementById('camp-'+t);
       if(!el.disabled){el.disabled=true;el.style.opacity='0.25';el.style.textDecoration='line-through';}
@@ -3463,6 +3638,18 @@ function campChoice(type){
     });
     document.getElementById('camp-go').style.display='block';
   }
+}
+function campChoice(type){
+  if(campPicks>=2)return;
+  if(type==='armor')campArmor();
+  else if(type==='pray')campPray();
+  else if(type==='intel')campIntel();
+  else if(type==='council')campCouncil();
+  campPicks++;
+  // Start camp animation
+  document.getElementById('camp-overlay').style.display='none';
+  S._campAnim={type:type,timer:0,maxTime:3};
+  if(!running){running=true;lastTime=performance.now();requestAnimationFrame(gameLoop);}
 }
 function campArmor(){
   S.campArmor=true;
@@ -3491,7 +3678,8 @@ function updateEstablishing(dt){
       {t:0,x:MAP.w-W/2,y:MAP.h/2-H/2,label:'The Wilderness East of Sidon'},
       {t:2.5,x:rx-W/2,y:300-H/2,label:'The River Sidon'},
       {t:5,x:HILL.x-W/2,y:HILL.y-H/2,label:'Hill Riplah'},
-      {t:7,x:S.cx-W/2,y:S.cy-H/2,label:null},
+      {t:5.5,x:840-W/2,y:350-H/2,label:'The Settlement of Manti'},
+      {t:7.5,x:S.cx-W/2,y:S.cy-H/2,label:null},
     ];
     S._targetLetterbox=1;
   }
@@ -3514,7 +3702,7 @@ function updateEstablishing(dt){
   // Label display
   S._estLabel=from.label;
   S._estLabelAlpha=from.label?Math.min(1,(1-Math.abs(p-0.5)*2)*2):0;
-  if(t>=8)skipEstablishing();
+  if(t>=9)skipEstablishing();
 }
 function skipEstablishing(){
   if(S.phase!=='establishing')return;
@@ -3574,6 +3762,7 @@ function beginMission(idx){
   S.zerahemnah=null;S._dialog=null;
   S._prayerActive=false;S._prayerDone=false;
   S._campPray=false;S.campArmor=false;S.campIntel=false;
+  S._campAnim=null;S.mantiHP=100;S._mantiWarning=false;S._mantiFallen=false;
   S._crossNote1=false;S._crossNote2=false;S._crossingDone=false;
   S._enemiesSpawned=false;S._scoutedEnemy=false;
   S._scoutSilentLost=false;S._scoutSilentAlerted=false;
