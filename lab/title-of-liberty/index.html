@@ -170,7 +170,7 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
     "Yea, verily, verily I say unto you, if all men had been, and were, and ever would be, like unto Moroni, behold, the very powers of hell would have been shaken forever."
     <div class="ref">— Alma 48:17</div>
   </div>
-  <div class="controls-hint">WASD move · SPACE rally · 1-5 formations · E scout · H headcount</div>
+  <div class="controls-hint">WASD move · SPACE rally · 1-5 formations · E scout · Q retrieve · H headcount</div>
 </div>
 
 <div id="story-overlay" style="display:none" onclick="advanceStory()">
@@ -330,13 +330,13 @@ const HILL={x:680,y:520,r:65};
 const TREES=[];
 (function(){
   // Wilderness around Hill Riplah (player concealment)
-  for(let i=0;i<90;i++)TREES.push({x:600+Math.random()*200,y:440+Math.random()*260,s:2+Math.random()*2});
+  for(let i=0;i<90;i++)TREES.push({x:600+Math.random()*200,y:440+Math.random()*260,s:5+Math.random()*4});
   // Northern wilderness (Lehi concealment)
-  for(let i=0;i<70;i++)TREES.push({x:520+Math.random()*250,y:50+Math.random()*200,s:2+Math.random()*2});
+  for(let i=0;i<70;i++)TREES.push({x:520+Math.random()*250,y:50+Math.random()*200,s:5+Math.random()*4});
   // Eastern scatter
-  for(let i=0;i<30;i++)TREES.push({x:400+Math.random()*400,y:250+Math.random()*200,s:1.5+Math.random()*1.5});
+  for(let i=0;i<30;i++)TREES.push({x:400+Math.random()*400,y:250+Math.random()*200,s:4+Math.random()*3});
   // Western (Lamanite side) — sparse
-  for(let i=0;i<20;i++)TREES.push({x:Math.random()*250,y:Math.random()*MAP.h,s:2+Math.random()*1.5});
+  for(let i=0;i<20;i++)TREES.push({x:Math.random()*250,y:Math.random()*MAP.h,s:5+Math.random()*3});
 })();
 
 // ══════════════════════════════════════
@@ -345,7 +345,7 @@ const TREES=[];
 function onRoad(x,y){for(const r of ROADS){const dx=r.x2-r.x1,dy=r.y2-r.y1,l2=dx*dx+dy*dy;let t=l2?((x-r.x1)*dx+(y-r.y1)*dy)/l2:0;t=Math.max(0,Math.min(1,t));const px=r.x1+t*dx,py=r.y1+t*dy;if(Math.sqrt((x-px)*(x-px)+(y-py)*(y-py))<r.w/2)return true;}return false;}
 function inRiver(x,y){return Math.abs(x-riverX(y))<RIVER_HALF_W;}
 function onHill(x,y){return Math.sqrt((x-HILL.x)*(x-HILL.x)+(y-HILL.y)*(y-HILL.y))<HILL.r;}
-function inTrees(x,y){for(const t of TREES){if(Math.abs(x-t.x)<8&&Math.abs(y-t.y)<8)return true;}return false;}
+function inTrees(x,y){for(const t of TREES){if(Math.abs(x-t.x)<15&&Math.abs(y-t.y)<15)return true;}return false;}
 function terrainSpeed(x,y){if(inRiver(x,y))return 0.3;if(onRoad(x,y))return 1.4;if(onHill(x,y))return 0.7;if(inTrees(x,y))return 0.6;return 1.0;}
 function terrainName(x,y){
   if(inRiver(x,y))return{name:'River Sidon',color:'#4a7a9a',icon:'≈≈',heatNote:'❄ Cooling'};
@@ -472,9 +472,11 @@ const SND={
     this._envTimers.bird-=dt;this._envTimers.water-=dt;this._envTimers.wind-=dt;
     const nearTree=TREES.some(t=>Math.abs(x-t.x)<40&&Math.abs(y-t.y)<40);
     // Tropical insects — continuous chirping near trees
+    // Bird sounds removed — TODO: add real audio samples later
+    // Insects chirping (not birds)
     if(nearTree&&this._envTimers.bird<=0){
-      this._envTimers.bird=0.3+Math.random()*0.8;
-      const vol=0.02+Math.random()*0.02;
+      this._envTimers.bird=1.5+Math.random()*2; // less frequent
+      const vol=0.01+Math.random()*0.01; // quieter
       this.tropicalInsects(vol);
     }
     // Water near river — louder, more present
@@ -613,6 +615,8 @@ const S={
   _crossingDone:false,
   _battleStarted:false,
   _surrenderOffered:false,
+  _capturedLamanites:0,
+  _routedEscaped:0,
   // Timers for delayed feedback
   _positionReminderTimer:0,
   _waitReminderTimer:0,
@@ -745,7 +749,7 @@ function makeUnit(x,y,team){
     state:'idle',aggroRange:80,spotted:false,
     waypointIdx:0,isLehi:false,facing:0,
     // Scout state
-    scoutFacing:0,returning:false,scoutImmunity:0,scoutWaypoints:null,scoutWpIdx:0,
+    scoutFacing:0,returning:false,scoutImmunity:0,scoutWaypoints:null,scoutWpIdx:0,_gatheredIntel:0,
     // Juice
     _hitFlash:0,_deathFade:0,_dead2:false,_name:'',facing:0,
     heat:0,_wasInRiver:false,
@@ -944,12 +948,12 @@ function updateMission(dt){
     // Progress callouts
     if(spottedCount>=3&&!S._scoutedEnemy&&returningScouts.length===0&&!S._waitingForReport){
       S._waitingForReport=true;
-      showCallout('Scouts have found them! Walk near a returning scout to receive the report.',5);
+      showCallout('Scouts are gathering intel! Press Q to send a retriever, or walk near returning scouts.',5);
     }
 
     // Reminder if no player scouts sent
     if(S.phaseTimer>12&&!S._scoutedEnemy&&playerScouts.length===0){
-      showCallout('Send scouts west! Face west (A) and press E. Send 2-3 for safety.',4);
+      showCallout('Send scouts west (E key). Send a retriever (Q key) to bring them back with intel. More scouts = safer recon!',5);
       S.phaseTimer=8;
     }
   }
@@ -1060,9 +1064,10 @@ function updateMission(dt){
     if(alive.length<S.totalLamanites*0.3&&!S._surrenderOffered){
       S._surrenderOffered=true;
       S.phase='surround';
-      setObjective('The Lamanites are surrounded.');
-      showCallout('Zerahemnah is surrounded!',5);
-      setTimeout(()=>showResults(),2000);
+      setObjective('Pursue and capture the routing Lamanites! Use Circle formation to surround them.');
+      setPhaseLabel('Phase 5 — Pursue & Capture');
+      showCallout('The Lamanites are breaking! Chase them down — don\'t let them escape!',5);
+      setTimeout(()=>{if(S.phase==='surround')showResults();},15000);
     }
 
     if(S.soldiers.filter(s=>!s.dead).length===0&&S.allies.filter(a=>!a.dead).length===0){
@@ -1501,8 +1506,26 @@ function update(dt){
       return;
     }
     if(e.state==='rout'){
-      const fx=e.x-S.cx,fy=e.y-S.cy;const fl=Math.sqrt(fx*fx+fy*fy)||1;
-      e.x+=fx/fl*e.speed*1.3*dt;e.y+=fy/fl*e.speed*1.3*dt;return;
+      // Flee from nearest Nephite instead of just commander
+      let fleeX=S.cx,fleeY=S.cy;
+      const nearestNeph=findNearest(e.x,e.y,200,S.soldiers.concat(S.allies));
+      if(nearestNeph){fleeX=nearestNeph.x;fleeY=nearestNeph.y;}
+      const fx=e.x-fleeX,fy=e.y-fleeY;const fl=Math.sqrt(fx*fx+fy*fy)||1;
+      e.x+=fx/fl*e.speed*1.3*dt;e.y+=fy/fl*e.speed*1.3*dt;
+      // Capture check — surrounded by Nephites
+      let nearbyNephites=0;
+      S.soldiers.forEach(s=>{if(!s.dead){const d=Math.sqrt((s.x-e.x)**2+(s.y-e.y)**2);if(d<40)nearbyNephites++;}});
+      S.allies.forEach(a=>{if(!a.dead){const d=Math.sqrt((a.x-e.x)**2+(a.y-e.y)**2);if(d<40)nearbyNephites++;}});
+      if(nearbyNephites>=3){
+        e.dead=true;e.state='captured';
+        S._capturedLamanites++;
+      }
+      // Escaped if off map
+      if(e.x<-20||e.x>MAP.w+20||e.y<-20||e.y>MAP.h+20){
+        e.dead=true;
+        S._routedEscaped++;
+      }
+      return;
     }
     if(e.state==='idle')return; // waiting for march order
     // fight
@@ -1585,6 +1608,18 @@ function update(dt){
           return;
         }
         S.scouts=S.scouts.filter(s=>s!==sc);
+        // Deliver gathered intel
+        if(sc._gatheredIntel && sc._gatheredIntel > S.scoutIntelLevel){
+          S.scoutIntelLevel = sc._gatheredIntel;
+          if(sc._gatheredIntel === 1) showCallout('Scout report: Enemy army spotted west of the river!',3);
+          if(sc._gatheredIntel === 2) showCallout('Scout report: ~'+S.totalLamanites+' Lamanite warriors. No armor. Swords and cimeters.',4);
+          if(sc._gatheredIntel === 3){
+            showCallout('Scout report: Detailed positions acquired. Zerahemnah leads from the center.',5);
+            S.enemies.forEach(e=>{if(!e.dead){e.spotted=true;S.knownEnemies.set(e.id,{x:e.x,y:e.y,lastSeen:S.time,conf:1,alive:true});}});
+          }
+        } else if(!sc._gatheredIntel) {
+          showCallout('Scout returned but found nothing. Send scouts further west!',3);
+        }
         sc.returning=false;
         sc.circleAngle=Math.random()*Math.PI*2;
         sc.circleRing=Math.floor(S.soldiers.length/10);
@@ -1630,20 +1665,9 @@ function update(dt){
     
     // Intel gathering based on proximity
     if(nearE&&nearD<fleeRange&&!sc._fleeTimer){
-      if(S.scoutMode==='safe'&&S.scoutIntelLevel<1){
-        S.scoutIntelLevel=1;
-        showCallout('Scout report: Enemy army spotted west of the river.',3);
-      }
-      if(S.scoutMode==='close'&&nearD<60&&S.scoutIntelLevel<2){
-        S.scoutIntelLevel=2;
-        showCallout('Scout report: ~'+S.totalLamanites+' Lamanite warriors. No armor. Swords and cimeters.',4);
-      }
-      if(S.scoutMode==='deep'&&nearD<35&&S.scoutIntelLevel<3){
-        S.scoutIntelLevel=3;
-        showCallout('Scout report: Detailed positions acquired. Zerahemnah leads from the center. Moving east toward the ford.',5);
-        // Reveal all enemies
-        S.enemies.forEach(e=>{if(!e.dead){e.spotted=true;S.knownEnemies.set(e.id,{x:e.x,y:e.y,lastSeen:S.time,conf:1,alive:true});}});
-      }
+      if(S.scoutMode==='safe'&&!sc._gatheredIntel){sc._gatheredIntel=1;}
+      if(S.scoutMode==='close'&&nearD<60&&(!sc._gatheredIntel||sc._gatheredIntel<2)){sc._gatheredIntel=2;}
+      if(S.scoutMode==='deep'&&nearD<35&&(!sc._gatheredIntel||sc._gatheredIntel<3)){sc._gatheredIntel=3;}
     }
     
     if(nearE&&nearD<fleeRange){
@@ -1956,10 +1980,12 @@ function showResults(){
   if(S.ambushReady)stars++;
   // Star 3: Low casualties (<25% of starting force)
   if(nephiteLost<=S.soldierCount*0.25)stars++;
+  // Star 4: Captured majority of routed Lamanites
+  if(S._capturedLamanites/Math.max(1,S._capturedLamanites+S._routedEscaped)>0.5)stars++;
   
-  const starText='★'.repeat(stars)+'☆'.repeat(3-stars);
-  const starColor=stars===3?'#c8a040':stars===2?'#8a8a6a':'#5a4a3a';
-  const ratingName=['','Pyrrhic Victory','Tactical Victory','Divine Victory'][stars];
+  const starText='★'.repeat(stars)+'☆'.repeat(4-stars);
+  const starColor=stars>=4?'#c8a040':stars===3?'#a8a060':stars===2?'#8a8a6a':'#5a4a3a';
+  const ratingName=['','Pyrrhic Victory','Tactical Victory','Divine Victory','Perfect Victory'][stars];
 
   // Flavor text based on casualties
   let flavorText='';
@@ -1990,6 +2016,8 @@ function showResults(){
     `<div class="stat">Lehi's losses: ${S.deadAllies} of 30</div>`+
     `<div class="stat">Lamanite dead: ${enemyDead} of ${S.totalLamanites}</div>`+
     `<div class="stat">Lamanite routed: ${enemyRouted}</div>`+
+    `<div class="stat">Lamanites captured: ${S._capturedLamanites}</div>`+
+    `<div class="stat">Lamanites escaped: ${S._routedEscaped}</div>`+
     casualtyText+
     flavorText;
   document.getElementById('mercy-choice').style.display='flex';
