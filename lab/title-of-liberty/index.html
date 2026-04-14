@@ -75,6 +75,25 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 #story-overlay .story-portrait{width:140px;min-width:140px;height:auto;image-rendering:pixelated;opacity:0.9;filter:drop-shadow(0 2px 12px rgba(200,160,64,0.15))}
 #story-overlay .story-right{display:flex;flex-direction:column;align-items:center;text-align:center}
 #story-overlay .no-portrait .story-inner{justify-content:center}
+/* Fire Emblem confront dialog */
+#confront-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:19;display:none;pointer-events:auto}
+#confront-overlay .fe-bg{position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(180deg,rgba(10,10,6,0.3) 0%,rgba(10,10,6,0.85) 60%,rgba(10,10,6,0.95) 100%)}
+#confront-overlay .fe-scene{position:absolute;bottom:0;left:0;right:0;display:flex;align-items:flex-end;padding:0 24px}
+.fe-portrait{width:180px;height:220px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;transition:all 0.5s}
+.fe-portrait.speaking{filter:brightness(1);transform:translateY(0)}
+.fe-portrait.silent{filter:brightness(0.4);transform:translateY(12px)}
+.fe-portrait-box{width:140px;height:180px;border:2px solid rgba(200,160,64,0.3);background:rgba(20,18,12,0.8);display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-size:3rem}
+.fe-portrait-box.moroni-box{border-color:rgba(100,140,200,0.4);color:#6a8ac8}
+.fe-portrait-box.zerahemnah-box{border-color:rgba(200,80,40,0.4);color:#c85030}
+.fe-portrait-name{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.1em;margin-top:6px;color:#a89868}
+.fe-textbox{flex:1;margin:0 16px;margin-bottom:24px;background:rgba(15,13,8,0.9);border:1px solid rgba(200,160,64,0.2);border-radius:2px;padding:20px 24px;min-height:80px}
+.fe-speaker{font-family:'Cinzel',serif;font-size:0.75rem;color:#c8a040;letter-spacing:0.1em;margin-bottom:8px}
+.fe-text{font-family:'Cinzel',serif;font-size:0.85rem;color:#a89868;line-height:1.7;letter-spacing:0.02em}
+.fe-ref{font-family:'Inter',sans-serif;font-size:0.6rem;color:#4a4230;font-style:italic;margin-top:8px}
+.fe-choices{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.fe-choice{font-family:'Cinzel',serif;font-size:0.75rem;color:#c8a040;background:rgba(200,160,64,0.05);border:1px solid rgba(200,160,64,0.2);padding:8px 14px;cursor:pointer;text-align:left;border-radius:2px;transition:all 0.2s}
+.fe-choice:hover{background:rgba(200,160,64,0.12);border-color:rgba(200,160,64,0.5)}
+.fe-hint{font-family:'Inter',sans-serif;font-size:0.55rem;color:#3a3220;margin-top:10px;text-align:center;letter-spacing:0.05em}
 
 /* ── Callout ── */
 #callout{position:fixed;top:45px;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;text-align:center;opacity:0;transition:opacity 0.4s;max-width:400px}
@@ -187,6 +206,27 @@ body{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' wi
       <div class="story-text" id="story-text"></div>
       <div class="story-ref" id="story-ref"></div>
       <div class="story-hint">click to continue</div>
+    </div>
+  </div>
+</div>
+
+<div id="confront-overlay">
+  <div class="fe-bg"></div>
+  <div class="fe-scene">
+    <div class="fe-portrait speaking" id="fe-left">
+      <div class="fe-portrait-box moroni-box">⚔</div>
+      <div class="fe-portrait-name">MORONI</div>
+    </div>
+    <div class="fe-textbox">
+      <div class="fe-speaker" id="fe-speaker"></div>
+      <div class="fe-text" id="fe-text"></div>
+      <div class="fe-ref" id="fe-ref"></div>
+      <div class="fe-choices" id="fe-choices"></div>
+      <div class="fe-hint" id="fe-hint"></div>
+    </div>
+    <div class="fe-portrait silent" id="fe-right">
+      <div class="fe-portrait-box zerahemnah-box">🗡</div>
+      <div class="fe-portrait-name">ZERAHEMNAH</div>
     </div>
   </div>
 </div>
@@ -1222,6 +1262,43 @@ function showInGameDialog(speaker,text,choices,onChoice){
 }
 function clearInGameDialog(){S._dialog=null;}
 
+function showFEDialog(speaker,text,ref,choices,onChoice){
+  const ov=document.getElementById('confront-overlay');
+  ov.style.display='block';
+  const leftP=document.getElementById('fe-left');
+  const rightP=document.getElementById('fe-right');
+  const isZ=speaker==='Zerahemnah';
+  const isSoldier=speaker==='Soldier';
+  leftP.className='fe-portrait '+((!isZ&&!isSoldier)?'speaking':'silent');
+  rightP.className='fe-portrait '+(isZ?'speaking':'silent');
+  document.getElementById('fe-speaker').textContent=speaker||'';
+  document.getElementById('fe-text').textContent=text;
+  document.getElementById('fe-ref').textContent=ref||'';
+  const choiceDiv=document.getElementById('fe-choices');
+  choiceDiv.innerHTML='';
+  if(choices&&choices.length>0){
+    document.getElementById('fe-hint').textContent='';
+    choices.forEach((ch,i)=>{
+      const btn=document.createElement('div');
+      btn.className='fe-choice';
+      btn.textContent=ch;
+      btn.onclick=()=>{
+        document.getElementById('confront-overlay').style.display='none';
+        if(onChoice)onChoice(i);
+      };
+      choiceDiv.appendChild(btn);
+    });
+  }else{
+    document.getElementById('fe-hint').textContent='click to continue';
+    ov.onclick=function(){
+      ov.onclick=null;
+      ov.style.display='none';
+      if(onChoice)onChoice(0);
+    };
+  }
+}
+function hideFEDialog(){document.getElementById('confront-overlay').style.display='none';}
+
 function beginConfront(){
   S.phase='confront';S._confrontPhase='retreat';S._confrontTimer=0;
   setPhaseLabel('Alma 44 — The Confrontation');
@@ -1263,26 +1340,24 @@ function updateConfrontPhase(dt){
   }
 
   if(phase==='demand_wait'&&S._confrontTimer>3){
-    showInGameDialog('Moroni','"Deliver up your weapons and covenant you will not return to war." (Alma 44:6)',[
-      'Deliver the demand'
-    ],function(idx){
-      clearInGameDialog();
+    showFEDialog('Moroni','Behold, Zerahemnah — I command you, in the name of that all-powerful God who has strengthened our arms... deliver up your weapons of war unto us, and we will seek not your blood, but we will spare your lives if ye will go your way and come not again to war against us.','Alma 44:6',null,function(){
       S._confrontPhase='refuse';S._confrontTimer=0;
     });
     S._confrontPhase='demand_choice';
   }
 
   if(phase==='refuse'&&S._confrontTimer>0.5){
-    showCallout('"We will surrender our weapons, but we will NOT make an oath we know we will break." (Alma 44:8)',5);
-    S._confrontPhase='refuse_wait';S._confrontTimer=0;
+    showFEDialog('Zerahemnah','We will give up our weapons unto you, but we will not suffer ourselves to take an oath unto you which we know that we shall break, and also our children. We are not of your faith.','Alma 44:8',null,function(){
+      S._confrontPhase='refuse_wait';S._confrontTimer=0;
+    });
+    S._confrontPhase='refuse_anim';
   }
 
-  if(phase==='refuse_wait'&&S._confrontTimer>3){
-    showInGameDialog('Moroni','Zerahemnah refuses the covenant. What say you?',[
-      '"Then we shall end this."',
+  if(phase==='refuse_wait'&&S._confrontTimer>0.5){
+    showFEDialog('Moroni','Behold, here are our weapons of war. We will deliver them up unto you, but we will not suffer ourselves to take an oath. Now make your choice.','Alma 44:9',[
+      '"Then behold — we shall end the conflict."',
       '"Very well. Take your weapons and go."'
     ],function(idx){
-      clearInGameDialog();
       if(idx===0){
         S._confrontPhase='scalp_charge';S._confrontTimer=0;
       }else{
@@ -1311,7 +1386,9 @@ function updateConfrontPhase(dt){
       z.hp=2;
       addTrauma(0.3,z.x,z.y);
       SND.swordHit();SND.swordHit();
-      showCallout('"A soldier smote off Zerahemnah\'s scalp upon his sword!" (Alma 44:12)',5);
+      showFEDialog('','A soldier stepped forward and smote off the scalp of Zerahemnah — it fell to the earth. Zerahemnah withdrew from before them into the midst of his soldiers.','Alma 44:12-13',null,function(){
+        S._confrontPhase='scalp_speech';S._confrontTimer=0;
+      });
       if(S._scalper){
         S._scalper.tx=z.x+5;S._scalper.ty=z.y-5;
       }
@@ -1322,10 +1399,14 @@ function updateConfrontPhase(dt){
 
   if(phase==='scalp_display'){
     S._scalpDisplayTimer-=dt;
-    if(S._scalpDisplayTimer<=0&&S._confrontTimer>3){
-      showCallout('"Even as this scalp has fallen to the earth — so shall ye fall unless ye deliver up your weapons with a covenant of peace!" (Alma 44:14)',6);
+    // Wait for FE dialog to handle transition to scalp_speech
+  }
+
+  if(phase==='scalp_speech'){
+    showFEDialog('Soldier','Even as this scalp has fallen to the earth, which is the scalp of your chief, so shall ye fall to the earth except ye will deliver up your weapons of war and depart with a covenant of peace.','Alma 44:14',null,function(){
       S._confrontPhase='mass_surrender_wait';S._confrontTimer=0;
-    }
+    });
+    S._confrontPhase='scalp_speech_wait';
   }
 
   if(phase==='mass_surrender_wait'&&S._confrontTimer>3){
@@ -1340,12 +1421,17 @@ function updateConfrontPhase(dt){
       S._capturedLamanites++;
       S._surrenderedCount++;
     }
-    showCallout('"Many Lamanites cast their weapons at the feet of Moroni." (Alma 44:15)',5);
-    S._confrontPhase='mass_surrender_show';S._confrontTimer=0;
+    showFEDialog('','Many of the Lamanites came forward and threw down their weapons of war at the feet of Moroni, and entered into a covenant of peace. And as many as entered into a covenant they suffered to depart into the wilderness.','Alma 44:15',null,function(){
+      S._confrontPhase='mass_surrender_show';S._confrontTimer=0;
+    });
+    S._confrontPhase='mass_surrender_dialog';
   }
 
-  if(phase==='mass_surrender_show'&&S._confrontTimer>3){
-    beginFinalBattle();
+  if(phase==='mass_surrender_show'&&S._confrontTimer>0.5){
+    showFEDialog('Zerahemnah','Now Zerahemnah was exceedingly wroth, and he did stir up the remainder of his soldiers to anger, to contend more powerfully against the Nephites.','Alma 44:16',null,function(){
+      beginFinalBattle();
+    });
+    S._confrontPhase='mass_surrender_final_dialog';
   }
 }
 
