@@ -1249,7 +1249,7 @@ function updateMission(dt){
 
     // Check Lamanite threat to Manti
     let mantiAttackers=0;
-    S.enemies.forEach(e=>{if(!e.dead&&e.x>820)mantiAttackers++;});
+    S.enemies.forEach(e=>{if(!e.dead&&e.x>840)mantiAttackers++;});
     if(mantiAttackers>0&&S.mantiHP>0){
       S.mantiHP-=dt*mantiAttackers*0.5;
       if(!S._mantiWarning){S._mantiWarning=true;showCallout('⚠ Lamanites are attacking Manti! Stop them before the settlement falls!',5);}
@@ -2889,7 +2889,7 @@ function render(){
   // ── Manti settlement animated elements (smoke, fire, HP bar) ──
   if(S.phase!=='briefing'){
     ctx.save();ctx.scale(SCALE,SCALE);ctx.translate(-S.camX,-S.camY);
-    const mx=840,my=350;
+    const mx=870,my=320;
     // Smoke wisps
     for(let i=0;i<3;i++){
       const st=S.time*0.8+i*1.3;
@@ -3195,7 +3195,14 @@ function buildTerrainCache(){
   tctx.fillStyle='rgba(110,100,55,0.12)';tctx.beginPath();tctx.arc(HILL.x,HILL.y,HILL.r*0.3,0,Math.PI*2);tctx.fill();
   tctx.strokeStyle='rgba(120,110,70,0.12)';tctx.lineWidth=0.5;
   [0.9,0.7,0.5,0.3].forEach(s=>{tctx.beginPath();tctx.arc(HILL.x,HILL.y,HILL.r*s,0,Math.PI*2);tctx.stroke();});
-  tctx.fillStyle='rgba(160,150,100,0.5)';tctx.font='5px Inter';tctx.fillText('Hill Riplah',HILL.x-18,HILL.y-HILL.r+8);
+  tctx.fillStyle='rgba(180,170,120,0.7)';tctx.font='bold 8px Cinzel,serif';tctx.fillText('Hill Riplah',HILL.x-22,HILL.y-HILL.r+6);
+  // River label (rotated)
+  tctx.save();
+  tctx.fillStyle='rgba(120,160,200,0.45)';tctx.font='bold 7px Cinzel,serif';
+  const rlx=riverX(200),rly=200;
+  tctx.translate(rlx+20,rly);tctx.rotate(-Math.PI/2);
+  tctx.fillText('River Sidon',0,0);
+  tctx.restore();
   // Tree ground layers
   TREES.forEach(t=>{
     tctx.fillStyle='rgba(10,18,8,0.2)';
@@ -3213,29 +3220,73 @@ function buildTerrainCache(){
   // Zone hints (static)
   ROADS.forEach(r=>{const dx=r.x2-r.x1,dy=r.y2-r.y1,len=Math.sqrt(dx*dx+dy*dy);const nx=-dy/len,ny=dx/len;tctx.strokeStyle='rgba(100,90,60,0.1)';tctx.lineWidth=0.3;tctx.setLineDash([2,4]);tctx.beginPath();tctx.moveTo(r.x1+nx*r.w/2,r.y1+ny*r.w/2);tctx.lineTo(r.x2+nx*r.w/2,r.y2+ny*r.w/2);tctx.stroke();tctx.beginPath();tctx.moveTo(r.x1-nx*r.w/2,r.y1-ny*r.w/2);tctx.lineTo(r.x2-nx*r.w/2,r.y2-ny*r.w/2);tctx.stroke();tctx.setLineDash([]);});
   tctx.strokeStyle='rgba(100,90,50,0.08)';tctx.lineWidth=0.3;tctx.setLineDash([3,5]);tctx.beginPath();tctx.arc(HILL.x,HILL.y,HILL.r,0,Math.PI*2);tctx.stroke();tctx.setLineDash([]);
-  // ── Settlement of Manti ──
-  const mx=840,my=350;
-  // Crops/fields south of buildings
-  tctx.fillStyle='rgba(60,90,30,0.35)';tctx.fillRect(mx-8,my+12,20,6);
-  tctx.fillStyle='rgba(50,80,25,0.3)';tctx.fillRect(mx-5,my+18,14,4);
-  // Palisade wall
-  tctx.strokeStyle='rgba(100,70,35,0.6)';tctx.lineWidth=0.8;
-  tctx.strokeRect(mx-12,my-10,28,22);
-  // Buildings
-  const buildings=[{x:mx-6,y:my-6},{x:mx+2,y:my-6},{x:mx-2,y:my+2},{x:mx+8,y:my}];
-  buildings.forEach(b=>{
-    tctx.fillStyle='rgba(90,65,35,0.8)';tctx.fillRect(b.x,b.y,4,6);
-    tctx.fillStyle='rgba(60,40,20,0.9)';tctx.fillRect(b.x,b.y,4,1);
+  // ── Settlement of Manti (large, cut off at right edge) ──
+  const mx=870,my=320;
+  // Outer fields / farmland (extends off-screen right)
+  tctx.fillStyle='rgba(55,85,28,0.3)';tctx.fillRect(mx-30,my+40,MAP.w-mx+30,25);
+  tctx.fillStyle='rgba(60,90,30,0.25)';tctx.fillRect(mx-20,my+65,MAP.w-mx+20,15);
+  // Crop rows
+  for(let cx=mx-25;cx<MAP.w;cx+=6){
+    tctx.fillStyle='rgba(70,100,35,0.35)';tctx.fillRect(cx,my+42,3,20);
+  }
+  // Outer palisade wall (large, right side cut off by map edge)
+  tctx.strokeStyle='rgba(110,75,35,0.7)';tctx.lineWidth=1.5;
+  tctx.beginPath();
+  tctx.moveTo(mx-35,my-45);tctx.lineTo(MAP.w,my-45); // top wall (runs off screen)
+  tctx.moveTo(mx-35,my-45);tctx.lineTo(mx-35,my+38); // left wall
+  tctx.moveTo(mx-35,my+38);tctx.lineTo(MAP.w,my+38); // bottom wall (runs off screen)
+  tctx.stroke();
+  // Palisade stakes on left wall
+  for(let py=my-43;py<my+38;py+=5){
+    tctx.fillStyle='rgba(100,70,35,0.5)';tctx.fillRect(mx-37,py,2,3);
+  }
+  // Gate opening in left wall
+  tctx.fillStyle='#2a2818';tctx.fillRect(mx-36,my-5,3,12);
+  tctx.strokeStyle='rgba(140,100,50,0.5)';tctx.lineWidth=0.5;
+  tctx.strokeRect(mx-37,my-6,4,14);
+  // Road leading to gate
+  tctx.strokeStyle='#3a3428';tctx.lineWidth=6;
+  tctx.beginPath();tctx.moveTo(mx-70,my+1);tctx.lineTo(mx-35,my+1);tctx.stroke();
+  // Buildings — multiple rows, varying sizes, extends off right
+  const blds=[
+    {x:mx-20,y:my-35,w:8,h:10},{x:mx-8,y:my-35,w:10,h:8},{x:mx+6,y:my-33,w:7,h:10},
+    {x:mx+18,y:my-35,w:12,h:9},{x:mx+34,y:my-34,w:8,h:8},
+    {x:mx-22,y:my-18,w:10,h:12},{x:mx-8,y:my-16,w:8,h:10},{x:mx+5,y:my-18,w:12,h:10},
+    {x:mx+22,y:my-16,w:9,h:11},{x:mx+36,y:my-18,w:10,h:9},
+    {x:mx-18,y:my+2,w:7,h:9},{x:mx-6,y:my+4,w:10,h:8},{x:mx+8,y:my+2,w:8,h:10},
+    {x:mx+20,y:my+3,w:11,h:9},{x:mx+35,y:my+1,w:9,h:10},
+    {x:mx-20,y:my+18,w:9,h:8},{x:mx-6,y:my+20,w:8,h:7},{x:mx+8,y:my+18,w:10,h:9},
+    {x:mx+22,y:my+19,w:8,h:8},{x:mx+34,y:my+20,w:12,h:7},
+  ];
+  blds.forEach(b=>{
+    // Building body
+    tctx.fillStyle='rgba(95,68,38,0.8)';tctx.fillRect(b.x,b.y,b.w,b.h);
+    // Roof (darker, 2px tall)
+    tctx.fillStyle='rgba(55,38,18,0.9)';tctx.fillRect(b.x-1,b.y,b.w+2,2);
+    // Door
+    tctx.fillStyle='rgba(40,28,12,0.7)';tctx.fillRect(b.x+Math.floor(b.w/2)-1,b.y+b.h-3,2,3);
+    // Window
+    if(b.w>7){tctx.fillStyle='rgba(180,160,100,0.25)';tctx.fillRect(b.x+2,b.y+3,2,2);}
   });
-  // Civilians (tiny tan figures)
-  [[mx-3,my],[mx+5,my+4],[mx+10,my-3]].forEach(c=>{
-    tctx.fillStyle='rgba(180,160,120,0.7)';tctx.fillRect(c[0],c[1],1,2);
+  // Central plaza / open area
+  tctx.fillStyle='rgba(70,60,35,0.15)';tctx.fillRect(mx-5,my-5,16,12);
+  // Civilians (scattered, more numerous)
+  const civils=[[mx-15,my-10],[mx+3,my+8],[mx+15,my-12],[mx-10,my+22],[mx+25,my+5],
+    [mx+30,my-25],[mx-5,my+14],[mx+12,my+24],[mx+38,my-8],[mx+40,my+15]];
+  civils.forEach(c=>{
+    tctx.fillStyle='rgba(180,160,120,0.6)';tctx.fillRect(c[0],c[1],1,3);
+    tctx.fillStyle='rgba(160,140,100,0.4)';tctx.fillRect(c[0],c[1]-1,1,1); // head
   });
-  // Flag pole
-  tctx.fillStyle='rgba(90,70,40,0.8)';tctx.fillRect(mx+14,my-10,1,12);
-  tctx.fillStyle='rgba(200,160,64,0.7)';tctx.fillRect(mx+15,my-10,2,3);
+  // Flag pole (taller)
+  tctx.fillStyle='rgba(90,70,40,0.8)';tctx.fillRect(mx-25,my-45,1,18);
+  tctx.fillStyle='rgba(200,160,64,0.7)';tctx.fillRect(mx-24,my-45,4,3);
+  tctx.fillStyle='rgba(180,140,54,0.5)';tctx.fillRect(mx-24,my-42,3,2);
+  // Watchtower at gate
+  tctx.fillStyle='rgba(80,60,30,0.8)';tctx.fillRect(mx-40,my-12,5,18);
+  tctx.fillStyle='rgba(55,38,18,0.9)';tctx.fillRect(mx-41,my-14,7,3);
+  tctx.fillStyle='rgba(180,160,120,0.6)';tctx.fillRect(mx-39,my-10,1,3); // guard
   // Label
-  tctx.fillStyle='rgba(160,150,100,0.5)';tctx.font='5px Inter';tctx.fillText('Manti',mx-5,my+30);
+  tctx.fillStyle='rgba(180,170,120,0.7)';tctx.font='bold 8px Cinzel,serif';tctx.fillText('Manti',mx-42,my+50);
   terrainCache=tc;
 }
 
@@ -3414,7 +3465,7 @@ function drawTerrain(){
   ctx.fillStyle='rgba(110,100,55,0.12)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*0.3,0,Math.PI*2);ctx.fill();
   ctx.strokeStyle='rgba(120,110,70,0.12)';ctx.lineWidth=0.5;
   [0.9,0.7,0.5,0.3].forEach(s=>{ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*s,0,Math.PI*2);ctx.stroke();});
-  ctx.fillStyle='rgba(160,150,100,0.5)';ctx.font='5px Inter';ctx.fillText('Hill Riplah',HILL.x-18,HILL.y-HILL.r+8);
+  ctx.fillStyle='rgba(180,170,120,0.7)';ctx.font='bold 8px Cinzel,serif';ctx.fillText('Hill Riplah',HILL.x-22,HILL.y-HILL.r+6);
 
   // Trees — visible canopy circles with shade, trunks, undergrowth
   TREES.forEach(t=>{
@@ -3678,7 +3729,7 @@ function updateEstablishing(dt){
       {t:0,x:MAP.w-W/2,y:MAP.h/2-H/2,label:'The Wilderness East of Sidon'},
       {t:2.5,x:rx-W/2,y:300-H/2,label:'The River Sidon'},
       {t:5,x:HILL.x-W/2,y:HILL.y-H/2,label:'Hill Riplah'},
-      {t:5.5,x:840-W/2,y:350-H/2,label:'The Settlement of Manti'},
+      {t:5.5,x:MAP.w-W,y:320-H/2,label:'The Settlement of Manti'},
       {t:7.5,x:S.cx-W/2,y:S.cy-H/2,label:null},
     ];
     S._targetLetterbox=1;
