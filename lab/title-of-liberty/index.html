@@ -17,6 +17,7 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 .tl-nodes{display:flex;justify-content:space-between;position:relative}
 .tl-node{display:flex;flex-direction:column;align-items:center;cursor:default;opacity:0.35;transition:all 0.3s;min-width:60px}
 .tl-node.unlocked{opacity:1;cursor:pointer}
+.tl-node.completed .tl-dot{background:#c8a040;border-color:#c8a040;box-shadow:0 0 8px rgba(200,160,64,0.3)}
 .tl-node.unlocked:hover .tl-dot{background:#c8a040;box-shadow:0 0 12px rgba(200,160,64,0.4)}
 .tl-dot{width:12px;height:12px;border-radius:50%;border:2px solid #4a4230;background:#1a1a10;transition:all 0.3s;margin-bottom:8px}
 .tl-node.unlocked .tl-dot{border-color:#c8a040;background:#2a2410}
@@ -83,7 +84,7 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 .fe-portrait.speaking{filter:brightness(1);transform:translateY(0)}
 .fe-portrait.silent{filter:brightness(0.4);transform:translateY(12px)}
 .fe-portrait-box{width:140px;height:180px;border:2px solid rgba(200,160,64,0.3);background:rgba(20,18,12,0.8);display:flex;align-items:center;justify-content:center;font-family:'Cinzel',serif;font-size:3rem}
-.fe-portrait-box.moroni-box{border-color:rgba(100,140,200,0.4);color:#6a8ac8}
+.fe-portrait-box.moroni-box{border-color:rgba(100,140,200,0.4);padding:0;overflow:hidden}
 .fe-portrait-box.zerahemnah-box{border-color:rgba(200,80,40,0.4);color:#c85030}
 .fe-portrait-name{font-family:'Cinzel',serif;font-size:0.7rem;letter-spacing:0.1em;margin-top:6px;color:#a89868}
 .fe-textbox{flex:1;margin:0 16px;margin-bottom:24px;background:rgba(15,13,8,0.9);border:1px solid rgba(200,160,64,0.2);border-radius:2px;padding:20px 24px;min-height:80px}
@@ -99,12 +100,12 @@ canvas{display:block;margin:0 auto;image-rendering:pixelated;cursor:none}
 #callout{position:fixed;top:45px;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;text-align:center;opacity:0;transition:opacity 0.4s;max-width:400px}
 #callout .callout-text{font-size:0.65rem;color:#c8a040;font-family:'Cinzel',serif;letter-spacing:0.04em;background:rgba(10,10,6,0.8);padding:6px 16px;border:1px solid rgba(200,160,64,0.15);border-radius:2px;line-height:1.4}
 #event-log{position:fixed;top:75px;left:50%;transform:translateX(-50%);z-index:5;pointer-events:none;max-height:100px;overflow:hidden;width:400px;display:flex;flex-direction:column;justify-content:flex-end}
-.event-entry{font-size:0.5rem;color:#5a5238;font-family:'Cinzel',serif;letter-spacing:0.03em;text-align:center;padding:1px 0;transition:opacity 0.5s}
+.event-entry{font-size:0.5rem;color:#8a7a58;font-family:'Cinzel',serif;letter-spacing:0.03em;text-align:center;padding:1px 0;transition:opacity 0.5s}
 
 /* ── Camp overlay ── */
-/* Gauntlet cursor */
-canvas,#hud,.cmd-btn,.bar-opt,.fmt-slot,.mercy-btn,.camp-btn,button{url("data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20width='32'%20height='48'%20viewBox='0%200%2016%2024'%20shape-rendering='crispEdges'><!--%20Blade%20tip%20--><rect%20x='1'%20y='0'%20width='1'%20height='1'%20fill='%23d8d8d0'/><rect%20x='0'%20y='1'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='1'%20y='1'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='1'%20y='2'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='2'%20y='2'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='2'%20y='3'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='3'%20y='3'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='3'%20y='4'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='4'%20y='4'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='4'%20y='5'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='5'%20y='5'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='5'%20y='6'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='6'%20y='6'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='6'%20y='7'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='7'%20y='7'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='7'%20y='8'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='8'%20y='8'%20width='2'%20height='1'%20fill='%23d8d8d0'/><!--%20Blade%20to%20crossguard%20--><rect%20x='8'%20y='9'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='9'%20y='9'%20width='2'%20height='1'%20fill='%23d8d8d0'/><!--%20Crossguard%20--><rect%20x='7'%20y='10'%20width='1'%20height='1'%20fill='%23c8a040'/><rect%20x='8'%20y='10'%20width='1'%20height='1'%20fill='%23dac060'/><rect%20x='9'%20y='10'%20width='1'%20height='1'%20fill='%23c8a040'/><rect%20x='10'%20y='10'%20width='2'%20height='1'%20fill='%23dac060'/><rect%20x='12'%20y='10'%20width='1'%20height='1'%20fill='%23c8a040'/><rect%20x='7'%20y='11'%20width='1'%20height='1'%20fill='%23b89030'/><rect%20x='8'%20y='11'%20width='1'%20height='1'%20fill='%23c8a040'/><rect%20x='9'%20y='11'%20width='1'%20height='1'%20fill='%23b89030'/><rect%20x='10'%20y='11'%20width='2'%20height='1'%20fill='%23c8a040'/><rect%20x='12'%20y='11'%20width='1'%20height='1'%20fill='%23b89030'/><!--%20Grip%20--><rect%20x='10'%20y='12'%20width='2'%20height='1'%20fill='%236b4226'/><rect%20x='10'%20y='13'%20width='1'%20height='1'%20fill='%235a3520'/><rect%20x='11'%20y='13'%20width='2'%20height='1'%20fill='%236b4226'/><rect%20x='11'%20y='14'%20width='2'%20height='1'%20fill='%235a3520'/><rect%20x='11'%20y='15'%20width='1'%20height='1'%20fill='%236b4226'/><rect%20x='12'%20y='15'%20width='2'%20height='1'%20fill='%235a3520'/><rect%20x='12'%20y='16'%20width='2'%20height='1'%20fill='%236b4226'/><!--%20Pommel%20--><rect%20x='12'%20y='17'%20width='1'%20height='1'%20fill='%23c8a040'/><rect%20x='13'%20y='17'%20width='2'%20height='1'%20fill='%23dac060'/><rect%20x='13'%20y='18'%20width='1'%20height='1'%20fill='%23b89030'/><rect%20x='14'%20y='18'%20width='1'%20height='1'%20fill='%23c8a040'/></svg>") 1 1, pointer}
-body{url("data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20width='32'%20height='48'%20viewBox='0%200%2016%2024'%20shape-rendering='crispEdges'><!--%20Blade%20tip%20--><rect%20x='1'%20y='0'%20width='1'%20height='1'%20fill='%23d8d8d0'/><rect%20x='0'%20y='1'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='1'%20y='1'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='1'%20y='2'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='2'%20y='2'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='2'%20y='3'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='3'%20y='3'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='3'%20y='4'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='4'%20y='4'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='4'%20y='5'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='5'%20y='5'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='5'%20y='6'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='6'%20y='6'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='6'%20y='7'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='7'%20y='7'%20width='2'%20height='1'%20fill='%23d8d8d0'/><rect%20x='7'%20y='8'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='8'%20y='8'%20width='2'%20height='1'%20fill='%23d8d8d0'/><!--%20Blade%20to%20crossguard%20--><rect%20x='8'%20y='9'%20width='1'%20height='1'%20fill='%23c0c0b8'/><rect%20x='9'%20y='9'%20width='2'%20height='1'%20fill='%23d8d8d0'/><!--%20Crossguard%20--><rect%20x='7'%20y='10'%20width='1'%20height='1'%20fill='%23c8a040'/><rect%20x='8'%20y='10'%20width='1'%20height='1'%20fill='%23dac060'/><rect%20x='9'%20y='10'%20width='1'%20height='1'%20fill='%23c8a040'/><rect%20x='10'%20y='10'%20width='2'%20height='1'%20fill='%23dac060'/><rect%20x='12'%20y='10'%20width='1'%20height='1'%20fill='%23c8a040'/><rect%20x='7'%20y='11'%20width='1'%20height='1'%20fill='%23b89030'/><rect%20x='8'%20y='11'%20width='1'%20height='1'%20fill='%23c8a040'/><rect%20x='9'%20y='11'%20width='1'%20height='1'%20fill='%23b89030'/><rect%20x='10'%20y='11'%20width='2'%20height='1'%20fill='%23c8a040'/><rect%20x='12'%20y='11'%20width='1'%20height='1'%20fill='%23b89030'/><!--%20Grip%20--><rect%20x='10'%20y='12'%20width='2'%20height='1'%20fill='%236b4226'/><rect%20x='10'%20y='13'%20width='1'%20height='1'%20fill='%235a3520'/><rect%20x='11'%20y='13'%20width='2'%20height='1'%20fill='%236b4226'/><rect%20x='11'%20y='14'%20width='2'%20height='1'%20fill='%235a3520'/><rect%20x='11'%20y='15'%20width='1'%20height='1'%20fill='%236b4226'/><rect%20x='12'%20y='15'%20width='2'%20height='1'%20fill='%235a3520'/><rect%20x='12'%20y='16'%20width='2'%20height='1'%20fill='%236b4226'/><!--%20Pommel%20--><rect%20x='12'%20y='17'%20width='1'%20height='1'%20fill='%23c8a040'/><rect%20x='13'%20y='17'%20width='2'%20height='1'%20fill='%23dac060'/><rect%20x='13'%20y='18'%20width='1'%20height='1'%20fill='%23b89030'/><rect%20x='14'%20y='18'%20width='1'%20height='1'%20fill='%23c8a040'/></svg>") 1 1, default}
+/* Sword cursor */
+body,.cmd-btn,.bar-opt,.fmt-slot,.mercy-btn,.camp-btn,button,.tl-node.unlocked,.fe-choice,#story-overlay{cursor:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cline x1='4' y1='4' x2='20' y2='20' stroke='%23222' stroke-width='5' stroke-linecap='round'/%3E%3Cline x1='4' y1='4' x2='20' y2='20' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='4' y1='4' x2='10' y2='4' stroke='%23c8a040' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='4' y1='4' x2='4' y2='10' stroke='%23c8a040' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='16' y1='22' x2='22' y2='16' stroke='%23c8a040' stroke-width='3' stroke-linecap='round'/%3E%3Cline x1='22' y1='22' x2='28' y2='28' stroke='%236b4226' stroke-width='3' stroke-linecap='round'/%3E%3Ccircle cx='28' cy='28' r='2' fill='%23c8a040'/%3E%3C/svg%3E") 4 4, default}
+canvas{cursor:none!important}
 #camp-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,6,0.95);z-index:18;display:none;flex-direction:column;align-items:center;justify-content:center}
 #camp-overlay h2{font-family:'Cinzel',serif;font-size:1.5rem;color:#c8a040;letter-spacing:0.1em;margin-bottom:8px}
 #camp-overlay .camp-sub{font-size:0.65rem;color:#5a5238;margin-bottom:20px;font-style:italic}
@@ -216,7 +217,7 @@ body{url("data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20width='
   <div class="fe-bg"></div>
   <div class="fe-scene">
     <div class="fe-portrait speaking" id="fe-left">
-      <div class="fe-portrait-box moroni-box">⚔</div>
+      <div class="fe-portrait-box moroni-box"><img src="moroni.png" style="width:100%;height:100%;object-fit:cover;border-radius:2px"></div>
       <div class="fe-portrait-name">MORONI</div>
     </div>
     <div class="fe-textbox">
@@ -326,6 +327,7 @@ body{url("data:image/svg+xml,<svg%20xmlns='http://www.w3.org/2000/svg'%20width='
   </div>
   <div class="epilogue" id="epilogue" style="display:none"></div>
   <button id="return-btn" class="mercy-btn" style="display:none;margin-top:20px" onclick="returnToTimeline()">Return to Timeline</button>
+  <button id="sandbox-btn" class="mercy-btn" style="display:none;margin-top:8px" onclick="startSandbox()">⚔ Free Battle</button>
 </div>
 
 <div id="pause-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,6,0.85);z-index:30;flex-direction:column;align-items:center;justify-content:center">
@@ -1106,6 +1108,7 @@ function checkConcealment(){
 // MISSION PHASES
 // ══════════════════════════════════════
 function updateMission(dt){
+  if(S.phase==='sandbox')return;
   S.phaseTimer+=dt;
   if(S.calloutTimer>0){S.calloutTimer-=dt;if(S.calloutTimer<=0)document.getElementById('callout').style.opacity='0';}
 
@@ -2503,6 +2506,8 @@ function showResults(){
   // Mercy was already handled in-game via Alma 44 sequence
   document.getElementById('mercy-choice').style.display='none';
   document.getElementById('return-btn').style.display='inline-block';
+  document.getElementById('sandbox-btn').style.display='inline-block';
+  localStorage.setItem('tol_mission_0_complete','1');
   document.getElementById('epilogue').style.display='block';
   const mercy=!S._mercySkipped;
   document.getElementById('epilogue').innerHTML=(mercy?
@@ -2556,6 +2561,41 @@ function returnToTimeline(){
   document.getElementById('title-screen').style.display='flex';
   document.getElementById('hud').style.display='none';
   document.getElementById('mission-text').style.display='none';
+  // Check completed missions
+  if(localStorage.getItem('tol_mission_0_complete')){
+    document.querySelectorAll('.tl-node')[0].classList.add('completed');
+  }
+  // Remove sandbox end button if present
+  var sbEnd=document.getElementById('sandbox-end-btn');if(sbEnd)sbEnd.remove();
+}
+
+function startSandbox(){
+  document.getElementById('results').style.display='none';
+  running=true;
+  S.phase='sandbox';
+  // Clear particles/blood/bodies
+  PARTICLES.length=0;BLOODSTAINS.length=0;BODIES.length=0;ATMOS_PARTICLES.length=0;
+  S._riverBlood=0;S._footprints=[];S._trampledGrass={};
+  // Reset soldiers to full HP, morale 100
+  S.soldiers.forEach(function(s){s.hp=s.maxHp||10;s.morale=100;s.dead=false;s.fleeing=false;s.state='idle';});
+  // Reset allies
+  S.allies.forEach(function(a){a.hp=a.maxHp||10;a.dead=false;a.fleeing=false;a.state='idle';});
+  // Clear old enemies and spawn fresh batch
+  S.enemies=[];
+  for(var i=0;i<80;i++){
+    S.enemies.push({x:50+Math.random()*200,y:20+Math.random()*(H-40),hp:8,maxHp:8,dead:false,fleeing:false,state:'idle',dir:1,atkCd:0,morale:80+Math.random()*20,type:'lamanite'});
+  }
+  // Show callout
+  S._callout={fullText:'Free battle — no objectives, no consequences. Fight as long as you want.',typed:'',charIdx:0,charTimer:0,dur:8,elapsed:0};
+  document.getElementById('callout').style.opacity='1';
+  // Add end sandbox button
+  var btn=document.createElement('button');
+  btn.id='sandbox-end-btn';
+  btn.className='mercy-btn';
+  btn.style.cssText='position:fixed;bottom:20px;right:20px;z-index:25;font-size:0.7rem;padding:6px 14px';
+  btn.textContent='End Sandbox';
+  btn.onclick=returnToTimeline;
+  document.body.appendChild(btn);
 }
 
 // ══════════════════════════════════════
@@ -3373,7 +3413,7 @@ function gameLoop(t){
   }
   // Event log fade
   const logEl=document.getElementById('event-log');
-  if(logEl){for(let i=0;i<logEl.children.length;i++){const e=logEl.children[i];const age=(performance.now()-e._born)/1000;if(age>0){e.style.opacity=Math.max(0,0.8*(1-age/30)).toFixed(2);if(age>=30){logEl.removeChild(e);i--;}}}}
+  if(logEl){for(let i=0;i<logEl.children.length;i++){const e=logEl.children[i];const age=(performance.now()-e._born)/1000;if(age>0){e.style.opacity=Math.max(0,0.8*(1-age/45)).toFixed(2);if(age>=45){logEl.removeChild(e);i--;}}}}
   // Establishing shot update
   if(S.phase==='establishing'){
     updateEstablishing(realDt);render();requestAnimationFrame(gameLoop);return;
@@ -3512,6 +3552,48 @@ function startLehiScout(){
 
 function beginMission(idx){
   if(idx!==0)return;
+  // Reset game state for replay
+  campPicks=0;
+  running=true;paused=false;
+  S._callout=null;S._calloutQueue=[];
+  S.phase=null;S.phaseTimer=0;
+  S._confrontPhase=null;S._confrontTimer=0;
+  S.zerahemnah=null;S._dialog=null;
+  S._prayerActive=false;S._prayerDone=false;
+  S._campPray=false;S.campArmor=false;S.campIntel=false;
+  S._crossNote1=false;S._crossNote2=false;S._crossingDone=false;
+  S._enemiesSpawned=false;S._scoutedEnemy=false;
+  S._scoutSilentLost=false;S._scoutSilentAlerted=false;
+  S.ambushReady=true;S.playerConcealed=true;
+  S.casualties=[];S.deadSoldiers=0;S.deadAllies=0;
+  S._capturedLamanites=0;S._routedEscaped=0;
+  S._surrenderOffered=false;S._mercySkipped=false;
+  S.scouts=[];S.enemies=[];S.allies=[];S.soldiers=[];S.messengers=[];
+  PARTICLES.length=0;BLOODSTAINS.length=0;BODIES.length=0;ATMOS_PARTICLES.length=0;
+  S._riverBlood=0;S._footprints=[];S._trampledGrass={};
+  S._bigText=null;S._bigTextTimer=0;S._screenFlash=0;
+  S._transitionPause=0;S._timeScale=1;S._targetTimeScale=1;
+  S._letterbox=0;S._targetLetterbox=0;
+  S.heat=0;S.faith=70;
+  S.lehiAttacking=false;S.lehiOrder=null;S.battleCmd=null;
+  S.scoutMode=false;S.scoutIntelLevel=0;
+  S._estTimer=0;S._estKeypoints=null;
+  // Reset camp overlay UI
+  ['armor','pray','intel','council'].forEach(t=>{
+    const el=document.getElementById('camp-'+t);
+    if(el){el.disabled=false;el.style.opacity='1';el.style.textDecoration='none';el.style.borderColor='';el.style.background='';}
+    const d=document.getElementById('camp-'+t+'-desc');
+    if(d){d.style.opacity='1';d.style.textDecoration='none';d.style.color='';d.style.fontSize='';}
+  });
+  document.getElementById('camp-go').style.display='none';
+  // Clear event log and callout
+  document.getElementById('event-log').innerHTML='';
+  document.getElementById('callout').style.opacity='0';
+  // Hide results/confront overlays
+  document.getElementById('results').style.display='none';
+  document.getElementById('confront-overlay').style.display='none';
+  // Remove sandbox button if present
+  var sbEnd=document.getElementById('sandbox-end-btn');if(sbEnd)sbEnd.remove();
   document.getElementById('title-screen').style.display='none';
   document.getElementById('hud').style.display='block';
   document.getElementById('formation-bar').style.display='block';
@@ -3531,6 +3613,8 @@ function resize(){
   canvas.style.marginTop=Math.max(0,(maxH-H*SCALE*scale)/2)+'px';
 }
 window.addEventListener('resize',resize);resize();
+// Check completed missions on load
+if(localStorage.getItem('tol_mission_0_complete')){document.querySelectorAll('.tl-node')[0].classList.add('completed');}
 requestAnimationFrame(gameLoop);
 </script>
 </body></html>
