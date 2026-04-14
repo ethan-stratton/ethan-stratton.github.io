@@ -348,11 +348,11 @@ function onHill(x,y){return Math.sqrt((x-HILL.x)*(x-HILL.x)+(y-HILL.y)*(y-HILL.y
 function inTrees(x,y){for(const t of TREES){if(Math.abs(x-t.x)<8&&Math.abs(y-t.y)<8)return true;}return false;}
 function terrainSpeed(x,y){if(inRiver(x,y))return 0.3;if(onRoad(x,y))return 1.4;if(onHill(x,y))return 0.7;if(inTrees(x,y))return 0.6;return 1.0;}
 function terrainName(x,y){
-  if(inRiver(x,y))return{name:'River Sidon',color:'#4a7a9a',icon:'≈≈'};
-  if(onRoad(x,y))return{name:'Road',color:'#a89868',icon:'►'};
-  if(onHill(x,y))return{name:'Hill Riplah',color:'#8a7a40',icon:'▲'};
-  if(inTrees(x,y))return{name:'Wilderness',color:'#4a7a3a',icon:'♣'};
-  return{name:'Open Ground',color:'#6a6248',icon:'·'};
+  if(inRiver(x,y))return{name:'River Sidon',color:'#4a7a9a',icon:'≈≈',heatNote:'❄ Cooling'};
+  if(onRoad(x,y))return{name:'Road',color:'#a89868',icon:'►',heatNote:''};
+  if(onHill(x,y))return{name:'Hill Riplah',color:'#8a7a40',icon:'▲',heatNote:'☀ Exposed'};
+  if(inTrees(x,y))return{name:'Wilderness',color:'#4a7a3a',icon:'♣',heatNote:'🌿 Shade'};
+  return{name:'Open Ground',color:'#6a6248',icon:'·',heatNote:''};
 }
 function isConcealed(x,y){
   if(inTrees(x,y))return true;
@@ -1281,10 +1281,14 @@ function update(dt){
   {
     const inTree=inTrees(S.cx,S.cy);
     const onH=onHill(S.cx,S.cy);
+    const inRiv=inRiver(S.cx,S.cy);
     let heatRate=inTree?0.5:onH?3:2;
     if(S.campArmor)heatRate+=1.5;
     if(S.moving)heatRate*=1.5;
-    if(!S.moving&&inTree)heatRate=-3;
+    // Cooling options: trees, river, or just stopping
+    if(!S.moving&&inTree)heatRate=-4; // trees: strong cooling
+    if(inRiv)heatRate=-6; // river: strongest cooling
+    if(!S.moving&&!inTree&&!inRiv&&!onH)heatRate=Math.min(heatRate,0.3); // standing still in open: barely rises
     S.heat=Math.max(0,Math.min(100,S.heat+heatRate*dt));
     // Effects
     S._heatCalloutTimer-=dt;
@@ -1923,7 +1927,7 @@ function updateHtmlHud(){
 
   const t=terrainName(S.cx,S.cy);
   const tn=document.getElementById('terrain-name');
-  tn.textContent=t.icon+' '+t.name;tn.style.color=t.color;
+  tn.textContent=t.icon+' '+t.name+(t.heatNote?' — '+t.heatNote:'');tn.style.color=t.color;
 
   const cs=document.getElementById('concealment-status');
   if(S.phase==='position'||S.phase==='wait'){
@@ -2154,7 +2158,8 @@ function render(){
     const b=Math.floor(130*s.shade),g=Math.floor(115*s.shade),bl=Math.floor(75*s.shade);
     const sFlash=s._hitFlash>0?(s._hitFlash-=1/60,'rgba(255,255,255,0.9)'):`rgb(${b},${g},${bl})`;
     ctx.fillStyle=sFlash;
-    ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-1),s.size|0,(s.size+0.5)|0);
+    const kneeling=S._prayerActive?1:0;
+    ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-1+kneeling),s.size|0,Math.max(1,(s.size+0.5)|0)-kneeling);
     // Armored Nephite distinction: breastplate (lighter chest), head-plate, arm-shield hints
     if(s.armored){
       ctx.fillStyle='rgba(220,200,140,0.4)';ctx.fillRect(Math.floor(s.x),Math.floor(s.y-1),1,1); // breastplate
@@ -2310,13 +2315,21 @@ function render(){
 
   // Prayer overlay
   if(S._prayerActive){
-    ctx.fillStyle='rgba(0,0,0,0.4)';ctx.fillRect(0,0,W,H);
-    ctx.fillStyle='rgba(200,160,64,0.7)';ctx.font='5px Cinzel';ctx.textAlign='center';
-    ctx.fillText('"And they did pray mightily that',W/2,H/2-8);
-    ctx.fillText('God would strengthen them."',W/2,H/2);
-    ctx.fillStyle='rgba(100,80,40,0.5)';ctx.font='3px Inter';
-    ctx.fillText('— Alma 43:49',W/2,H/2+8);
+    ctx.save();
+    ctx.setTransform(SCALE,0,0,SCALE,0,0); // reset to screen space
+    ctx.fillStyle='rgba(0,0,0,0.5)';ctx.fillRect(0,0,W,H);
+    // Golden glow behind text
+    const glow=0.15+Math.sin(S._prayerTimer*2)*0.05;
+    ctx.fillStyle=`rgba(200,160,64,${glow})`;
+    ctx.fillRect(W/2-80,H/2-20,160,35);
+    // Main text — large, readable
+    ctx.fillStyle='rgba(220,180,80,0.9)';ctx.font="bold 7px 'Cinzel',serif";ctx.textAlign='center';
+    ctx.fillText('"And they did pray mightily',W/2,H/2-8);
+    ctx.fillText('that God would strengthen them."',W/2,H/2+2);
+    ctx.fillStyle='rgba(160,130,60,0.7)';ctx.font="5px 'Inter',sans-serif";
+    ctx.fillText('— Alma 43:49',W/2,H/2+14);
     ctx.textAlign='start';
+    ctx.restore();
   }
 
   // Objective arrow (points toward Hill Riplah during position phase)
@@ -2342,26 +2355,35 @@ function seedRand(x,y){let s=x*374761393+y*668265263+1013904223;s=(s^(s>>13))*12
 
 function drawTerrain(){
   ctx.fillStyle='#2a2818';ctx.fillRect(0,0,MAP.w,MAP.h);
+  // Base ground texture — warmer earth tone
   for(let x=0;x<MAP.w;x+=8){for(let y=0;y<MAP.h;y+=8){
     const n=Math.sin(x*0.1+y*0.13)*0.5+Math.sin(x*0.07-y*0.11)*0.5;
     if(n>0.3){ctx.fillStyle='rgba(60,70,30,0.12)';ctx.fillRect(x,y,6,6);}
+    if(n>0.1&&n<=0.3){ctx.fillStyle='rgba(50,55,25,0.06)';ctx.fillRect(x,y,4,4);}
   }}
 
-  // Tall grass patches (seeded)
-  for(let x=0;x<MAP.w;x+=6){for(let y=0;y<MAP.h;y+=6){
+  // Tall grass patches (seeded) — visible blades
+  for(let x=0;x<MAP.w;x+=4){for(let y=0;y<MAP.h;y+=4){
     const r=seedRand(x,y);
-    if(r>0.7&&!inRiver(x,y)){
-      const nearT=TREES.some(t=>Math.abs(x-t.x)<20&&Math.abs(y-t.y)<20);
-      const dense=nearT?0.5:0.75;
+    if(r>0.55&&!inRiver(x,y)&&!onRoad(x,y)){
+      const nearT=TREES.some(t=>Math.abs(x-t.x)<25&&Math.abs(y-t.y)<25);
+      const dense=nearT?0.45:0.7;
       if(r>dense){
         const key=x+','+y;
-        const trampled=S._trampledGrass[key];
+        const trampled=S._trampledGrass&&S._trampledGrass[key];
         if(trampled){
-          ctx.fillStyle='rgba(40,50,20,0.15)';
+          ctx.fillStyle='rgba(45,50,22,0.25)';
+          ctx.fillRect(x,y,2,1);
         }else{
-          ctx.fillStyle='rgba(50,70,25,0.2)';
+          const h=1+Math.floor(seedRand(x+1,y)*3);
+          const shade=nearT?'rgba(35,60,20,0.45)':'rgba(55,80,30,0.35)';
+          ctx.fillStyle=shade;
+          ctx.fillRect(x,y-h,1,h+1);
+          if(r>0.8){
+            ctx.fillStyle=nearT?'rgba(30,55,18,0.35)':'rgba(50,70,28,0.3)';
+            ctx.fillRect(x+1,y-h+1,1,h);
+          }
         }
-        ctx.fillRect(x,y,1,1+Math.floor(seedRand(x+1,y)*2));
       }
     }
   }}
@@ -2371,59 +2393,81 @@ function drawTerrain(){
   ctx.strokeStyle='rgba(70,60,40,0.2)';
   ROADS.forEach(r=>{ctx.lineWidth=r.w*0.3;ctx.beginPath();ctx.moveTo(r.x1,r.y1);ctx.lineTo(r.x2,r.y2);ctx.stroke();});
 
-  // River with enhanced visuals
+  // River
   ctx.fillStyle='#1a2a3a';ctx.beginPath();
   for(let y=0;y<=MAP.h;y+=4){const rx=riverX(y);if(y===0)ctx.moveTo(rx-RIVER_HALF_W,y);ctx.lineTo(rx-RIVER_HALF_W,y);}
   for(let y=MAP.h;y>=0;y-=4){ctx.lineTo(riverX(y)+RIVER_HALF_W,y);}ctx.fill();
+  // Mud banks
+  for(let y=0;y<MAP.h;y+=3){
+    const rx=riverX(y);
+    ctx.fillStyle='rgba(60,50,30,0.2)';
+    ctx.fillRect(rx-RIVER_HALF_W-3,y,3,2);
+    ctx.fillRect(rx+RIVER_HALF_W,y,3,2);
+  }
   // River blood tint
   if(S._riverBlood>0){
     const bloodAlpha=Math.min(0.3,S._riverBlood*0.01);
-    for(let y=Math.max(0,S._riverBloodY);y<MAP.h;y+=4){
+    for(let y=Math.max(0,S._riverBloodY||0);y<MAP.h;y+=4){
       const rx=riverX(y);
-      ctx.fillStyle=`rgba(120,20,10,${bloodAlpha*Math.max(0,1-(y-S._riverBloodY)/200)})`;
+      ctx.fillStyle=`rgba(120,20,10,${bloodAlpha*Math.max(0,1-(y-(S._riverBloodY||0))/200)})`;
       ctx.fillRect(rx-RIVER_HALF_W,y,RIVER_HALF_W*2,4);
     }
   }
   // Animated ripple lines + foam
-  for(let y=0;y<MAP.h;y+=6){
+  for(let y=0;y<MAP.h;y+=4){
     const rx=riverX(y);
-    // Ripple
-    ctx.fillStyle='rgba(40,80,120,0.15)';
-    ctx.fillRect(rx-10+Math.sin(S.time*2.5+y*0.08)*5,y,4,1);
-    ctx.fillRect(rx+3+Math.sin(S.time*1.8+y*0.12+2)*4,y,3,1);
-    // Foam near banks
-    if(Math.sin(S.time*1.5+y*0.2)>0.5){
-      ctx.fillStyle='rgba(180,200,220,0.12)';
+    ctx.fillStyle='rgba(50,100,140,0.2)';
+    ctx.fillRect(rx-8+Math.sin(S.time*2.5+y*0.08)*5,y,3,1);
+    ctx.fillRect(rx+4+Math.sin(S.time*1.8+y*0.12+2)*4,y,2,1);
+    const foam=Math.sin(S.time*1.5+y*0.2);
+    if(foam>0.3){
+      ctx.fillStyle=`rgba(180,200,220,${0.08+foam*0.1})`;
       ctx.fillRect(rx-RIVER_HALF_W+1,y,2,1);
       ctx.fillRect(rx+RIVER_HALF_W-3,y,2,1);
     }
   }
 
-  // Hill
-  ctx.fillStyle='rgba(80,70,40,0.18)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='rgba(90,80,45,0.12)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*0.65,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='rgba(100,90,50,0.08)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*0.3,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='rgba(140,130,90,0.35)';ctx.font='5px Inter';ctx.fillText('Hill Riplah',HILL.x-18,HILL.y-HILL.r+8);
+  // Hill with contour lines
+  ctx.fillStyle='rgba(90,80,45,0.25)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(100,90,50,0.18)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*0.65,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(110,100,55,0.12)';ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*0.3,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(120,110,70,0.12)';ctx.lineWidth=0.5;
+  [0.9,0.7,0.5,0.3].forEach(s=>{ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r*s,0,Math.PI*2);ctx.stroke();});
+  ctx.fillStyle='rgba(160,150,100,0.5)';ctx.font='5px Inter';ctx.fillText('Hill Riplah',HILL.x-18,HILL.y-HILL.r+8);
 
-  // Trees with ferns/undergrowth
+  // Trees — visible canopy circles with shade, trunks, undergrowth
   TREES.forEach(t=>{
-    ctx.fillStyle='rgba(25,45,18,0.5)';ctx.fillRect(t.x,t.y,t.s*0.4,t.s);
-    ctx.fillStyle='rgba(35,55,22,0.4)';ctx.fillRect(t.x-t.s*0.5,t.y-t.s*0.5,t.s*1.5,t.s*0.7);
-    // Ferns at base
-    ctx.fillStyle='rgba(20,50,15,0.3)';
-    ctx.beginPath();ctx.moveTo(t.x-t.s*0.3,t.y+t.s);ctx.lineTo(t.x,t.y+t.s-2);ctx.lineTo(t.x+t.s*0.3,t.y+t.s);ctx.fill();
-    ctx.beginPath();ctx.moveTo(t.x+t.s*0.5,t.y+t.s);ctx.lineTo(t.x+t.s*0.3,t.y+t.s-1.5);ctx.lineTo(t.x+t.s*0.7,t.y+t.s);ctx.fill();
+    // Ground shade zone
+    ctx.fillStyle='rgba(15,25,10,0.15)';
+    ctx.beginPath();ctx.arc(t.x,t.y+t.s*0.3,t.s*1.2,0,Math.PI*2);ctx.fill();
+    // Trunk
+    ctx.fillStyle='rgba(50,35,20,0.7)';ctx.fillRect(t.x-1,t.y,Math.max(2,t.s*0.3),t.s);
+    // Main canopy
+    ctx.fillStyle='rgba(25,55,18,0.65)';
+    ctx.beginPath();ctx.arc(t.x,t.y-t.s*0.2,t.s*0.8,0,Math.PI*2);ctx.fill();
+    // Lighter highlight
+    ctx.fillStyle='rgba(40,75,25,0.4)';
+    ctx.beginPath();ctx.arc(t.x-t.s*0.2,t.y-t.s*0.4,t.s*0.4,0,Math.PI*2);ctx.fill();
+    // Second canopy blob
+    ctx.fillStyle='rgba(30,60,20,0.5)';
+    ctx.beginPath();ctx.arc(t.x+t.s*0.3,t.y-t.s*0.1,t.s*0.5,0,Math.PI*2);ctx.fill();
+    // Undergrowth ferns
+    ctx.fillStyle='rgba(25,55,18,0.45)';
+    ctx.beginPath();ctx.moveTo(t.x-t.s*0.6,t.y+t.s);ctx.lineTo(t.x-t.s*0.1,t.y+t.s*0.4);ctx.lineTo(t.x+t.s*0.4,t.y+t.s);ctx.fill();
+    ctx.fillStyle='rgba(20,50,15,0.4)';
+    ctx.beginPath();ctx.moveTo(t.x+t.s*0.2,t.y+t.s);ctx.lineTo(t.x+t.s*0.5,t.y+t.s*0.5);ctx.lineTo(t.x+t.s*0.9,t.y+t.s);ctx.fill();
+    ctx.fillStyle='rgba(30,60,20,0.3)';
+    ctx.beginPath();ctx.moveTo(t.x-t.s*0.8,t.y+t.s*0.8);ctx.lineTo(t.x-t.s*0.4,t.y+t.s*0.3);ctx.lineTo(t.x,t.y+t.s*0.8);ctx.fill();
   });
 
   // Footprints
-  S._footprints.forEach(fp=>{
+  if(S._footprints)S._footprints.forEach(fp=>{
     if(fp.alpha>0){
       ctx.fillStyle=`rgba(60,45,25,${fp.alpha})`;
       ctx.fillRect(Math.floor(fp.x),Math.floor(fp.y),1,1);
     }
   });
 }
-
 function drawTerrainZoneHints(){
   ROADS.forEach(r=>{const dx=r.x2-r.x1,dy=r.y2-r.y1,len=Math.sqrt(dx*dx+dy*dy);const nx=-dy/len,ny=dx/len;ctx.strokeStyle='rgba(100,90,60,0.1)';ctx.lineWidth=0.3;ctx.setLineDash([2,4]);ctx.beginPath();ctx.moveTo(r.x1+nx*r.w/2,r.y1+ny*r.w/2);ctx.lineTo(r.x2+nx*r.w/2,r.y2+ny*r.w/2);ctx.stroke();ctx.beginPath();ctx.moveTo(r.x1-nx*r.w/2,r.y1-ny*r.w/2);ctx.lineTo(r.x2-nx*r.w/2,r.y2-ny*r.w/2);ctx.stroke();ctx.setLineDash([]);});
   ctx.strokeStyle='rgba(100,90,50,0.08)';ctx.lineWidth=0.3;ctx.setLineDash([3,5]);ctx.beginPath();ctx.arc(HILL.x,HILL.y,HILL.r,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
