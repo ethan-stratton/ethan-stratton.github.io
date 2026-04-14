@@ -1321,26 +1321,52 @@ function updateMission(dt){
     });
 
     // Zerahemnah fights
-    if(S.zerahemnah&&!S.zerahemnah.dead){
+    if(!S._combatPaused&&S.zerahemnah&&!S.zerahemnah.dead){
       const z=S.zerahemnah;
-      const target=findNearest(z.x,z.y,150,S.soldiers);
-      if(target){
-        const ddx=target.x-z.x,ddy=target.y-z.y,d=Math.sqrt(ddx*ddx+ddy*ddy);
-        if(d<20){
-          z._atkCd=(z._atkCd||0)-dt;
-          if(z._atkCd<=0){
-            z._atkCd=1.2;
-            target.hp-=0.8;target._hitFlash=0.1;spawnBlood(target.x,target.y,2);SND.swordHit();
-            if(target.hp<=0){target.dead=true;spawnDeathParticles(target.x,target.y);SND.death();S.casualties.push(target._name);S._lastDeathTime=S.time;}
-          }
-        }else{moveToward(z,target.x,target.y,50,dt);}
+      // Check if nearly killed → covenant scene
+      if(z.hp<=1&&!S._zNearlyKilled){
+        S._zNearlyKilled=true;
+        z._fighting=false;
+        setSlowMo(0.25,3);
+        S._combatPaused=true;
+        showFEDialog('','And it came to pass that the soldier who stood by, who smote off the scalp of Zerahemnah, took up the scalp from off the ground and laid it upon the point of his sword, and stretched it forth, and cried with a loud voice:','Alma 44:17-18',null,function(){
+          showFEDialog('Soldier','Even as this scalp has fallen to the earth, so shall YE fall unless ye deliver up your weapons!','Alma 44:18',null,function(){
+            showFEDialog('','And now when Moroni saw that Zerahemnah was smitten almost unto death, he commanded his people that they should withhold and stay their hand.','Alma 44:19',null,function(){
+              showFEDialog('','Zerahemnah, seeing that he was about to be slain, cried mightily unto Moroni, promising to covenant. And Moroni caused the work of death to cease.','Alma 44:19-20',null,function(){
+                S._combatPaused=false;
+                S.enemies.forEach(e=>{
+                  if(!e.dead&&e.state==='fight'){
+                    e.state='surrendered';
+                    S._capturedLamanites++;
+                  }
+                });
+                beginFinalSurrender();
+              });
+            });
+          });
+        });
+      } else if(!S._zNearlyKilled){
+        const target=findNearest(z.x,z.y,150,S.soldiers);
+        if(target){
+          const ddx=target.x-z.x,ddy=target.y-z.y,d=Math.sqrt(ddx*ddx+ddy*ddy);
+          if(d<20){
+            z._atkCd=(z._atkCd||0)-dt;
+            if(z._atkCd<=0){
+              z._atkCd=0.8;
+              target.hp-=1.2;target._hitFlash=0.1;spawnBlood(target.x,target.y,2);SND.swordHit();
+              if(target.hp<=0){target.dead=true;spawnDeathParticles(target.x,target.y);SND.death();S.casualties.push(target._name);S._lastDeathTime=S.time;}
+            }
+          }else{moveToward(z,target.x,target.y,50,dt);}
+        }
       }
     }
 
-    const aliveEnemies=S.enemies.filter(e=>!e.dead&&e.state==='fight');
-    const aliveZ=S.zerahemnah&&!S.zerahemnah.dead?1:0;
-    if(aliveEnemies.length+aliveZ<5){
-      beginFinalSurrender();
+    if(!S._combatPaused){
+      const aliveEnemies=S.enemies.filter(e=>!e.dead&&e.state==='fight');
+      const aliveZ=S.zerahemnah&&!S.zerahemnah.dead?1:0;
+      if(aliveEnemies.length+aliveZ<5&&(!S.zerahemnah||S.zerahemnah.dead)){
+        beginFinalSurrender();
+      }
     }
     if(S.soldiers.filter(s=>!s.dead).length===0&&S.allies.filter(a=>!a.dead).length===0){
       S.phase='defeat';showDefeat();
@@ -1474,7 +1500,7 @@ function updateConfrontPhase(dt){
     const alive=S.enemies.filter(e=>!e.dead&&e.state==='retreat_confront');
     const cx=alive.reduce((s,e)=>s+e.x,0)/(alive.length||1);
     const cy=alive.reduce((s,e)=>s+e.y,0)/(alive.length||1);
-    S.zerahemnah={x:cx,y:cy,hp:5,maxHp:5,dead:false,_atkCd:0};
+    S.zerahemnah={x:cx,y:cy,hp:8,maxHp:8,dead:false,_atkCd:0};
     showCallout('"Zerahemnah comes forward. Moroni speaks:"',4);
     S._confrontPhase='demand_wait';S._confrontTimer=0;
   }
@@ -1544,7 +1570,7 @@ function updateConfrontPhase(dt){
 
   if(phase==='mass_surrender_wait'&&S._confrontTimer>3){
     // Calculate surrender percentage
-    const surrenderPct=0.3+(S.ambushReady?0.2:0)+(S.deadSoldiers<S.soldierCount*0.15?0.2:0);
+    const surrenderPct=Math.min(0.4, 0.3+(S.ambushReady?0.1:0));
     const alive=S.enemies.filter(e=>!e.dead&&e.state==='retreat_confront');
     const surrenderCount=Math.floor(alive.length*surrenderPct);
     // Shuffle and surrender
@@ -1579,8 +1605,10 @@ function beginFinalBattle(){
   S.enemies.forEach(e=>{
     if(!e.dead&&e.state==='retreat_confront'){
       e.state='fight';
-      e.morale=60+Math.random()*30;
-      e.speed=Math.min(55,e.speed*1.2);
+      e.morale=80+Math.random()*20;
+      e.speed=Math.min(60,e.speed*1.4);
+      e.hp=Math.min(e.maxHp,e.hp+1);
+      e._dmgMult=1.5;
     }
   });
   // Zerahemnah fights
@@ -2324,9 +2352,11 @@ function findNearest(x,y,range,list){
 }
 
 function doCombat(atk,def,dt){
+  if(S._combatPaused) return;
   atk.attackCd-=dt;if(atk.attackCd>0)return;
   atk.attackCd=0.8+Math.random()*0.4;
   let dmg=atk.team==='nephite'?1:0.6;
+  dmg*=(atk._dmgMult||1);
   // Wounded attacker does less damage
   if(atk.hp<atk.maxHp*0.25){return;} // critical — can't fight
   if(atk.hp<atk.maxHp*0.4){dmg*=0.5;} // wounded — half damage
@@ -2594,6 +2624,7 @@ function togglePause(){
 function returnToTimeline(){
   running=false;paused=false;
   S._dialog=null;S.zerahemnah=null;S._confrontPhase=null;
+  S._zNearlyKilled=false;S._combatPaused=false;
   document.body.style.background='#1a1610';
   document.getElementById('results').style.display='none';
   document.getElementById('epilogue').style.display='none';
@@ -2833,19 +2864,21 @@ function render(){
     }
   }
 
-  // Draw Zerahemnah — larger, distinct
+  // Draw Zerahemnah — larger, distinct boss
   if(S.zerahemnah&&!S.zerahemnah.dead){
     const z=S.zerahemnah;
-    ctx.fillStyle='#8a2020';
+    ctx.fillStyle='#aa2020';
     ctx.fillRect(Math.floor(z.x-2),Math.floor(z.y-3),5,6);
-    ctx.fillStyle='#aa4020';
+    ctx.fillStyle='#cc4020';
     ctx.fillRect(Math.floor(z.x-1),Math.floor(z.y-4),3,1);
-    if(z.hp<z.maxHp){
-      ctx.fillStyle='rgba(200,50,30,0.7)';
-      ctx.fillRect(Math.floor(z.x-2),Math.floor(z.y-6),Math.ceil(5*(z.hp/z.maxHp)),1);
-    }
-    ctx.fillStyle='rgba(200,80,40,0.6)';ctx.font='3px Inter';
-    ctx.fillText('Zerahemnah',Math.floor(z.x-12),Math.floor(z.y-8));
+    // HP bar
+    ctx.fillStyle='rgba(80,0,0,0.8)';
+    ctx.fillRect(Math.floor(z.x-3),Math.floor(z.y-7),7,2);
+    ctx.fillStyle='rgba(0,200,0,0.8)';
+    ctx.fillRect(Math.floor(z.x-3),Math.floor(z.y-7),Math.ceil(7*(z.hp/z.maxHp)),2);
+    // "Z" label
+    ctx.fillStyle='rgba(255,200,60,0.9)';ctx.font='4px Inter';
+    ctx.fillText('Z',Math.floor(z.x-2),Math.floor(z.y-9));
   }
 
   // Draw surrendered Lamanites (kneeling — 1px shorter)
@@ -3870,6 +3903,7 @@ function beginMission(idx){
   S.phase=null;S.phaseTimer=0;
   S._confrontPhase=null;S._confrontTimer=0;
   S.zerahemnah=null;S._dialog=null;
+  S._zNearlyKilled=false;S._combatPaused=false;
   S._prayerActive=false;S._prayerDone=false;
   S._campPray=false;S.campArmor=false;S.campIntel=false;
   S._campAnim=null;S.mantiHP=100;S._mantiWarning=false;S._mantiFallen=false;
