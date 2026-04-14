@@ -378,6 +378,7 @@ let running=false,lastTime=0;
 const keys={};
 window.addEventListener('keydown',e=>{
   if(e.key==='Escape'){if(running)togglePause();return;}
+  if(S.phase==='establishing'){skipEstablishing();return;}
   keys[e.key.toLowerCase()]=true;
   handleKey(e.key.toLowerCase());
   if(['arrowup','arrowdown','arrowleft','arrowright',' ','f1','f2','f3'].includes(e.key.toLowerCase()||e.key))e.preventDefault();
@@ -753,7 +754,64 @@ const S={
   _scoutLostTimer:0,
   _scoutSilentLost:false,
   _scoutSilentAlerted:false,
+  // ── Cinematic systems ──
+  _timeScale:1.0,_targetTimeScale:1.0,_slowMoTimer:0,
+  _letterbox:0,_targetLetterbox:0,
+  _screenFlash:0,
+  _bigText:null,_bigTextTimer:0,
+  _transitionPause:0,
+  // Establishing shot
+  _estTimer:0,_estKeypoints:null,_estSkipped:false,
+  // Typewriter callout
+  _callout:null,
 };
+
+// ── Atmosphere particles ──
+const ATMOS_PARTICLES=[];
+let _atmosSpawnTimer=0;
+function spawnAtmosParticle(){
+  if(ATMOS_PARTICLES.length>=40)return;
+  const roll=Math.random();
+  let p;
+  if(roll<0.4){// dust
+    p={x:S.camX+Math.random()*W,y:S.camY+Math.random()*H,vx:(Math.random()-0.5)*3,vy:(Math.random()-0.5)*2,life:1,maxLife:4+Math.random()*4,type:'dust',size:0.5+Math.random()*0.5,alpha:0.15};
+  }else if(roll<0.7){// pollen - near trees
+    const t=TREES[Math.floor(Math.random()*TREES.length)];
+    if(!t)return;
+    p={x:t.x+(Math.random()-0.5)*20,y:t.y+(Math.random()-0.5)*20,vx:(Math.random()-0.5)*1,vy:-3-Math.random()*2,life:1,maxLife:5+Math.random()*3,type:'pollen',size:0.5,alpha:0.2};
+  }else{// mist - near river
+    const ry=S.camY+Math.random()*H;
+    const rx=riverX(ry)+(Math.random()-0.5)*40;
+    p={x:rx,y:ry,vx:3+Math.random()*4,vy:(Math.random()-0.5)*1,life:1,maxLife:6+Math.random()*4,type:'mist',size:1+Math.random(),alpha:0.1};
+  }
+  p.life=p.maxLife;
+  ATMOS_PARTICLES.push(p);
+}
+function updateAtmosParticles(dt){
+  _atmosSpawnTimer+=dt;
+  while(_atmosSpawnTimer>0.5){_atmosSpawnTimer-=0.5;spawnAtmosParticle();}
+  for(let i=ATMOS_PARTICLES.length-1;i>=0;i--){
+    const p=ATMOS_PARTICLES[i];
+    p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;
+    if(p.life<=0)ATMOS_PARTICLES.splice(i,1);
+  }
+}
+function drawAtmosParticles(){
+  ATMOS_PARTICLES.forEach(p=>{
+    const a=p.alpha*(p.life/p.maxLife);
+    if(p.type==='dust')ctx.fillStyle=`rgba(220,220,200,${a})`;
+    else if(p.type==='pollen')ctx.fillStyle=`rgba(220,200,100,${a})`;
+    else ctx.fillStyle=`rgba(240,240,255,${a})`;
+    ctx.fillRect(Math.floor(p.x),Math.floor(p.y),p.size,p.size);
+  });
+}
+
+// ── Cinematic helpers ──
+function setSlowMo(scale,duration){
+  S._targetTimeScale=scale;S._slowMoTimer=duration;
+  S._targetLetterbox=1;
+}
+function setLetterbox(on){S._targetLetterbox=on?1:0;}
 
 // ══════════════════════════════════════
 // STORY SYSTEM
@@ -814,9 +872,10 @@ function onStoryEnd(){
 // CALLOUT
 // ══════════════════════════════════════
 function showCallout(text,dur){
-  document.getElementById('callout-text').textContent=text;
+  document.getElementById('callout-text').textContent='';
   document.getElementById('callout').style.opacity='1';
-  S.calloutTimer=dur||4;
+  S._callout={fullText:text,displayedChars:0,charTimer:0,dur:dur||4,elapsed:0,done:false};
+  S.calloutTimer=9999; // managed by typewriter system
 }
 function setObjective(t){document.getElementById('mission-obj').textContent=t;}
 function setPhaseLabel(t){document.getElementById('phase-label').textContent=t;}
@@ -1028,6 +1087,7 @@ function updateMission(dt){
     if(spottedCount>=3&&returningScouts.length>0&&!S._scoutedEnemy){
       S._scoutedEnemy=true;
       S.phase='position';S.phaseTimer=0;
+      S._transitionPause=0.5;
       setObjective('Move your forces behind Hill Riplah (south). Hide in the trees or behind the hill!');
       setPhaseLabel('Phase 2 of 4 — Get into position');
       showCallout('Scout reports: Lamanite army to the west! ~'+S.totalLamanites+' warriors! Get behind the hill!',6);
@@ -1056,6 +1116,7 @@ function updateMission(dt){
     if((nearHill||inSouthernWild)&&S.playerConcealed&&!S._inPosition){
       S._inPosition=true;
       S.phase='wait';S.phaseTimer=0;
+      S._bigText='HOLD';S._bigTextTimer=2;
       setObjective('Hold position. The Lamanites are approaching the river. Do NOT break cover!');
       setPhaseLabel('Phase 3 of 4 — Wait for crossing');
       showCallout('Good position! Hold here. Lehi is ready in the north. The Lamanites are marching...',6);
@@ -1103,6 +1164,8 @@ function updateMission(dt){
 
       if(S.playerConcealed){
         S.ambushReady=true;SND.ambush();addTrauma(0.2);
+        setSlowMo(0.3,2);S._screenFlash=0.8;
+        S._bigText='AMBUSH';S._bigTextTimer=2;
         setObjective('CHARGE! Signal Lehi when ready! (📨 Lehi → Charge)');
         setPhaseLabel('Phase 4 of 4 — THE AMBUSH');
         showCallout('They have crossed! Spring the trap — signal Lehi to charge!',6);
@@ -1301,6 +1364,7 @@ function hideFEDialog(){document.getElementById('confront-overlay').style.displa
 
 function beginConfront(){
   S.phase='confront';S._confrontPhase='retreat';S._confrontTimer=0;
+  setSlowMo(0.3,2);setLetterbox(true);
   setPhaseLabel('Alma 44 — The Confrontation');
   setObjective('The Lamanites are breaking...');
   // All remaining Lamanites retreat toward river center
@@ -1330,6 +1394,7 @@ function updateConfrontPhase(dt){
   }
 
   if(phase==='spawn_z'){
+    setSlowMo(0.3,2);
     // Find center of Lamanite cluster
     const alive=S.enemies.filter(e=>!e.dead&&e.state==='retreat_confront');
     const cx=alive.reduce((s,e)=>s+e.x,0)/(alive.length||1);
@@ -1458,6 +1523,7 @@ function beginFinalBattle(){
 
 function beginFinalSurrender(){
   S.phase='final_surrender';
+  setSlowMo(0.3,2);
   setPhaseLabel('Alma 44 — Surrender');
   if(S.zerahemnah&&!S.zerahemnah.dead){
     S.zerahemnah.dead=true;
@@ -1630,7 +1696,8 @@ function lehiOrder(order){
 // UPDATE
 // ══════════════════════════════════════
 function update(dt){
-  S.time+=dt;
+  S.time+=(S._realDt||dt); // S.time advances at real time for animations
+  updateAtmosParticles(S._realDt||dt);
   updateParticles(dt);
   updateMission(dt);
 
@@ -2461,6 +2528,9 @@ function render(){
 
   drawTerrain();
 
+  // Atmosphere particles (after terrain, before units)
+  drawAtmosParticles();
+
   // Blood stains on ground
   BLOODSTAINS.forEach(b=>{
     ctx.fillStyle=`rgba(80,15,10,${b.alpha})`;
@@ -2775,6 +2845,37 @@ function render(){
   }
 
   ctx.restore();
+
+  // ── Screen-space cinematic overlays ──
+  // Letterbox bars
+  if(S._letterbox>0.01){
+    ctx.fillStyle=`rgba(0,0,0,${S._letterbox})`;
+    const barH=30*S._letterbox*SCALE;
+    ctx.fillRect(0,0,canvas.width,barH);
+    ctx.fillRect(0,canvas.height-barH,canvas.width,barH);
+  }
+  // Screen flash
+  if(S._screenFlash>0.01){
+    ctx.fillStyle=`rgba(255,255,255,${S._screenFlash})`;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+  // Big text
+  if(S._bigText){
+    const a=Math.min(1,S._bigTextTimer/0.5);
+    ctx.save();ctx.setTransform(SCALE,0,0,SCALE,0,0);
+    ctx.fillStyle=`rgba(200,160,64,${a*0.9})`;
+    ctx.font="bold 12px 'Cinzel',serif";ctx.textAlign='center';
+    ctx.fillText(S._bigText,W/2,H/2);
+    ctx.textAlign='start';ctx.restore();
+  }
+  // Establishing shot label
+  if(S.phase==='establishing'&&S._estLabel&&S._estLabelAlpha>0){
+    ctx.save();ctx.setTransform(SCALE,0,0,SCALE,0,0);
+    ctx.fillStyle=`rgba(200,160,64,${S._estLabelAlpha*0.8})`;
+    ctx.font="bold 8px 'Cinzel',serif";ctx.textAlign='center';
+    ctx.fillText(S._estLabel,W/2,H-40);
+    ctx.textAlign='start';ctx.restore();
+  }
 }
 
 // ══════════════════════════════════════
@@ -2823,16 +2924,49 @@ function drawTerrain(){
   ctx.strokeStyle='rgba(70,60,40,0.2)';
   ROADS.forEach(r=>{ctx.lineWidth=r.w*0.3;ctx.beginPath();ctx.moveTo(r.x1,r.y1);ctx.lineTo(r.x2,r.y2);ctx.stroke();});
 
-  // River
-  ctx.fillStyle='#1a2a3a';ctx.beginPath();
-  for(let y=0;y<=MAP.h;y+=4){const rx=riverX(y);if(y===0)ctx.moveTo(rx-RIVER_HALF_W,y);ctx.lineTo(rx-RIVER_HALF_W,y);}
-  for(let y=MAP.h;y>=0;y-=4){ctx.lineTo(riverX(y)+RIVER_HALF_W,y);}ctx.fill();
+  // River — enhanced water
+  // Base water fill with gradient across width
+  for(let y=0;y<MAP.h;y+=2){
+    const rx=riverX(y);
+    for(let dx=-RIVER_HALF_W;dx<RIVER_HALF_W;dx+=2){
+      const edgeDist=1-Math.abs(dx)/RIVER_HALF_W;
+      const r=20+edgeDist*15,g=50+edgeDist*20,b=70+edgeDist*15;
+      const a=0.7+edgeDist*0.2;
+      ctx.fillStyle=`rgba(${Math.floor(r)},${Math.floor(g)},${Math.floor(b)},${a})`;
+      ctx.fillRect(rx+dx,y,2,2);
+    }
+  }
+  // Animated current lines flowing downward
+  for(let i=0;i<8;i++){
+    const phase=i*0.8;
+    for(let y=0;y<MAP.h;y+=3){
+      const rx=riverX(y);
+      const offsetX=Math.sin(y*0.05+phase)*6+(i-4)*3;
+      const flowY=(S.time*20+y+i*80)%MAP.h;
+      const fy=flowY;const frx=riverX(fy);
+      if(Math.abs(offsetX)<RIVER_HALF_W-2){
+        const a=0.06+Math.sin(S.time*1.2+i+fy*0.03)*0.04;
+        ctx.fillStyle=`rgba(100,160,200,${Math.max(0,a)})`;
+        ctx.fillRect(frx+offsetX,fy,1,2);
+      }
+    }
+  }
   // Mud banks
   for(let y=0;y<MAP.h;y+=3){
     const rx=riverX(y);
     ctx.fillStyle='rgba(60,50,30,0.2)';
     ctx.fillRect(rx-RIVER_HALF_W-3,y,3,2);
     ctx.fillRect(rx+RIVER_HALF_W,y,3,2);
+  }
+  // Foam at banks (prominent)
+  for(let y=0;y<MAP.h;y+=2){
+    const rx=riverX(y);
+    const foam1=Math.sin(S.time*2+y*0.15);
+    const foam2=Math.sin(S.time*1.7+y*0.12+3);
+    const fa=0.15+Math.max(foam1,foam2)*0.15;
+    ctx.fillStyle=`rgba(200,220,240,${fa})`;
+    ctx.fillRect(rx-RIVER_HALF_W+Math.sin(S.time+y*0.1)*1,y,2,1);
+    ctx.fillRect(rx+RIVER_HALF_W-2+Math.sin(S.time*0.9+y*0.1)*1,y,2,1);
   }
   // River blood tint
   if(S._riverBlood>0){
@@ -2843,18 +2977,12 @@ function drawTerrain(){
       ctx.fillRect(rx-RIVER_HALF_W,y,RIVER_HALF_W*2,4);
     }
   }
-  // Animated ripple lines + foam
+  // Animated ripple lines (enhanced)
   for(let y=0;y<MAP.h;y+=4){
     const rx=riverX(y);
-    ctx.fillStyle='rgba(50,100,140,0.2)';
+    ctx.fillStyle='rgba(50,100,140,0.25)';
     ctx.fillRect(rx-8+Math.sin(S.time*2.5+y*0.08)*5,y,3,1);
     ctx.fillRect(rx+4+Math.sin(S.time*1.8+y*0.12+2)*4,y,2,1);
-    const foam=Math.sin(S.time*1.5+y*0.2);
-    if(foam>0.3){
-      ctx.fillStyle=`rgba(180,200,220,${0.08+foam*0.1})`;
-      ctx.fillRect(rx-RIVER_HALF_W+1,y,2,1);
-      ctx.fillRect(rx+RIVER_HALF_W-3,y,2,1);
-    }
   }
 
   // Hill with contour lines
@@ -3016,7 +3144,37 @@ function handleKey(k){
 // ══════════════════════════════════════
 function gameLoop(t){
   if(!running||paused){requestAnimationFrame(gameLoop);return;}
-  const dt=Math.min((t-lastTime)/1000,0.05);lastTime=t;
+  const realDt=Math.min((t-lastTime)/1000,0.05);lastTime=t;
+  // Slow-mo lerp (uses real time)
+  S._timeScale+=(S._targetTimeScale-S._timeScale)*Math.min(1,3.0*realDt);
+  if(S._slowMoTimer>0){S._slowMoTimer-=realDt;if(S._slowMoTimer<=0){S._targetTimeScale=1.0;S._targetLetterbox=0;}}
+  // Letterbox lerp
+  S._letterbox+=(S._targetLetterbox-S._letterbox)*Math.min(1,5.0*realDt);
+  // Screen flash decay
+  if(S._screenFlash>0)S._screenFlash=Math.max(0,S._screenFlash-realDt*10);
+  // Big text timer
+  if(S._bigText){S._bigTextTimer-=realDt;if(S._bigTextTimer<=0)S._bigText=null;}
+  // Transition pause
+  if(S._transitionPause>0){S._transitionPause-=realDt;render();requestAnimationFrame(gameLoop);return;}
+  // Typewriter callout update
+  if(S._callout){
+    const c=S._callout;
+    if(!c.done){
+      c.charTimer+=realDt;
+      while(c.charTimer>=0.025&&c.displayedChars<c.fullText.length){c.charTimer-=0.025;c.displayedChars++;if(typeof SND!=='undefined'&&SND.tick)SND.tick();}
+      document.getElementById('callout-text').textContent=c.fullText.substring(0,c.displayedChars);
+      if(c.displayedChars>=c.fullText.length)c.done=true;
+    }else{
+      c.elapsed+=realDt;
+      if(c.elapsed>=c.dur){document.getElementById('callout').style.opacity='0';S._callout=null;S.calloutTimer=0;}
+    }
+  }
+  // Establishing shot update
+  if(S.phase==='establishing'){
+    updateEstablishing(realDt);render();requestAnimationFrame(gameLoop);return;
+  }
+  const dt=realDt*S._timeScale;
+  S._realDt=realDt;
   update(dt);render();
   requestAnimationFrame(gameLoop);
 }
@@ -3065,6 +3223,50 @@ function campCouncil(){
   S.campCouncil=true;
   
 }
+// ── Establishing shot ──
+function updateEstablishing(dt){
+  S._estTimer+=dt;
+  if(!S._estKeypoints){
+    // Keypoints: east jungle → river → hill → player start
+    const rx=riverX(350);
+    S._estKeypoints=[
+      {t:0,x:MAP.w-W/2,y:MAP.h/2-H/2,label:'The Wilderness East of Sidon'},
+      {t:2.5,x:rx-W/2,y:300-H/2,label:'The River Sidon'},
+      {t:5,x:HILL.x-W/2,y:HILL.y-H/2,label:'Hill Riplah'},
+      {t:7,x:S.cx-W/2,y:S.cy-H/2,label:null},
+    ];
+    S._targetLetterbox=1;
+  }
+  const kp=S._estKeypoints;
+  const t=S._estTimer;
+  // Find current segment
+  let from=kp[0],to=kp[1];
+  for(let i=0;i<kp.length-1;i++){
+    if(t>=kp[i].t&&t<kp[i+1].t){from=kp[i];to=kp[i+1];break;}
+    if(i===kp.length-2){from=kp[i];to=kp[i+1];}
+  }
+  const seg=to.t-from.t;
+  const p=Math.min(1,Math.max(0,(t-from.t)/seg));
+  // Ease in-out
+  const ep=p<0.5?2*p*p:(1-Math.pow(-2*p+2,2)/2);
+  S.camX=from.x+(to.x-from.x)*ep;
+  S.camY=from.y+(to.y-from.y)*ep;
+  S.camX=Math.max(0,Math.min(MAP.w-W,S.camX));
+  S.camY=Math.max(0,Math.min(MAP.h-H,S.camY));
+  // Label display
+  S._estLabel=from.label;
+  S._estLabelAlpha=from.label?Math.min(1,(1-Math.abs(p-0.5)*2)*2):0;
+  if(t>=8)skipEstablishing();
+}
+function skipEstablishing(){
+  if(S.phase!=='establishing')return;
+  S._targetLetterbox=0;S._estLabel=null;
+  S.phase='scout';S.phaseTimer=0;
+  setObjective('Send scouts west toward the river. We need to find their army. (Press A then E)');
+  setPhaseLabel('Phase 1 of 4 — Scouting');
+  startLehiScout();
+}
+
 function campBegin(){
   document.getElementById('camp-overlay').style.display='none';
   SND.startAmbient();
@@ -3076,19 +3278,13 @@ function campBegin(){
     showCallout('"And they did pray mightily that God would strengthen them." (Alma 43:49)',4);
     setTimeout(()=>{
       S._prayerActive=false;S._prayerDone=true;
-      // Now start scout phase
-      S.phase='scout';S.phaseTimer=0;
-      setObjective('Send scouts west toward the river. We need to find their army. (Press A then E)');
-      setPhaseLabel('Phase 1 of 4 — Scouting');
-      startLehiScout();
+      // Now start establishing shot
+      S.phase='establishing';S._estTimer=0;S._estKeypoints=null;
     },3000);
     return;
   }
-  // Now start scout phase
-  S.phase='scout';S.phaseTimer=0;
-  setObjective('Send scouts west toward the river. We need to find their army. (Press A then E)');
-  setPhaseLabel('Phase 1 of 4 — Scouting');
-  startLehiScout();
+  // Now start establishing shot
+  S.phase='establishing';S._estTimer=0;S._estKeypoints=null;
 }
 
 function startLehiScout(){
