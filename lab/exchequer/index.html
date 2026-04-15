@@ -417,8 +417,8 @@ function renderDashboard(){
     return`<div class="streak-item"><span>🔥</span><span class="streak-count">${ct}</span><span>${STREAK_LABELS[k]}</span><span class="streak-rank">${rank}${best>ct?' (best:'+best+')':''}</span></div>`;
   }).join('');
 
-  let dqHTML=S.loadout.dailyQuests.map(i=>{const q=QUESTS.Daily[i];return q?`<div style="padding:4px 0">📜 ${q.name}</div>`:''}).join('');
-  let puHTML=S.loadout.powerups.map(i=>{const p=POWERUPS[i];return p?`<div style="padding:4px 0">⚡ ${p.name}</div>`:''}).join('');
+  let dqHTML=S.loadout.dailyQuests.map(i=>{const q=QUESTS.Daily[i];return q?`<div style="padding:4px 0">📜 <strong>${q.name}</strong> <span style="color:var(--text-dim);font-size:.85rem">— ${q.desc}</span></div>`:''}).join('');
+  let puHTML=S.loadout.powerups.map(i=>{const p=POWERUPS[i];return p?`<div style="padding:4px 0">⚡ <strong>${p.name}</strong> <span style="color:var(--text-dim);font-size:.85rem">— ${p.desc}</span></div>`:''}).join('');
 
   document.getElementById('dashContent').innerHTML=`
     <div class="panel panel-gold" style="text-align:center">
@@ -532,7 +532,7 @@ function renderLog(){
   const boss=getAllMonsters()[S.loadout.bossIdx];
   const alreadyLogged=S.lastCheckIn===today;
 
-  let dqChecks=S.loadout.dailyQuests.map(i=>{const q=QUESTS.Daily[i];return q?`<label class="quest-check"><input type="checkbox" data-logdq="${i}"> 📜 ${q.name}</label>`:''}).join('');
+  let dqChecks=S.loadout.dailyQuests.map(i=>{const q=QUESTS.Daily[i];return q?`<label class="quest-check"><input type="checkbox" data-logdq="${i}"> 📜 <strong>${q.name}</strong> <span style="color:var(--text-dim);font-size:.85rem">— ${q.desc}</span></label>`:''}).join('');
   let puToggles=S.loadout.powerups.map(i=>{const p=POWERUPS[i];return p?`<button class="toggle-btn" data-logpu="${i}">⚡ ${p.name}</button>`:''}).join(' ');
   let streakChecks=STREAK_TYPES.map(k=>`<label class="quest-check"><input type="checkbox" data-streak="${k}"> ${STREAK_LABELS[k]}</label>`).join('');
 
