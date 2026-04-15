@@ -1490,6 +1490,7 @@ function updateMission(dt){
   if(S.phase==='sandbox')return;
   // Mission 2 phases
   if(currentMission===1){
+    if(S.calloutTimer>0){S.calloutTimer-=dt;if(S.calloutTimer<=0)document.getElementById('callout').style.opacity='0';}
     if(S.phase==='m2_pursuit'){updateM2(dt);}
     return;
   }
@@ -2303,7 +2304,7 @@ function update(dt){
   if(S._travelScatter){S._travelScatterTimer-=dt;if(S._travelScatterTimer<=0){S._travelScatter=false;S.soldiers.forEach(s=>{if(!s.dead)s.fleeing=false;});}}
 
   // ── Soldiers ──
-  const alive=S.soldiers.filter(s=>!s.dead);
+  const alive=S.soldiers.filter(s=>!s.dead&&!s._isVanguard);
   alive.forEach((s,i)=>{
     // Shield of faith — reduce damage taken
     if(s._shielded>0)s._shielded-=dt;
@@ -2849,8 +2850,12 @@ function doCombat(atk,def,dt){
 // ══════════════════════════════════════
 function updateHtmlHud(){
   document.getElementById('faith-fill').style.width=S.faith+'%';
-  const ac=S.soldiers.filter(s=>!s.dead).length;
-  document.getElementById('army-count').textContent=ac+' soldiers';
+  const ac=S.soldiers.filter(s=>!s.dead&&!s._isVanguard).length;
+  if(currentMission===1&&(m2.capturedCount>0||m2.escapedCount>0)){
+    document.getElementById('army-count').textContent=ac+' soldiers | '+m2.capturedCount+' captured';
+  }else{
+    document.getElementById('army-count').textContent=ac+' soldiers';
+  }
 
   const scEl=document.getElementById('scout-count');
   const scAlive=S.scouts.filter(s=>!s.dead).length;
@@ -3801,6 +3806,13 @@ function buildM2TerrainCache(){
 }
 
 function drawDynamicTerrain(){
+  if(currentMission===1){
+    // M2: just footprints, no river/grass overlays
+    if(S._footprints)S._footprints.forEach(fp=>{
+      if(fp.alpha>0){ctx.fillStyle=`rgba(60,45,25,${fp.alpha})`;ctx.fillRect(Math.floor(fp.x),Math.floor(fp.y),1,1);}
+    });
+    return;
+  }
   // Trampled grass overlay
   for(let x=0;x<MAP.w;x+=4){for(let y=0;y<MAP.h;y+=4){
     const r=seedRand(x,y);
