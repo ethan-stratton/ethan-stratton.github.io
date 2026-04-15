@@ -2256,7 +2256,7 @@ function update(dt){
   // Smooth camera follow (asymptotic averaging)
   const targetCamX=Math.max(0,Math.min(MAP.w-W,S.cx-W/2));
   const targetCamY=Math.max(0,Math.min(MAP.h-H,S.cy-H/2));
-  const camLerp=1-Math.pow(0.02,dt); // frame-rate independent smoothing
+  const camLerp=1-Math.pow(0.0004,dt); // frame-rate independent smoothing (softer follow)
   S.camX+=(targetCamX-S.camX)*camLerp;
   S.camY+=(targetCamY-S.camY)*camLerp;
 
@@ -2344,6 +2344,9 @@ function moveSoldierToTarget(s,dt){
   if(S.rallying){maxSpd=S.speed*ts*0.95;accel=400*dt;}
   else if(S.formation==='circle'){maxSpd=s.speed*ts*0.6*Math.min(1.5,1+dist*0.01);accel=120*dt;}
   else{const urg=Math.min(2.5,1+dist*0.03);maxSpd=s.speed*ts*urg;accel=180*dt;}
+  // Wounded soldiers move slower
+  if(s.hp<s.maxHp*0.4)maxSpd*=0.6;
+  else if(s.hp<s.maxHp*0.7)maxSpd*=0.85;
   if(dist<0.5)dist=0.5;
   const dvx=(ddx/dist)*maxSpd,dvy=(ddy/dist)*maxSpd;
   s.vx+=(dvx-s.vx)*Math.min(1,accel/(maxSpd||1));
