@@ -860,11 +860,17 @@ const M2_ZARAHEMLA_X=1200;
 const M2_BREAKOFF_X=400;
 
 const M2_BRIEFING=[
-  {speaker:'Advisor',text:'Amalickiah has gathered thousands of dissenters. They refuse to defend our people. They desire a king to rule over the land.',ref:'Alma 46:4'},
-  {speaker:'Captain Moroni',text:'He rent his coat; and he took a piece thereof, and wrote upon it — In memory of our God, our religion, and freedom, and our peace, our wives, and our children.',ref:'Alma 46:12'},
-  {speaker:'',text:'And Moroni fastened the writing upon the end of a pole, and he put on his head-plate, and his breastplate, and his shields, and girded on his armor. He bowed himself to the earth, and prayed mightily unto his God.',ref:'Alma 46:13–14'},
-  {speaker:'Captain Moroni',text:'Whosoever will maintain this title upon the land, let him come forth in the strength of the Lord, and enter into a covenant that he will maintain his rights and his religion.',ref:'Alma 46:20'},
-  {speaker:'Advisor',text:'Amalickiah sees his cause is lost — the people flock to Moroni by the thousands. He flees westward with his followers toward the land of Nephi. He must not escape!',ref:'Alma 46:29'},
+  {speaker:'Advisor',text:'Amalickiah has gathered thousands of dissenters. They refuse to defend our people — they desire a king.',ref:'Alma 46:4'},
+  {speaker:'',text:'Moroni rent his coat and wrote upon it: In memory of our God, our religion, and freedom, and our peace, our wives, and our children. He fastened it upon a pole.',ref:'Alma 46:12-13'},
+  {speaker:'Captain Moroni',text:'Whosoever will maintain this title upon the land, let him come forth in the strength of the Lord!',ref:'Alma 46:20'},
+];
+
+const M2_RALLY_POINTS = [
+  {x:1280, y:250, name:'Market Square', soldiers:12, text:'Moroni plants the Title of Liberty. "Come forth! Maintain your rights and your religion!"', ref:'Alma 46:20'},
+  {x:1220, y:350, name:'South Gate', soldiers:10, text:'The people come running together with their armor, rending their garments as a covenant.', ref:'Alma 46:21'},
+  {x:1100, y:200, name:'Temple Steps', soldiers:15, text:'Moroni prays upon the temple steps. The people kneel with him, covenanting before God.', ref:'Alma 46:13'},
+  {x:1050, y:320, name:'West Quarter', soldiers:10, text:'Even in the outer quarters, men take up arms. They will not be enslaved.', ref:'Alma 46:28'},
+  {x:950, y:270, name:'City Gate', soldiers:15, text:'At the western gate, the last volunteers assemble. Beyond lies Amalickiah\'s retreat.', ref:'Alma 46:29'},
 ];
 
 const M2_AFTERMATH=[
@@ -938,25 +944,138 @@ let m2={
   gameTimer:0,
   surrenderWaves:0,
   showingTab:false,
+  rallyPoints:[],
+  ralliedCount:0,
+  rallyDone:false,
+  dissenters:[],
+  dissenterExtra:0,
 };
+
+// ── M2 rally phase ──
+function m2StartRally(){
+  S.phase='m2_rally_play';m2.phaseTimer=0;
+  S.cx=1300;S.cy=280;S.facing=Math.PI;
+  S.camX=S.cx-W/2;S.camY=S.cy-H/2;
+  S.faith=70;
+  document.getElementById('faith-fill').style.width='70%';
+  // Spawn 5 personal guard
+  S.soldiers=[];
+  for(let i=0;i<5;i++){
+    const s=makeUnit(1300+Math.random()*6-3,280+i*5-10,'nephite');
+    s.circleAngle=(i/5)*Math.PI*2;s.circleRing=0;
+    s.morale=90+Math.random()*10;s.armored=true;
+    assignName(s);
+    S.soldiers.push(s);
+  }
+  S.soldierCount=5;
+  // Init rally points
+  m2.rallyPoints=M2_RALLY_POINTS.map(rp=>({...rp,activated:false}));
+  m2.ralliedCount=0;m2.rallyDone=false;m2.dissenterExtra=0;
+  // Spawn 6 dissenter clusters fleeing west
+  m2.dissenters=[];
+  for(let i=0;i<6;i++){
+    m2.dissenters.push({
+      x:1100+Math.random()*100,
+      y:150+Math.random()*200,
+      count:3+Math.floor(Math.random()*3),
+      speed:25,
+      fled:false,
+    });
+  }
+  showCallout('Rally the people of Zarahemla! Visit the gathering points.',5);
+  setObjective('Walk to glowing rally points and press SPACE to gather soldiers.');
+  setPhaseLabel('The Rally');
+  document.getElementById('mission-title').textContent='Mission 2: Title of Liberty';
+}
+
+function m2RallyActivate(rp){
+  if(rp.activated)return;
+  rp.activated=true;
+  m2.ralliedCount++;
+  // Spawn soldiers
+  for(let i=0;i<rp.soldiers;i++){
+    const s=makeUnit(rp.x+Math.random()*20-10,rp.y+Math.random()*20-10,'nephite');
+    s.circleAngle=Math.random()*Math.PI*2;s.circleRing=Math.floor(S.soldiers.length/10);
+    s.morale=80+Math.random()*20;s.armored=true;
+    assignName(s);
+    S.soldiers.push(s);
+  }
+  S.soldierCount=S.soldiers.length;
+  showCallout(rp.text,3);
+  // Check completion
+  if(m2.ralliedCount>=5){
+    S.faith=95;
+    document.getElementById('faith-fill').style.width='95%';
+    setTimeout(()=>{
+      showCallout('The people are united! Not one soul will fall!',3);
+      setTimeout(()=>{m2.rallyDone=true;m2TransitionToPursuit();},2000);
+    },2500);
+  }else if(m2.ralliedCount>=3&&!m2.rallyDone){
+    setTimeout(()=>{
+      showCallout('Amalickiah flees west! Pursue! (or rally more points)',4);
+    },2500);
+  }
+}
+
+function m2TransitionToPursuit(){
+  m2.rallyPoints=[];
+  m2.dissenters=[];
+  m2StartPursuit();
+}
+
+function updateM2Rally(dt){
+  m2.phaseTimer+=dt;
+  // Move dissenter clusters west
+  for(let i=m2.dissenters.length-1;i>=0;i--){
+    const d=m2.dissenters[i];
+    if(d.fled)continue;
+    // Flee faster if player is near
+    const dx=d.x-S.cx,dy=d.y-S.cy;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    const spd=dist<60?50:25;
+    d.x-=spd*dt;
+    if(d.x<200){
+      d.fled=true;
+      m2.dissenterExtra+=3;
+    }
+  }
+  // Auto-transition: if 3+ rallied and player moves past x<1000
+  if(m2.ralliedCount>=3&&!m2.rallyDone&&S.cx<950){
+    m2.rallyDone=true;
+    showCallout('Amalickiah flees west! Pursue!',3);
+    setTimeout(()=>{m2TransitionToPursuit();},2000);
+  }
+}
 
 // ── M2 pursuit start ──
 function m2StartPursuit(){
   S.phase='m2_pursuit';m2.phaseTimer=0;m2.gameTimer=0;
-  S.faith=90;
-  document.getElementById('faith-fill').style.width='90%';
-  // Spawn player army at Zarahemla
-  S.soldiers=[];
-  S.cx=1250;S.cy=M2_ROAD_Y;S.facing=Math.PI;
-  for(let i=0;i<60;i++){
-    const row=Math.floor(i/6),col=i%6;
-    const s=makeUnit(1230+row*4+Math.random()*2,M2_ROAD_Y-12+col*5+Math.random()*2,'nephite');
-    s.circleAngle=(i/60)*Math.PI*2;s.circleRing=Math.floor(i/10);
-    s.morale=85+Math.random()*15;s.armored=true;
-    assignName(s);
-    S.soldiers.push(s);
+  S.faith=Math.max(S.faith,90);
+  document.getElementById('faith-fill').style.width=S.faith+'%';
+  // Spawn player army only if no soldiers from rally
+  if(S.soldiers.length===0){
+    S.soldiers=[];
+    S.cx=1250;S.cy=M2_ROAD_Y;S.facing=Math.PI;
+    for(let i=0;i<60;i++){
+      const row=Math.floor(i/6),col=i%6;
+      const s=makeUnit(1230+row*4+Math.random()*2,M2_ROAD_Y-12+col*5+Math.random()*2,'nephite');
+      s.circleAngle=(i/60)*Math.PI*2;s.circleRing=Math.floor(i/10);
+      s.morale=85+Math.random()*15;s.armored=true;
+      assignName(s);
+      S.soldiers.push(s);
+    }
+    S.soldierCount=60;
+  }else{
+    // Position existing soldiers near Zarahemla start
+    S.cx=1250;S.cy=M2_ROAD_Y;S.facing=Math.PI;
+    S.soldiers.forEach((s,i)=>{
+      s.x=1230+Math.floor(i/6)*4+Math.random()*2;
+      s.y=M2_ROAD_Y-12+(i%6)*5+Math.random()*2;
+      s.tx=s.x;s.ty=s.y;
+    });
+    S.soldierCount=S.soldiers.length;
   }
-  S.soldierCount=60;
+  m2.totalDissenters=30+m2.dissenterExtra;
   // Spawn Amalickiah's dissenters on the road heading west
   m2.enemies=[];m2.capturedCount=0;m2.escapedCount=0;m2.amalickiahEscaped=false;m2.amalickiahBrokenOff=false;
   m2.surrenderWaves=0;
@@ -1236,8 +1355,7 @@ function onStoryEnd(){
     document.getElementById('camp-overlay').style.display='flex';
   }
   if(currentMission===1&&S.phase==='m2_rally'){
-    // After rally cutscene, spawn army and start pursuit
-    m2StartPursuit();
+    m2StartRally();
   }
   if(currentMission===1&&S.phase==='m2_aftermath'){
     m2ShowResults();
@@ -1491,6 +1609,7 @@ function updateMission(dt){
   // Mission 2 phases
   if(currentMission===1){
     if(S.calloutTimer>0){S.calloutTimer-=dt;if(S.calloutTimer<=0)document.getElementById('callout').style.opacity='0';}
+    if(S.phase==='m2_rally_play'){updateM2Rally(dt);}
     if(S.phase==='m2_pursuit'){updateM2(dt);}
     return;
   }
@@ -2851,7 +2970,9 @@ function doCombat(atk,def,dt){
 function updateHtmlHud(){
   document.getElementById('faith-fill').style.width=S.faith+'%';
   const ac=S.soldiers.filter(s=>!s.dead&&!s._isVanguard).length;
-  if(currentMission===1&&(m2.capturedCount>0||m2.escapedCount>0)){
+  if(currentMission===1&&S.phase==='m2_rally_play'){
+    document.getElementById('army-count').textContent=ac+' soldiers | Dissenters gathering: '+m2.dissenterExtra;
+  }else if(currentMission===1&&(m2.capturedCount>0||m2.escapedCount>0)){
     document.getElementById('army-count').textContent=ac+' soldiers | '+m2.capturedCount+' captured';
   }else{
     document.getElementById('army-count').textContent=ac+' soldiers';
@@ -3337,6 +3458,37 @@ function render(){
 
   // Tree canopy overlay — drawn ON TOP of units so characters are partially obscured
   drawTreeCanopy();
+
+  // ── M2 Rally phase rendering ──
+  if(currentMission===1&&S.phase==='m2_rally_play'){
+    // Rally points
+    m2.rallyPoints.forEach(rp=>{
+      const pulse=Math.sin(S.time*3)*2+8;
+      if(!rp.activated){
+        ctx.strokeStyle='rgba(255,220,60,0.7)';
+        ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(rp.x,rp.y,pulse,0,Math.PI*2);ctx.stroke();
+        ctx.fillStyle='rgba(255,220,60,0.15)';
+        ctx.beginPath();ctx.arc(rp.x,rp.y,pulse,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='rgba(255,220,60,0.9)';ctx.font='5px "Press Start 2P",monospace';
+        ctx.textAlign='center';ctx.fillText(rp.name,rp.x,rp.y-14);ctx.textAlign='left';
+      }else{
+        ctx.strokeStyle='rgba(255,220,60,0.15)';
+        ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(rp.x,rp.y,6,0,Math.PI*2);ctx.stroke();
+        ctx.fillStyle='rgba(255,220,60,0.3)';ctx.font='6px monospace';
+        ctx.textAlign='center';ctx.fillText('✓',rp.x,rp.y+2);ctx.textAlign='left';
+      }
+    });
+    // Dissenter clusters
+    m2.dissenters.forEach(d=>{
+      if(d.fled)return;
+      for(let i=0;i<d.count;i++){
+        ctx.fillStyle='rgba(180,50,40,0.7)';
+        ctx.fillRect(Math.floor(d.x+i*4-d.count*2),Math.floor(d.y+Math.sin(i)*3),2,3);
+      }
+    });
+  }
 
   // Particles (blood + sparks)
   PARTICLES.forEach(p=>{
@@ -4076,6 +4228,22 @@ function handleKey(k){
     m2ShowDetachUI();return;
   }
   if(k===' '){
+    // M2 rally phase: check proximity to rally points
+    if(currentMission===1&&S.phase==='m2_rally_play'){
+      let activated=false;
+      m2.rallyPoints.forEach(rp=>{
+        if(rp.activated)return;
+        const dx=rp.x-S.cx,dy=rp.y-S.cy;
+        if(Math.sqrt(dx*dx+dy*dy)<30){
+          m2RallyActivate(rp);activated=true;
+        }
+      });
+      if(!activated){
+        // Normal rally horn
+        S.rallying=true;S.rallyTimer=3;SND.rallyHorn();
+      }
+      return;
+    }
     S.rallying=true;S.rallyTimer=3;SND.rallyHorn();
     // War cry counter — if rallying before war cry, negate it
     if(!S._warCryDone)S._warCryPreRally=true;
@@ -4398,6 +4566,7 @@ function beginMission(idx){
     m2.phase='m2_rally';m2.phaseTimer=0;m2.enemies=[];m2.vanguard=[];
     m2.capturedCount=0;m2.escapedCount=0;m2.amalickiahEscaped=false;m2.amalickiahBrokenOff=false;
     m2.vanguardSent=false;m2.vanguardSize=0;m2.gameTimer=0;m2.surrenderWaves=0;m2.showingTab=false;
+    m2.rallyPoints=[];m2.ralliedCount=0;m2.rallyDone=false;m2.dissenters=[];m2.dissenterExtra=0;
     document.getElementById('event-log').innerHTML='';
     document.getElementById('callout').style.opacity='0';
     document.getElementById('results').style.display='none';
