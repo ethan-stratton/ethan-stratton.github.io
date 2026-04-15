@@ -152,7 +152,7 @@ canvas{}
         <div class="tl-year">~74 BC</div>
         <div class="tl-name">Hill Riplah</div>
       </div>
-      <div class="tl-node">
+      <div class="tl-node" id="tl-node-1">
         <div class="tl-dot"></div>
         <div class="tl-year">~72 BC</div>
         <div class="tl-name">Amalickiah's Revolt</div>
@@ -338,6 +338,17 @@ canvas{}
   <button class="mercy-btn" style="margin-top:8px" onclick="returnToTimeline()">Quit to Timeline</button>
 </div>
 
+<div id="m2-detach-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(10,10,6,0.9);z-index:18;flex-direction:column;align-items:center;justify-content:center">
+  <h2 style="font-family:'Cinzel',serif;font-size:1.2rem;color:#c8a040;letter-spacing:0.08em;margin-bottom:8px">Send Vanguard?</h2>
+  <div style="font-size:0.65rem;color:#5a5238;margin-bottom:16px;font-style:italic">Detach soldiers to pursue independently at faster speed</div>
+  <div style="display:flex;gap:12px">
+    <button class="mercy-btn" onclick="m2Detach(10)">10 Soldiers</button>
+    <button class="mercy-btn" onclick="m2Detach(20)">20 Soldiers</button>
+    <button class="mercy-btn" onclick="m2Detach(30)">30 Soldiers</button>
+  </div>
+  <button class="mercy-btn" style="margin-top:12px;color:#5a5238;border-color:rgba(200,160,64,0.15)" onclick="m2CancelDetach()">Cancel</button>
+</div>
+
 <div id="camp-overlay">
   <h2>⛺ Camp</h2>
   <div class="camp-sub">Choose <strong>2</strong> preparations — you cannot do everything</div>
@@ -384,20 +395,21 @@ canvas.addEventListener('click',function(evt){
 });
 
 let running=false,lastTime=0;
+let currentMission=0;
 const keys={};
 window.addEventListener('keydown',e=>{
   if(e.key==='Escape'){if(running)togglePause();return;}
   if(S.phase==='establishing'){skipEstablishing();return;}
   keys[e.key.toLowerCase()]=true;
   handleKey(e.key.toLowerCase());
-  if(['arrowup','arrowdown','arrowleft','arrowright',' ','f1','f2','f3'].includes(e.key.toLowerCase()||e.key))e.preventDefault();
+  if(['arrowup','arrowdown','arrowleft','arrowright',' ','f1','f2','f3','tab'].includes(e.key.toLowerCase()||e.key))e.preventDefault();
 });
 window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
 
 // ══════════════════════════════════════
 // MAP
 // ══════════════════════════════════════
-const MAP={w:900,h:700};
+let MAP={w:900,h:700};
 const ROADS=[
   {x1:500,y1:0,x2:500,y2:700,w:10},     // N-S road on east side
   {x1:500,y1:350,x2:900,y2:350,w:12},    // E-W road from center east
@@ -433,8 +445,9 @@ function onRoad(x,y){for(const r of ROADS){const dx=r.x2-r.x1,dy=r.y2-r.y1,l2=dx
 function inRiver(x,y){return Math.abs(x-riverX(y))<RIVER_HALF_W;}
 function onHill(x,y){return Math.sqrt((x-HILL.x)*(x-HILL.x)+(y-HILL.y)*(y-HILL.y))<HILL.r;}
 function inTrees(x,y){for(const t of TREES){if(Math.abs(x-t.x)<15&&Math.abs(y-t.y)<15)return true;}return false;}
-function terrainSpeed(x,y){if(inRiver(x,y))return 0.3;if(onRoad(x,y))return 1.4;if(onHill(x,y))return 0.7;if(inTrees(x,y))return 0.6;return 1.0;}
+function terrainSpeed(x,y){if(currentMission===1)return m2TerrainSpeed(x,y);if(inRiver(x,y))return 0.3;if(onRoad(x,y))return 1.4;if(onHill(x,y))return 0.7;if(inTrees(x,y))return 0.6;return 1.0;}
 function terrainName(x,y){
+  if(currentMission===1)return m2TerrainName(x,y);
   if(inRiver(x,y))return{name:'River Sidon',color:'#4a7a9a',icon:'≈≈',heatNote:'❄ Cooling'};
   if(onRoad(x,y))return{name:'Road',color:'#a89868',icon:'►',heatNote:''};
   if(onHill(x,y))return{name:'Hill Riplah',color:'#8a7a40',icon:'▲',heatNote:'☀ Exposed'};
@@ -837,6 +850,351 @@ const BRIEFING=[
   {speaker:'',text:'Your orders:\n\n① Scout west — find the Lamanite army\n② Move to Hill Riplah — conceal your forces\n③ Wait for the crossing\n④ Spring the trap',ref:''},
 ];
 
+// ══════════════════════════════════════
+// MISSION 2 — TITLE OF LIBERTY (Alma 46)
+// ══════════════════════════════════════
+const M2_MAP={w:1400,h:500};
+const M2_ROAD_Y=280;
+const M2_ESCAPE_X=80;
+const M2_ZARAHEMLA_X=1200;
+const M2_BREAKOFF_X=400;
+
+const M2_BRIEFING=[
+  {speaker:'Advisor',text:'Amalickiah has gathered thousands of dissenters. They refuse to defend our people. They desire a king to rule over the land.',ref:'Alma 46:4'},
+  {speaker:'Captain Moroni',text:'He rent his coat; and he took a piece thereof, and wrote upon it — In memory of our God, our religion, and freedom, and our peace, our wives, and our children.',ref:'Alma 46:12'},
+  {speaker:'',text:'And Moroni fastened the writing upon the end of a pole, and he put on his head-plate, and his breastplate, and his shields, and girded on his armor. He bowed himself to the earth, and prayed mightily unto his God.',ref:'Alma 46:13–14'},
+  {speaker:'Captain Moroni',text:'Whosoever will maintain this title upon the land, let him come forth in the strength of the Lord, and enter into a covenant that he will maintain his rights and his religion.',ref:'Alma 46:20'},
+  {speaker:'Advisor',text:'Amalickiah sees his cause is lost — the people flock to Moroni by the thousands. He flees westward with his followers toward the land of Nephi. He must not escape!',ref:'Alma 46:29'},
+];
+
+const M2_AFTERMATH=[
+  {speaker:'',text:'The dissenters who would not enter into the covenant of freedom were put to death. And there were but few who denied the covenant of freedom.',ref:'Alma 46:35'},
+  {speaker:'',text:'But Amalickiah escaped into the land of Nephi, taking a small number of his men with him.',ref:'Alma 46:33'},
+  {speaker:'',text:'And Amalickiah, by his fraud, gained the hearts of the Lamanites. He poisoned the king of the Lamanites by degrees, and took the queen to wife.',ref:'Alma 47:18, 35'},
+  {speaker:'',text:'And thus Amalickiah obtained the kingdom — by treachery and murder. He prepared his people for war against the Nephites, burning with hatred for Moroni and the covenant of freedom.',ref:'Alma 48:1–2'},
+];
+
+// M2 terrain data (generated per-mission)
+let m2Roads=[],m2Trees=[],m2Hills=[],m2Buildings=[];
+
+function initM2Terrain(){
+  m2Roads=[{x1:0,y1:M2_ROAD_Y,x2:M2_MAP.w,y2:M2_ROAD_Y,w:12}];
+  m2Trees=[];
+  m2Hills=[];
+  m2Buildings=[];
+  // Forest clusters
+  for(let i=0;i<50;i++)m2Trees.push({x:200+Math.random()*900,y:30+Math.random()*120,s:6+Math.random()*5});
+  for(let i=0;i<8;i++)m2Trees.push({x:250+Math.random()*800,y:40+Math.random()*100,s:11+Math.random()*5});
+  // Southern forest
+  for(let i=0;i<35;i++)m2Trees.push({x:300+Math.random()*600,y:380+Math.random()*100,s:6+Math.random()*5});
+  // Wilderness border (left)
+  for(let i=0;i<25;i++)m2Trees.push({x:20+Math.random()*80,y:Math.random()*M2_MAP.h,s:7+Math.random()*6});
+  // Hills in the north
+  m2Hills.push({x:500,y:80,r:55});
+  m2Hills.push({x:750,y:100,r:40});
+  // Zarahemla buildings
+  m2Buildings.push({x:1220,y:230,w:40,h:30,color:'#4a4032'});
+  m2Buildings.push({x:1270,y:260,w:50,h:40,color:'#3a3428'});
+  m2Buildings.push({x:1240,y:310,w:35,h:25,color:'#4a4032'});
+  m2Buildings.push({x:1300,y:230,w:30,h:35,color:'#3a3428'});
+  m2Buildings.push({x:1280,y:340,w:45,h:30,color:'#4a4032'});
+  m2Buildings.push({x:1330,y:280,w:35,h:40,color:'#3a3428'});
+  m2Buildings.push({x:1350,y:320,w:30,h:25,color:'#4a4032'});
+}
+
+function m2OnRoad(x,y){
+  for(const r of m2Roads){
+    const dx=r.x2-r.x1,dy=r.y2-r.y1,l2=dx*dx+dy*dy;
+    let t=l2?((x-r.x1)*dx+(y-r.y1)*dy)/l2:0;
+    t=Math.max(0,Math.min(1,t));
+    const px=r.x1+t*dx,py=r.y1+t*dy;
+    if(Math.sqrt((x-px)*(x-px)+(y-py)*(y-py))<r.w/2)return true;
+  }return false;
+}
+function m2InTrees(x,y){for(const t of m2Trees){if(Math.abs(x-t.x)<15&&Math.abs(y-t.y)<15)return true;}return false;}
+function m2OnHill(x,y){for(const h of m2Hills){if(Math.sqrt((x-h.x)*(x-h.x)+(y-h.y)*(y-h.y))<h.r)return true;}return false;}
+function m2TerrainSpeed(x,y){
+  if(m2OnRoad(x,y))return 1.4;
+  if(m2OnHill(x,y))return 0.7;
+  if(m2InTrees(x,y))return 0.6;
+  return 1.0;
+}
+function m2TerrainName(x,y){
+  if(m2OnRoad(x,y))return{name:'Road',color:'#a89868',icon:'►',heatNote:''};
+  if(m2OnHill(x,y))return{name:'Hill',color:'#8a7a40',icon:'▲',heatNote:'☀ Exposed'};
+  if(m2InTrees(x,y))return{name:'Forest',color:'#4a7a3a',icon:'♣',heatNote:'🌿 Shade'};
+  if(x<100)return{name:'Wilderness Border',color:'#5a4a3a',icon:'🌿',heatNote:''};
+  if(x>M2_ZARAHEMLA_X)return{name:'Zarahemla',color:'#a89868',icon:'🏠',heatNote:''};
+  return{name:'Open Ground',color:'#6a6248',icon:'·',heatNote:''};
+}
+
+// M2 state
+let m2={
+  phase:'m2_rally',phaseTimer:0,
+  enemies:[],vanguard:[],
+  totalDissenters:30,capturedCount:0,escapedCount:0,
+  amalickiah:null,amalickiahEscaped:false,amalickiahBrokenOff:false,
+  vanguardSent:false,vanguardSize:0,
+  gameTimer:0,
+  surrenderWaves:0,
+  showingTab:false,
+};
+
+// ── M2 pursuit start ──
+function m2StartPursuit(){
+  S.phase='m2_pursuit';m2.phaseTimer=0;m2.gameTimer=0;
+  S.faith=90;
+  document.getElementById('faith-fill').style.width='90%';
+  // Spawn player army at Zarahemla
+  S.soldiers=[];
+  S.cx=1250;S.cy=M2_ROAD_Y;S.facing=Math.PI;
+  for(let i=0;i<60;i++){
+    const row=Math.floor(i/6),col=i%6;
+    const s=makeUnit(1230+row*4+Math.random()*2,M2_ROAD_Y-12+col*5+Math.random()*2,'nephite');
+    s.circleAngle=(i/60)*Math.PI*2;s.circleRing=Math.floor(i/10);
+    s.morale=85+Math.random()*15;s.armored=true;
+    assignName(s);
+    S.soldiers.push(s);
+  }
+  S.soldierCount=60;
+  // Spawn Amalickiah's dissenters on the road heading west
+  m2.enemies=[];m2.capturedCount=0;m2.escapedCount=0;m2.amalickiahEscaped=false;m2.amalickiahBrokenOff=false;
+  m2.surrenderWaves=0;
+  for(let i=0;i<m2.totalDissenters;i++){
+    const e=makeUnit(950+i*5+Math.random()*10,M2_ROAD_Y-8+Math.random()*16,'lamanite');
+    e.speed=38+Math.random()*8;
+    e.morale=30+Math.random()*10;
+    e.state='flee';e.surrendered=false;
+    e.isAmalickiah=false;
+    S.enemies.push(e);m2.enemies.push(e);
+  }
+  // Mark Amalickiah (last unit, slightly larger, faster)
+  const amal=m2.enemies[m2.enemies.length-1];
+  amal.isAmalickiah=true;amal.size=3.5;amal.speed=48;amal.morale=90;
+  m2.amalickiah=amal;
+  
+  showCallout('Pursue Amalickiah! Do not let the dissenters escape west!',5);
+  setObjective('Chase Amalickiah\'s forces west. Capture as many dissenters as possible!');
+  setPhaseLabel('The Pursuit');
+  document.getElementById('mission-title').textContent='Mission 2: Title of Liberty';
+  // Camera
+  S.camX=S.cx-W/2;S.camY=S.cy-H/2;
+}
+
+// ── M2 vanguard detachment ──
+function m2ShowDetachUI(){
+  if(m2.vanguardSent||currentMission!==1||S.phase!=='m2_pursuit')return;
+  m2.showingTab=true;
+  // Simple overlay using the camp-overlay mechanism
+  const ov=document.getElementById('m2-detach-overlay');
+  ov.style.display='flex';
+  running=false;
+}
+function m2Detach(count){
+  if(m2.vanguardSent)return;
+  m2.vanguardSent=true;m2.vanguardSize=count;m2.showingTab=false;
+  document.getElementById('m2-detach-overlay').style.display='none';
+  running=true;lastTime=performance.now();requestAnimationFrame(gameLoop);
+  // Detach soldiers from main force
+  const alive=S.soldiers.filter(s=>!s.dead);
+  const detached=alive.slice(0,count);
+  m2.vanguard=[];
+  detached.forEach(s=>{
+    s._isVanguard=true;
+    s.speed=55; // faster
+    m2.vanguard.push(s);
+  });
+  showCallout(count+' soldiers sent as vanguard! They\'ll pursue independently.',4);
+}
+function m2CancelDetach(){
+  m2.showingTab=false;
+  document.getElementById('m2-detach-overlay').style.display='none';
+  running=true;lastTime=performance.now();requestAnimationFrame(gameLoop);
+}
+
+// ── M2 update ──
+function updateM2(dt){
+  m2.phaseTimer+=dt;
+  m2.gameTimer+=dt;
+  
+  // Update fleeing enemies
+  m2.enemies.forEach(e=>{
+    if(e.dead||e.surrendered)return;
+    if(e.state==='flee'){
+      // Move west on road
+      let tx=e.x-50,ty=M2_ROAD_Y;
+      // Amalickiah breakoff
+      if(e.isAmalickiah&&e.x<=M2_BREAKOFF_X&&!m2.amalickiahBrokenOff){
+        m2.amalickiahBrokenOff=true;
+        showCallout('Amalickiah breaks from the column! He flees into the wilderness!',5);
+        // Take ~8 units with him
+        let taken=0;
+        m2.enemies.forEach(f=>{
+          if(!f.dead&&!f.surrendered&&!f.isAmalickiah&&f.state==='flee'&&taken<8){
+            f._followAmal=true;taken++;
+          }
+        });
+      }
+      if(e.isAmalickiah&&m2.amalickiahBrokenOff){
+        tx=e.x-40;ty=e.y+20; // southwest into wilderness
+      }else if(e._followAmal&&m2.amalickiahBrokenOff&&m2.amalickiah){
+        tx=m2.amalickiah.x+Math.random()*10;ty=m2.amalickiah.y+Math.random()*10;
+      }
+      const spd=e.speed*(m2OnRoad(e.x,e.y)?1.4:0.8);
+      const ddx=tx-e.x,ddy=ty-e.y,d=Math.sqrt(ddx*ddx+ddy*ddy);
+      if(d>2){e.x+=ddx/d*spd*dt;e.y+=ddy/d*spd*dt;}
+      e.x=Math.max(2,Math.min(M2_MAP.w-2,e.x));
+      e.y=Math.max(2,Math.min(M2_MAP.h-2,e.y));
+      
+      // Amalickiah escape
+      if(e.isAmalickiah&&e.x<M2_ESCAPE_X){
+        m2.amalickiahEscaped=true;e.dead=true;m2.escapedCount++;
+        // His followers also escape
+        m2.enemies.forEach(f=>{if(f._followAmal&&!f.dead&&!f.surrendered){f.dead=true;m2.escapedCount++;}});
+        showCallout('Amalickiah has escaped into the wilderness!',5);
+      }
+      // Regular dissenter escape
+      if(!e.isAmalickiah&&!e._followAmal&&e.x<M2_ESCAPE_X){
+        e.dead=true;m2.escapedCount++;
+      }
+    }
+  });
+  
+  // Check proximity for surrender
+  const playerUnits=[...S.soldiers.filter(s=>!s.dead)];
+  const fleeingEnemies=m2.enemies.filter(e=>!e.dead&&!e.surrendered&&e.state==='flee'&&!e.isAmalickiah&&!e._followAmal);
+  
+  // Find rear of fleeing column
+  if(fleeingEnemies.length>0){
+    // Sort by x descending (rear = highest x = closest to pursuers)
+    const sorted=[...fleeingEnemies].sort((a,b)=>b.x-a.x);
+    const rearGroup=sorted.slice(0,Math.ceil(sorted.length*0.3));
+    
+    // Check if any player unit or vanguard is close to the rear
+    let pursuerNear=false;
+    rearGroup.forEach(re=>{
+      playerUnits.forEach(s=>{
+        if(Math.sqrt((s.x-re.x)**2+(s.y-re.y)**2)<80)pursuerNear=true;
+      });
+    });
+    
+    if(pursuerNear&&m2.surrenderWaves<5){
+      m2.surrenderWaves++;
+      rearGroup.forEach(e=>{
+        e.surrendered=true;e.state='surrendered';
+        e.speed=0;
+      });
+      // Speed up remaining
+      m2.enemies.forEach(e=>{if(!e.dead&&!e.surrendered&&e.state==='flee')e.speed*=1.05;});
+      const count=rearGroup.length;
+      showCallout(count+' dissenters surrender!',3);
+    }
+  }
+  
+  // Capture surrendered enemies near player
+  m2.enemies.forEach(e=>{
+    if(!e.dead&&e.surrendered&&!e._captured){
+      let nearPlayer=false;
+      playerUnits.forEach(s=>{
+        if(Math.sqrt((s.x-e.x)**2+(s.y-e.y)**2)<40)nearPlayer=true;
+      });
+      if(nearPlayer){
+        e._captured=true;e._fadeTimer=1.0;
+        m2.capturedCount++;
+      }
+    }
+    // Fade out captured
+    if(e._captured&&e._fadeTimer!==undefined){
+      e._fadeTimer-=dt;
+      if(e._fadeTimer<=0)e.dead=true;
+    }
+  });
+  
+  // Combat with non-surrendered enemies that are caught
+  m2.enemies.forEach(e=>{
+    if(e.dead||e.surrendered)return;
+    playerUnits.forEach(s=>{
+      if(s.dead)return;
+      const d=Math.sqrt((s.x-e.x)**2+(s.y-e.y)**2);
+      if(d<20){
+        // Brief combat — dissenters rout quickly
+        e.morale-=dt*30;
+        doCombat(s,e,dt);
+        if(e.morale<=0&&!e.surrendered){
+          e.surrendered=true;e.state='surrendered';e.speed=0;
+        }
+      }
+    });
+  });
+  
+  // Vanguard AI
+  m2.vanguard.forEach(s=>{
+    if(s.dead||!s._isVanguard)return;
+    // Move west along road toward enemies
+    const nearestEnemy=m2.enemies.find(e=>!e.dead&&!e.surrendered);
+    let tx=s.x-100,ty=M2_ROAD_Y;
+    if(nearestEnemy){
+      tx=nearestEnemy.x;ty=nearestEnemy.y;
+    }
+    const spd=s.speed*(m2OnRoad(s.x,s.y)?1.3:0.9);
+    const ddx=tx-s.x,ddy=ty-s.y,d=Math.sqrt(ddx*ddx+ddy*ddy);
+    if(d>5){s.x+=ddx/d*spd*dt;s.y+=ddy/d*spd*dt;}
+    s.x=Math.max(4,Math.min(M2_MAP.w-4,s.x));
+    s.y=Math.max(4,Math.min(M2_MAP.h-4,s.y));
+  });
+  
+  // HUD update for capture count
+  if(m2.capturedCount>0||m2.escapedCount>0){
+    document.getElementById('army-count').textContent=S.soldiers.filter(s=>!s.dead).length+' soldiers | '+m2.capturedCount+' captured';
+  }
+  
+  // Check for mission end
+  const aliveEnemies=m2.enemies.filter(e=>!e.dead&&!e.surrendered);
+  const allHandled=aliveEnemies.length===0;
+  if(allHandled){
+    S.phase='m2_aftermath';
+    showStory(M2_AFTERMATH);
+  }
+}
+
+function m2ShowResults(){
+  running=false;
+  if(typeof SND!=='undefined')SND.victory();
+  const r=document.getElementById('results');r.style.display='flex';
+  const total=m2.totalDissenters;
+  const captured=m2.capturedCount;
+  const escaped=m2.escapedCount;
+  const captureRate=captured/Math.max(1,total);
+  const gameMin=m2.gameTimer/60;
+  
+  let stars=1; // always win
+  if(captureRate>0.75)stars=2;
+  if(captureRate>0.9)stars=3;
+  if(captureRate>0.9&&gameMin<3)stars=4;
+  
+  const starText='★'.repeat(stars)+'☆'.repeat(4-stars);
+  const starColor=stars>=4?'#c8a040':stars===3?'#a8a060':stars===2?'#8a8a6a':'#5a4a3a';
+  const ratingName=['','Victory','Decisive Victory','Covenant Victory','Perfect Pursuit'][stars];
+  
+  document.getElementById('results-title').textContent=ratingName;
+  document.getElementById('results-stats').innerHTML=
+    '<div class="stat" style="font-size:2rem;color:'+starColor+';letter-spacing:8px;margin-bottom:8px">'+starText+'</div>'+
+    '<div class="stat">Dissenters captured: '+captured+' of '+total+'</div>'+
+    '<div class="stat">Dissenters escaped: '+escaped+'</div>'+
+    '<div class="stat">Time: '+gameMin.toFixed(1)+' minutes</div>'+
+    (m2.amalickiahEscaped?'<div class="stat" style="color:#8a5a3a">Amalickiah escaped into the land of Nephi.</div>':'')+
+    '<div class="stat" style="font-style:italic;margin-top:12px;color:#6a6248">'+
+    (captureRate>0.9?'Nearly all the dissenters were brought to the covenant.':
+     captureRate>0.75?'Most dissenters were captured. Some slipped away.':
+     'Many dissenters escaped. Amalickiah\'s influence spreads.')+
+    '</div>';
+  document.getElementById('mercy-choice').style.display='none';
+  document.getElementById('return-btn').style.display='inline-block';
+  document.getElementById('sandbox-btn').style.display='none';
+  document.getElementById('epilogue').style.display='none';
+  localStorage.setItem('tol_mission_1_complete','1');
+}
+
 let storyQueue=[],storyIdx=0;
 
 function showStory(queue){
@@ -869,13 +1227,20 @@ function advanceStory(){
   renderStoryPage();
 }
 function onStoryEnd(){
-  if(S.phase==='briefing'){
+  if(currentMission===0&&S.phase==='briefing'){
     // Show camp after briefing
     ['camp-armor','camp-pray','camp-intel','camp-council'].forEach(id=>{
       const el=document.getElementById(id);if(el){el.disabled=false;el.style.opacity='1';}
       const fl=document.getElementById(id+'-flavor');if(fl)fl.textContent='';
     });
     document.getElementById('camp-overlay').style.display='flex';
+  }
+  if(currentMission===1&&S.phase==='m2_rally'){
+    // After rally cutscene, spawn army and start pursuit
+    m2StartPursuit();
+  }
+  if(currentMission===1&&S.phase==='m2_aftermath'){
+    m2ShowResults();
   }
 }
 
@@ -1092,6 +1457,7 @@ function updateVision(dt){
 }
 
 function getEnemyDisp(e){
+  if(currentMission===1)return{x:e.x,y:e.y,a:0.9};
   const kn=S.knownEnemies.get(e.id);if(!kn)return null;
   if(kn.conf>0.8)return{x:e.x,y:e.y,a:0.9};
   if(kn.conf>0.05)return{x:kn.x,y:kn.y,a:kn.conf*0.6+0.1};
@@ -1122,6 +1488,11 @@ function checkConcealment(){
 // ══════════════════════════════════════
 function updateMission(dt){
   if(S.phase==='sandbox')return;
+  // Mission 2 phases
+  if(currentMission===1){
+    if(S.phase==='m2_pursuit'){updateM2(dt);}
+    return;
+  }
   S.phaseTimer+=dt;
   if(S.calloutTimer>0){S.calloutTimer-=dt;if(S.calloutTimer<=0)document.getElementById('callout').style.opacity='0';}
 
@@ -1804,6 +2175,7 @@ function update(dt){
   updateMission(dt);
 
   // ── Jungle ambient: howler monkey ──
+  if(currentMission===0){
   S._monkeyTimer-=dt;
   if(S._monkeyTimer<=0){
     S._monkeyTimer=15+Math.random()*15;
@@ -1812,12 +2184,13 @@ function update(dt){
   // ── Distant thunder ──
   S._thunderTimer-=dt;
   if(S._thunderTimer<=0){S._thunderTimer=60+Math.random()*60;SND.distantThunder();}
+  }
 
   // ── Heat/fatigue system ──
   {
-    const inTree=inTrees(S.cx,S.cy);
-    const onH=onHill(S.cx,S.cy);
-    const inRiv=inRiver(S.cx,S.cy);
+    const inTree=currentMission===1?m2InTrees(S.cx,S.cy):inTrees(S.cx,S.cy);
+    const onH=currentMission===1?m2OnHill(S.cx,S.cy):onHill(S.cx,S.cy);
+    const inRiv=currentMission===1?false:inRiver(S.cx,S.cy);
     let heatRate=inTree?0.5:onH?3:2;
     if(S.campArmor)heatRate+=1.5;
     if(S.moving)heatRate*=1.5;
@@ -1841,8 +2214,8 @@ function update(dt){
   S._footprints.forEach(fp=>{fp.alpha-=dt/30;});
   S._footprints=S._footprints.filter(fp=>fp.alpha>0);
 
-  // ── River blood tracking ──
-  if(S.phase==='battle'||S.phase==='surround'){
+  // ── River blood tracking (M1 only) ──
+  if(currentMission===0&&(S.phase==='battle'||S.phase==='surround')){
     S.enemies.concat(S.soldiers).forEach(u=>{
       if(!u.dead&&inRiver(u.x,u.y)&&u.hp<u.maxHp){
         S._riverBlood=Math.min(30,S._riverBlood+dt*0.5);
@@ -1851,8 +2224,8 @@ function update(dt){
     });
   }
 
-  // ── War cry (when Lamanites spot player during battle) ──
-  if(S.phase==='battle'&&!S._warCryDone){
+  // ── War cry (when Lamanites spot player during battle, M1 only) ──
+  if(currentMission===0&&S.phase==='battle'&&!S._warCryDone){
     S._warCryDone=true;
     SND.warCry();addTrauma(0.15);
     if(!S._warCryPreRally){
@@ -2250,7 +2623,7 @@ function update(dt){
     if(d<25)sc.returning=true;
   });
 
-  updateVision(dt);
+  if(currentMission===0)updateVision(dt);
 
   // Camera
   // Smooth camera follow (asymptotic averaging)
@@ -2654,6 +3027,18 @@ function returnToTimeline(){
   if(localStorage.getItem('tol_mission_0_complete')){
     document.querySelectorAll('.tl-node')[0].classList.add('completed');
   }
+  if(localStorage.getItem('tol_mission_0_complete')){
+    const n1=document.getElementById('tl-node-1');
+    if(n1){n1.classList.add('unlocked');n1.onclick=function(){beginMission(1);};}
+  }
+  if(localStorage.getItem('tol_mission_1_complete')){
+    document.querySelectorAll('.tl-node')[1].classList.add('completed');
+  }
+  // Restore M1 HUD visibility
+  document.getElementById('lehi-bar').style.display='';
+  document.getElementById('scout-bar').style.display='';
+  // Restore MAP for safety
+  MAP={w:900,h:700};
   // Remove sandbox end button if present
   var sbEnd=document.getElementById('sandbox-end-btn');if(sbEnd)sbEnd.remove();
 }
@@ -2718,6 +3103,21 @@ function render(){
   S.enemies.forEach(e=>{
     if(e.dead)return;
     const d=getEnemyDisp(e);if(!d)return;
+    // M2 surrendered enemies: lighter, transparent
+    if(currentMission===1&&e.surrendered){
+      const fa=e._captured?(e._fadeTimer||0):0.4;
+      ctx.fillStyle=`rgba(160,140,100,${fa})`;
+      ctx.fillRect(Math.floor(d.x-1),Math.floor(d.y-1),2,3);
+      return;
+    }
+    // M2 Amalickiah: red tint, larger
+    if(currentMission===1&&e.isAmalickiah){
+      ctx.fillStyle='rgba(200,40,30,0.9)';
+      ctx.fillRect(Math.floor(d.x-2),Math.floor(d.y-3),4,5);
+      ctx.fillStyle='rgba(255,200,60,0.9)';ctx.font='4px Inter';
+      ctx.fillText('A',Math.floor(d.x-2),Math.floor(d.y-5));
+      return;
+    }
     const a=e.state==='rout'?0.3:d.a;
     const eFlash=e._hitFlash>0?(e._hitFlash-=1/60,'rgba(255,255,255,0.9)'):`rgba(140,60,40,${a})`;
     ctx.fillStyle=eFlash;
@@ -2742,6 +3142,12 @@ function render(){
   // Player soldiers
   S.soldiers.forEach(s=>{
     if(s.dead)return;
+    // M2 vanguard: blue tint
+    if(currentMission===1&&s._isVanguard){
+      ctx.fillStyle='rgba(80,120,200,0.85)';
+      ctx.fillRect(Math.floor(s.x-1),Math.floor(s.y-1),s.size|0,Math.max(1,(s.size+0.5)|0));
+      return;
+    }
     const b=Math.floor(130*s.shade),g=Math.floor(115*s.shade),bl=Math.floor(75*s.shade);
     const sFlash=s._hitFlash>0?(s._hitFlash-=1/60,'rgba(255,255,255,0.9)'):`rgb(${b},${g},${bl})`;
     ctx.fillStyle=sFlash;
@@ -2945,7 +3351,7 @@ function render(){
   ctx.restore();
 
   // ── Manti settlement animated elements (smoke, fire, HP bar) ──
-  if(S.phase!=='briefing'){
+  if(currentMission===0&&S.phase!=='briefing'){
     ctx.save();ctx.scale(SCALE,SCALE);ctx.translate(-S.camX,-S.camY);
     const mx=870,my=320;
     // Smoke wisps
@@ -3195,6 +3601,7 @@ function seedRand(x,y){let s=x*374761393+y*668265263+1013904223;s=(s^(s>>13))*12
 
 let terrainCache=null;
 function buildTerrainCache(){
+  if(currentMission===1){buildM2TerrainCache();return;}
   const tc=document.createElement('canvas');
   tc.width=MAP.w;tc.height=MAP.h;
   const tctx=tc.getContext('2d');
@@ -3351,6 +3758,48 @@ function buildTerrainCache(){
   terrainCache=tc;
 }
 
+function buildM2TerrainCache(){
+  const tc=document.createElement('canvas');
+  tc.width=M2_MAP.w;tc.height=M2_MAP.h;
+  const tctx=tc.getContext('2d');
+  tctx.fillStyle='#2a2818';tctx.fillRect(0,0,M2_MAP.w,M2_MAP.h);
+  // Ground texture
+  for(let x=0;x<M2_MAP.w;x+=8){for(let y=0;y<M2_MAP.h;y+=8){
+    const n=Math.sin(x*0.1+y*0.13)*0.5+Math.sin(x*0.07-y*0.11)*0.5;
+    if(n>0.3){tctx.fillStyle='rgba(60,70,30,0.12)';tctx.fillRect(x,y,6,6);}
+    if(n>0.1&&n<=0.3){tctx.fillStyle='rgba(50,55,25,0.06)';tctx.fillRect(x,y,4,4);}
+  }}
+  // Road
+  m2Roads.forEach(r=>{tctx.strokeStyle='#3a3428';tctx.lineWidth=r.w;tctx.lineCap='round';tctx.beginPath();tctx.moveTo(r.x1,r.y1);tctx.lineTo(r.x2,r.y2);tctx.stroke();});
+  m2Roads.forEach(r=>{tctx.strokeStyle='rgba(70,60,40,0.2)';tctx.lineWidth=r.w*0.3;tctx.beginPath();tctx.moveTo(r.x1,r.y1);tctx.lineTo(r.x2,r.y2);tctx.stroke();});
+  // Hills
+  m2Hills.forEach(h=>{
+    tctx.fillStyle='rgba(90,80,45,0.25)';tctx.beginPath();tctx.arc(h.x,h.y,h.r,0,Math.PI*2);tctx.fill();
+    tctx.fillStyle='rgba(100,90,50,0.18)';tctx.beginPath();tctx.arc(h.x,h.y,h.r*0.65,0,Math.PI*2);tctx.fill();
+  });
+  // Trees
+  m2Trees.forEach(t=>{
+    tctx.fillStyle='rgba(10,18,8,0.2)';tctx.beginPath();tctx.arc(t.x,t.y+t.s*0.3,t.s*1.5,0,Math.PI*2);tctx.fill();
+    tctx.fillStyle='rgba(50,35,20,0.7)';tctx.fillRect(t.x-1,t.y,Math.max(2,t.s*0.3),t.s);
+    tctx.fillStyle='rgba(25,55,18,0.45)';tctx.beginPath();tctx.moveTo(t.x-t.s*0.6,t.y+t.s);tctx.lineTo(t.x-t.s*0.1,t.y+t.s*0.4);tctx.lineTo(t.x+t.s*0.4,t.y+t.s);tctx.fill();
+  });
+  // Zarahemla buildings
+  m2Buildings.forEach(b=>{
+    tctx.fillStyle=b.color;tctx.fillRect(b.x,b.y,b.w,b.h);
+    tctx.strokeStyle='rgba(100,80,50,0.4)';tctx.lineWidth=1;tctx.strokeRect(b.x,b.y,b.w,b.h);
+  });
+  // Labels
+  tctx.fillStyle='rgba(180,170,120,0.8)';tctx.font="6px 'Press Start 2P'";
+  tctx.fillText('Zarahemla',M2_ZARAHEMLA_X+10,220);
+  tctx.fillStyle='rgba(120,100,80,0.5)';tctx.font="5px 'Press Start 2P'";
+  tctx.fillText('← Wilderness (Lamanite Territory)',10,M2_ROAD_Y-20);
+  // Wilderness border indicator
+  tctx.fillStyle='rgba(80,50,30,0.15)';tctx.fillRect(0,0,100,M2_MAP.h);
+  tctx.strokeStyle='rgba(100,60,30,0.3)';tctx.lineWidth=1;tctx.setLineDash([4,4]);
+  tctx.beginPath();tctx.moveTo(100,0);tctx.lineTo(100,M2_MAP.h);tctx.stroke();tctx.setLineDash([]);
+  terrainCache=tc;
+}
+
 function drawDynamicTerrain(){
   // Trampled grass overlay
   for(let x=0;x<MAP.w;x+=4){for(let y=0;y<MAP.h;y+=4){
@@ -3368,7 +3817,8 @@ function drawDynamicTerrain(){
       }
     }
   }}
-  // Animated current lines
+  // Animated current lines (M1 only — M2 has no river)
+  if(currentMission!==1)
   for(let i=0;i<8;i++){
     const phase=i*0.8;
     for(let y=0;y<MAP.h;y+=3){
@@ -3560,7 +4010,8 @@ function drawTerrainZoneHints(){
 }
 
 function drawTreeCanopy(){
-  TREES.forEach(t=>{
+  const trees=currentMission===1?m2Trees:TREES;
+  trees.forEach(t=>{
     // Main canopy — semi-transparent so units are partially visible beneath
     ctx.fillStyle='rgba(20,50,15,0.55)';
     ctx.beginPath();ctx.arc(t.x,t.y-t.s*0.2,t.s*0.9,0,Math.PI*2);ctx.fill();
@@ -3608,6 +4059,10 @@ function drawMinimap(){
 // ══════════════════════════════════════
 function handleKey(k){
   if(!running)return;
+  // Mission 2: TAB for detachment
+  if(k==='tab'&&currentMission===1&&S.phase==='m2_pursuit'&&!m2.vanguardSent){
+    m2ShowDetachUI();return;
+  }
   if(k===' '){
     S.rallying=true;S.rallyTimer=3;SND.rallyHorn();
     // War cry counter — if rallying before war cry, negate it
@@ -3625,7 +4080,7 @@ function handleKey(k){
   }
   if(k==='q'){doSendRetriever();}
   if(k==='h'){doHeadcount();}
-  if(k==='e'){
+  if(k==='e'&&currentMission===0){
     const alive=S.soldiers.filter(s=>!s.dead);
     if(alive.length>5){
       const sc=alive[alive.length-1];
@@ -3911,7 +4366,48 @@ function startLehiScout(){
 }
 
 function beginMission(idx){
+  if(idx===1){
+    currentMission=1;
+    MAP={w:M2_MAP.w,h:M2_MAP.h};
+    initM2Terrain();
+    // Reset state
+    running=true;paused=false;
+    S._callout=null;S._calloutQueue=[];
+    S.phase='m2_rally';S.phaseTimer=0;
+    S.scouts=[];S.enemies=[];S.allies=[];S.soldiers=[];S.messengers=[];
+    PARTICLES.length=0;BLOODSTAINS.length=0;BODIES.length=0;ATMOS_PARTICLES.length=0;
+    S.heat=0;S.faith=70;S.deadSoldiers=0;S.deadAllies=0;
+    S._bigText=null;S._bigTextTimer=0;S._screenFlash=0;
+    S._transitionPause=0;S._timeScale=1;S._targetTimeScale=1;
+    S._letterbox=0;S._targetLetterbox=0;
+    S._footprints=[];S._trampledGrass={};
+    S.casualties=[];
+    S.battleCmd='follow';
+    m2.phase='m2_rally';m2.phaseTimer=0;m2.enemies=[];m2.vanguard=[];
+    m2.capturedCount=0;m2.escapedCount=0;m2.amalickiahEscaped=false;m2.amalickiahBrokenOff=false;
+    m2.vanguardSent=false;m2.vanguardSize=0;m2.gameTimer=0;m2.surrenderWaves=0;m2.showingTab=false;
+    document.getElementById('event-log').innerHTML='';
+    document.getElementById('callout').style.opacity='0';
+    document.getElementById('results').style.display='none';
+    document.getElementById('title-screen').style.display='none';
+    document.getElementById('hud').style.display='block';
+    document.getElementById('formation-bar').style.display='block';
+    document.getElementById('terrain-indicator').style.display='block';
+    document.getElementById('mission-text').style.display='block';
+    document.getElementById('mission-title').textContent='Mission 2: Title of Liberty';
+    document.getElementById('camp-overlay').style.display='none';
+    // Hide M1-specific HUD elements
+    document.getElementById('lehi-bar').style.display='none';
+    document.getElementById('scout-bar').style.display='none';
+    // Build terrain
+    buildTerrainCache();
+    S.phase='m2_rally';
+    showStory(M2_BRIEFING);
+    return;
+  }
   if(idx!==0)return;
+  currentMission=0;
+  MAP={w:900,h:700};
   // Reset game state for replay
   campPicks=0;
   running=true;paused=false;
@@ -3976,7 +4472,12 @@ function resize(){
 }
 window.addEventListener('resize',resize);resize();
 // Check completed missions on load
-if(localStorage.getItem('tol_mission_0_complete')){document.querySelectorAll('.tl-node')[0].classList.add('completed');}
+if(localStorage.getItem('tol_mission_0_complete')){
+  document.querySelectorAll('.tl-node')[0].classList.add('completed');
+  const n1=document.getElementById('tl-node-1');
+  if(n1){n1.classList.add('unlocked');n1.onclick=function(){beginMission(1);};}
+}
+if(localStorage.getItem('tol_mission_1_complete')){document.querySelectorAll('.tl-node')[1].classList.add('completed');}
 requestAnimationFrame(gameLoop);
 </script>
 </body></html>
