@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
 <title>Exchequer — Life Quest Companion</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=MedievalSharp&display=swap" rel="stylesheet">
 <style>
@@ -28,6 +29,12 @@ repeating-radial-gradient(circle at 80% 20%,transparent 0,transparent 1px,rgba(2
 h1,h2,h3{font-family:var(--font-title);color:var(--gold);font-weight:700}
 h1{font-size:1.6rem}h2{font-size:1.3rem}h3{font-size:1.1rem}
 .card-title{font-family:var(--font-card);color:var(--gold);font-size:1.2rem}
+/* AVATAR */
+.avatar-frame{width:100px;height:100px;border:3px solid var(--gold);border-radius:50%;overflow:hidden;margin:0 auto 8px;cursor:pointer;position:relative;background:var(--bg)}
+.avatar-frame img{width:100%;height:100%;object-fit:cover}
+.avatar-frame .avatar-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:var(--gold-dim)}
+.avatar-frame:hover::after{content:'📷';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);font-size:1.5rem}
+.avatar-frame input{display:none}
 /* BUTTONS */
 .btn{font-family:var(--font-title);background:linear-gradient(180deg,#3a3020,#2a2418);color:var(--gold);border:2px solid var(--gold-dim);padding:12px 24px;border-radius:6px;font-size:1rem;cursor:pointer;min-height:44px;min-width:44px;transition:all .2s}
 .btn:active,.btn:hover{border-color:var(--gold);box-shadow:0 0 12px rgba(212,175,55,.3)}
@@ -88,6 +95,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;heigh
 /* MODAL OVERLAY */
 .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
 .modal{background:var(--panel);border:2px solid var(--gold);border-radius:12px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:20px;box-shadow:0 0 30px rgba(212,175,55,.2)}
+.field-label{display:block;font-family:var(--font-title);color:var(--gold-dim);font-size:.8rem;margin:10px 0 3px;letter-spacing:.5px}
+.field-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:4px;font-family:var(--font-body);font-size:.95rem}
+.field-input:focus{border-color:var(--gold);outline:none}
 /* LEVEL UP */
 @keyframes goldFlash{0%{opacity:0;transform:scale(.5)}50%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:scale(1.5)}}
 .level-up-flash{position:fixed;top:0;left:0;right:0;bottom:0;z-index:300;display:flex;align-items:center;justify-content:center;pointer-events:none}
@@ -264,7 +274,7 @@ function saveState(){localStorage.setItem(SAVE_KEY,JSON.stringify(S))}
 function resetState(){localStorage.removeItem(SAVE_KEY);S=null;location.reload()}
 
 function defaultState(){return{
-  character:{name:'',class_idx:0,stats:[5,5,5,5,5,5,5],level:1,xp:0,hp:10,mp:10,gp:10},
+  character:{name:'',class_idx:0,stats:[5,5,5,5,5,5,5],level:1,xp:0,hp:10,mp:10,gp:10,avatar:null},
   loadout:{mainQuest:'',dailyQuests:[],powerups:[],bossIdx:0},
   allies:[],
   streaks:{prayer:0,scripture:0,service:0,cleanLiving:0,exercise:0,custom:0},
@@ -272,7 +282,8 @@ function defaultState(){return{
   lastCheckIn:null,
   history:[],
   monsterRecord:{},
-  weeklyReviews:[]
+  weeklyReviews:[],
+  customMonsters:[]
 }}
 
 // ============== NAV ==============
@@ -399,7 +410,7 @@ function renderDashboard(){
   if(!S)return;
   const ch=S.character;const cl=CLASSES[ch.class_idx];
   const xpForLevel=500;const xpInLevel=ch.xp%xpForLevel;const pct=Math.round(xpInLevel/xpForLevel*100);
-  const boss=MONSTERS[S.loadout.bossIdx];
+  const boss=getAllMonsters()[S.loadout.bossIdx];
 
   let streaksHTML=STREAK_TYPES.map(k=>{
     const ct=S.streaks[k]||0;const best=S.streakBest[k]||0;const rank=getStreakRank(ct);
@@ -411,7 +422,10 @@ function renderDashboard(){
 
   document.getElementById('dashContent').innerHTML=`
     <div class="panel panel-gold" style="text-align:center">
-      <div style="font-size:2rem">${cl.icon}</div>
+      <div class="avatar-frame" onclick="document.getElementById('avatarInput').click()">
+        ${ch.avatar?`<img src="${ch.avatar}" alt="avatar">`:`<div class="avatar-placeholder">${cl.icon}</div>`}
+        <input type="file" id="avatarInput" accept="image/*" onchange="uploadAvatar(this)">
+      </div>
       <h1>${ch.name}</h1>
       <div style="color:var(--text-dim)">${cl.name} — Level ${ch.level}</div>
       <div style="margin:8px auto;max-width:300px">
@@ -492,7 +506,7 @@ function drawFromDeck(type){
     html=`<div class="card-title">${card.name}</div><div class="stars">${tier}</div><p style="margin:8px 0">${card.desc}</p>
       <div style="color:var(--text-dim);font-size:.85rem">+${card.xp} XP · ${card.stat}</div>`;
   } else if(type==='monster'){
-    card=MONSTERS[Math.floor(Math.random()*MONSTERS.length)];
+    const allM=getAllMonsters();card=allM[Math.floor(Math.random()*allM.length)];
     html=`<div style="font-size:2rem">${card.icon}</div><div class="card-title">${card.name}</div>
       <div class="stars">${'★'.repeat(card.stars)}${'☆'.repeat(5-card.stars)}</div>
       <div style="color:var(--text-dim);font-size:.85rem">${card.brood} brood · ${card.sin}</div>
@@ -515,7 +529,7 @@ function drawFromDeck(type){
 // ============== DAILY LOG ==============
 function renderLog(){
   const today=new Date().toISOString().slice(0,10);
-  const boss=MONSTERS[S.loadout.bossIdx];
+  const boss=getAllMonsters()[S.loadout.bossIdx];
   const alreadyLogged=S.lastCheckIn===today;
 
   let dqChecks=S.loadout.dailyQuests.map(i=>{const q=QUESTS.Daily[i];return q?`<label class="quest-check"><input type="checkbox" data-logdq="${i}"> 📜 ${q.name}</label>`:''}).join('');
@@ -598,8 +612,9 @@ function showLevelUp(){
 
 // ============== BESTIARUM ==============
 function renderBestiarum(){
+  const all=getAllMonsters();
   const grid=document.getElementById('bestiaryGrid');
-  grid.innerHTML=MONSTERS.map((m,i)=>{
+  grid.innerHTML=all.map((m,i)=>{
     const rec=S.monsterRecord[i]||{wins:0,losses:0};
     return`<div class="card" onclick="showMonsterDetail(${i})">
       <div style="font-size:2.5rem;text-align:center">${m.icon}</div>
@@ -607,12 +622,18 @@ function renderBestiarum(){
       <div class="stars" style="text-align:center">${'★'.repeat(m.stars)}${'☆'.repeat(5-m.stars)}</div>
       <div style="text-align:center;color:var(--text-dim);font-size:.85rem">${m.brood} · ${m.sin}</div>
       <div style="text-align:center;font-size:.8rem;margin-top:4px">W:${rec.wins} / L:${rec.losses}</div>
-      ${S.loadout.bossIdx===i?'<div style="text-align:center;color:var(--gold);font-size:.8rem">⚔️ ACTIVE BOSS</div>':''}</div>`;
-  }).join('');
+      ${S.loadout.bossIdx===i?'<div style="text-align:center;color:var(--gold);font-size:.8rem">⚔️ ACTIVE BOSS</div>':''}
+      ${m.custom?'<div style="text-align:center;font-size:.7rem;color:var(--text-dim)">✍️ Custom</div>':''}</div>`;
+  }).join('')+`<div class="card" onclick="showAddMonster()" style="display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;min-height:140px;border-style:dashed">
+    <div style="font-size:2.5rem">➕</div>
+    <div class="card-title" style="text-align:center">Add Monster</div>
+    <div style="color:var(--text-dim);font-size:.85rem;text-align:center">Name your enemy</div>
+  </div>`;
 }
 
 function showMonsterDetail(idx){
-  const m=MONSTERS[idx];const rec=S.monsterRecord[idx]||{wins:0,losses:0};
+  const all=getAllMonsters();const m=all[idx];const rec=S.monsterRecord[idx]||{wins:0,losses:0};
+  const isCustom=idx>=MONSTERS.length;const customIdx=idx-MONSTERS.length;
   const overlay=document.createElement('div');overlay.className='modal-overlay';
   overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
   overlay.innerHTML=`<div class="modal">
@@ -630,6 +651,7 @@ function showMonsterDetail(idx){
       <button class="btn btn-primary btn-sm" onclick="S.loadout.bossIdx=${idx};saveState();this.closest('.modal-overlay').remove();renderBestiarum()">Set as Active Boss</button>
       <button class="btn btn-sm" onclick="recordMonster(${idx},'win');this.closest('.modal-overlay').remove();renderBestiarum()">✅ Win</button>
       <button class="btn btn-sm btn-danger" onclick="recordMonster(${idx},'loss');this.closest('.modal-overlay').remove();renderBestiarum()">❌ Loss</button>
+      ${isCustom?`<button class="btn btn-sm" style="border-color:#8b2020;color:#c44" onclick="deleteCustomMonster(${customIdx})">🗑️ Delete</button>`:''}
       <button class="btn btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
     </div></div>`;
   document.body.appendChild(overlay);
@@ -639,6 +661,88 @@ function recordMonster(idx,result){
   if(!S.monsterRecord[idx])S.monsterRecord[idx]={wins:0,losses:0};
   if(result==='win')S.monsterRecord[idx].wins++;else S.monsterRecord[idx].losses++;
   saveState();
+}
+
+// ============== AVATAR UPLOAD ==============
+function uploadAvatar(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    // Resize to 200x200 max to keep localStorage small
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const sz=Math.min(img.width,img.height);
+      const sx=(img.width-sz)/2,sy=(img.height-sz)/2;
+      canvas.width=200;canvas.height=200;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,sx,sy,sz,sz,0,0,200,200);
+      S.character.avatar=canvas.toDataURL('image/jpeg',0.8);
+      saveState();renderDashboard();
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ============== CUSTOM MONSTERS ==============
+function getAllMonsters(){return[...MONSTERS,...(S.customMonsters||[])]}
+
+function showAddMonster(){
+  const overlay=document.createElement('div');overlay.className='modal-overlay';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
+  overlay.innerHTML=`<div class="modal">
+    <h2 style="text-align:center">👹 Create a Monster</h2>
+    <p style="color:var(--text-dim);text-align:center;margin-bottom:12px">Name the creature that haunts you. Naming is the first weapon.</p>
+    <label class="field-label">Name</label>
+    <input id="cm-name" class="field-input" placeholder="The Shadow That…">
+    <label class="field-label">Brood (archetype)</label>
+    <input id="cm-brood" class="field-input" placeholder="e.g. Acedian, Corrosive, Melancholic…">
+    <label class="field-label">What sin / struggle does it embody?</label>
+    <input id="cm-sin" class="field-input" placeholder="e.g. perfectionism, comparison, isolation">
+    <label class="field-label">Icon (one emoji)</label>
+    <input id="cm-icon" class="field-input" placeholder="👹" maxlength="4" style="width:60px">
+    <label class="field-label">Threat Level (1-5)</label>
+    <input id="cm-stars" type="number" class="field-input" min="1" max="5" value="3" style="width:60px">
+    <label class="field-label">Signature Moves (comma-separated)</label>
+    <input id="cm-moves" class="field-input" placeholder="Guilt Spiral, The Comparison Trap">
+    <label class="field-label">Weakness</label>
+    <input id="cm-weakness" class="field-input" placeholder="What defeats it?">
+    <label class="field-label">Flavor text</label>
+    <input id="cm-flavor" class="field-input" placeholder="It appears when…">
+    <label class="field-label">Insight (your weapon against it)</label>
+    <input id="cm-insight" class="field-input" placeholder="When it attacks, ask yourself…">
+    <label class="field-label">Loot (what you gain on defeat)</label>
+    <input id="cm-loot" class="field-input" placeholder="e.g. Self-Compassion (+1 Charity)">
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:16px">
+      <button class="btn btn-primary" onclick="saveCustomMonster(this)">Create Monster</button>
+      <button class="btn btn-sm" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+    </div></div>`;
+  document.body.appendChild(overlay);
+}
+
+function saveCustomMonster(btn){
+  const g=id=>document.getElementById(id).value.trim();
+  const name=g('cm-name');if(!name){alert('Name your enemy.');return}
+  const m={
+    name,brood:g('cm-brood')||'Unknown',sin:g('cm-sin')||'unknown',
+    icon:g('cm-icon')||'👹',stars:Math.max(1,Math.min(5,parseInt(g('cm-stars'))||3)),
+    moves:(g('cm-moves')||'Unknown Attack').split(',').map(s=>s.trim()),
+    weakness:g('cm-weakness')||'Unknown',flavor:g('cm-flavor')||'It lurks within.',
+    insight:g('cm-insight')||'Face it.',loot:g('cm-loot')||'Self-knowledge',
+    custom:true
+  };
+  if(!S.customMonsters)S.customMonsters=[];
+  S.customMonsters.push(m);saveState();
+  btn.closest('.modal-overlay').remove();
+  renderBestiarum();
+}
+
+function deleteCustomMonster(customIdx){
+  if(!confirm('Remove this monster from the Bestiarum?'))return;
+  S.customMonsters.splice(customIdx,1);saveState();
+  document.querySelector('.modal-overlay')?.remove();
+  renderBestiarum();
 }
 
 // ============== ARMORY ==============
