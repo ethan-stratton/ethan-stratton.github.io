@@ -273,6 +273,29 @@ function loadState(){try{S=JSON.parse(localStorage.getItem(SAVE_KEY))}catch(e){S
 function saveState(){localStorage.setItem(SAVE_KEY,JSON.stringify(S))}
 function resetState(){localStorage.removeItem(SAVE_KEY);S=null;location.reload()}
 
+function exportSave(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`exchequer-${S.character.name.replace(/\s+/g,'-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();URL.revokeObjectURL(a.href);
+}
+
+function importSave(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data.character||!data.character.name){alert('Invalid save file.');return}
+      if(!confirm(`Load save for "${data.character.name}" (Level ${data.character.level})? This will replace your current character.`))return;
+      S=data;saveState();location.reload();
+    }catch(err){alert('Could not read save file.')}
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
 function defaultState(){return{
   character:{name:'',class_idx:0,stats:[5,5,5,5,5,5,5],level:1,xp:0,hp:10,mp:10,gp:10,avatar:null},
   loadout:{mainQuest:'',dailyQuests:[],powerups:[],bossIdx:0},
@@ -458,6 +481,9 @@ function renderDashboard(){
       <button class="btn btn-primary" onclick="showScreen('draw')">🃏 Draw a Card</button>
       <button class="btn btn-primary" onclick="showScreen('log')">📋 Check In</button>
       <button class="btn" onclick="showWeeklyReview()">📊 Weekly Review</button>
+      <button class="btn btn-sm" onclick="exportSave()" style="margin-right:4px">📤 Export Save</button>
+      <button class="btn btn-sm" onclick="document.getElementById('importInput').click()">📥 Import Save</button>
+      <input type="file" id="importInput" accept=".json" style="display:none" onchange="importSave(this)">
       <button class="btn btn-danger btn-sm" onclick="if(confirm('Reset character? This cannot be undone.'))resetState()">Reset Character</button>
     </div>`;
   drawRadar();
