@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Exchequer — Life Quest Companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=MedievalSharp&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#1a1610;--panel:#2a2418;--border:#3a3020;--gold:#d4af37;--gold-dim:#8a7a2a;
+--red:#8b2020;--blue:#204080;--green:#206020;--text:#d4c8a0;--text-dim:#8a7e60;
+--font-title:'Cinzel',serif;--font-body:'Crimson Text',serif;--font-card:'MedievalSharp',cursive;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:16px;overflow-x:hidden}
+body{
+background:var(--bg);
+background-image:repeating-radial-gradient(circle at 20% 50%,transparent 0,transparent 1px,rgba(255,255,255,.003) 1px,transparent 2px),
+repeating-radial-gradient(circle at 80% 20%,transparent 0,transparent 1px,rgba(255,255,255,.005) 1px,transparent 2px);
+}
+#app{display:none;min-height:100vh;padding-bottom:70px}
+.hidden{display:none!important}
+/* PANELS */
+.panel{background:var(--panel);border:2px solid var(--border);border-radius:8px;padding:16px;margin:8px;box-shadow:inset 0 0 20px rgba(0,0,0,.3),0 2px 8px rgba(0,0,0,.5)}
+.panel-gold{border-color:var(--gold);box-shadow:inset 0 0 20px rgba(0,0,0,.3),0 0 10px rgba(212,175,55,.15)}
+/* TYPOGRAPHY */
+h1,h2,h3{font-family:var(--font-title);color:var(--gold);font-weight:700}
+h1{font-size:1.6rem}h2{font-size:1.3rem}h3{font-size:1.1rem}
+.card-title{font-family:var(--font-card);color:var(--gold);font-size:1.2rem}
+/* BUTTONS */
+.btn{font-family:var(--font-title);background:linear-gradient(180deg,#3a3020,#2a2418);color:var(--gold);border:2px solid var(--gold-dim);padding:12px 24px;border-radius:6px;font-size:1rem;cursor:pointer;min-height:44px;min-width:44px;transition:all .2s}
+.btn:active,.btn:hover{border-color:var(--gold);box-shadow:0 0 12px rgba(212,175,55,.3)}
+.btn-primary{background:linear-gradient(180deg,#4a3a10,#2a2000);border-color:var(--gold)}
+.btn-danger{border-color:var(--red);color:#e08080}
+.btn-sm{padding:8px 16px;font-size:.85rem}
+/* INPUTS */
+input[type=text],input[type=number],textarea{background:#1a1610;border:1px solid var(--border);color:var(--text);font-family:var(--font-body);font-size:1rem;padding:10px 12px;border-radius:4px;width:100%}
+input:focus,textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 6px rgba(212,175,55,.2)}
+textarea{resize:vertical;min-height:80px}
+/* SLIDER */
+input[type=range]{-webkit-appearance:none;width:100%;height:8px;background:linear-gradient(90deg,var(--border),var(--gold));border-radius:4px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;background:var(--gold);border-radius:50%;cursor:pointer;border:2px solid var(--bg)}
+/* NAV */
+#nav{position:fixed;bottom:0;left:0;right:0;background:#0f0d08;border-top:2px solid var(--border);display:flex;z-index:100;height:64px}
+#nav button{flex:1;background:none;border:none;color:var(--text-dim);font-size:.7rem;font-family:var(--font-body);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:44px;padding:4px}
+#nav button .nav-icon{font-size:1.4rem}
+#nav button.active{color:var(--gold);border-top:2px solid var(--gold);margin-top:-2px}
+/* SCREEN */
+.screen{display:none;max-width:800px;margin:0 auto;padding:8px}
+.screen.active{display:block}
+/* BARS */
+.bar-track{background:#0f0d08;border:1px solid var(--border);border-radius:4px;height:20px;overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.bar-label{position:absolute;top:0;left:0;right:0;text-align:center;font-size:.75rem;line-height:20px;color:var(--text);font-family:var(--font-title);text-shadow:0 1px 2px #000}
+.bar-hp .bar-fill{background:linear-gradient(90deg,#5a1010,var(--red),#c03030)}
+.bar-mp .bar-fill{background:linear-gradient(90deg,#102050,var(--blue),#3060b0)}
+.bar-gp .bar-fill{background:linear-gradient(90deg,#104010,var(--green),#30a030)}
+.bar-xp .bar-fill{background:linear-gradient(90deg,var(--gold-dim),var(--gold))}
+/* CARDS */
+.card{background:var(--panel);border:2px solid var(--border);border-radius:8px;padding:14px;margin:6px;cursor:pointer;transition:all .2s;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.card:hover,.card:active,.card.selected{border-color:var(--gold);box-shadow:0 0 12px rgba(212,175,55,.2)}
+.card.selected{background:#2e2a1a}
+/* PROGRESS DOTS */
+.dots{display:flex;justify-content:center;gap:8px;padding:12px}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--border);transition:all .3s}
+.dot.active{background:var(--gold);box-shadow:0 0 6px var(--gold)}
+.dot.done{background:var(--gold-dim)}
+/* GRID */
+.grid{display:grid;gap:8px}.grid-2{grid-template-columns:1fr 1fr}.grid-3{grid-template-columns:1fr 1fr 1fr}
+@media(max-width:600px){.grid-2,.grid-3{grid-template-columns:1fr}}
+/* CARD FLIP */
+.flip-container{perspective:800px;width:200px;height:280px;margin:20px auto;cursor:pointer}
+.flip-inner{position:relative;width:100%;height:100%;transition:transform .6s;transform-style:preserve-3d}
+.flip-container.flipped .flip-inner{transform:rotateY(180deg)}
+.flip-front,.flip-back{position:absolute;width:100%;height:100%;backface-visibility:hidden;border-radius:8px;border:2px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;flex-direction:column;padding:12px}
+.flip-front{background:linear-gradient(135deg,#2a2418,#1a1610);font-size:3rem}
+.flip-back{background:var(--panel);transform:rotateY(180deg);overflow-y:auto;text-align:center}
+/* RADAR */
+#radarCanvas{display:block;margin:0 auto;max-width:100%}
+/* TABS */
+.tabs{display:flex;gap:4px;margin-bottom:12px}
+.tab{flex:1;text-align:center;padding:10px;background:var(--panel);border:1px solid var(--border);border-radius:6px 6px 0 0;cursor:pointer;font-family:var(--font-title);font-size:.85rem;color:var(--text-dim)}
+.tab.active{color:var(--gold);border-color:var(--gold);border-bottom-color:var(--panel)}
+/* CHECKBOX */
+.quest-check{display:flex;align-items:center;gap:10px;padding:8px;min-height:44px;cursor:pointer}
+.quest-check input{width:20px;height:20px;accent-color:var(--gold)}
+/* MODAL OVERLAY */
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--panel);border:2px solid var(--gold);border-radius:12px;max-width:500px;width:100%;max-height:80vh;overflow-y:auto;padding:20px;box-shadow:0 0 30px rgba(212,175,55,.2)}
+/* LEVEL UP */
+@keyframes goldFlash{0%{opacity:0;transform:scale(.5)}50%{opacity:1;transform:scale(1.2)}100%{opacity:0;transform:scale(1.5)}}
+.level-up-flash{position:fixed;top:0;left:0;right:0;bottom:0;z-index:300;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.level-up-flash h1{font-size:3rem;color:var(--gold);text-shadow:0 0 40px var(--gold);animation:goldFlash 2s forwards}
+/* STREAK */
+.streak-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)}
+.streak-count{font-family:var(--font-title);color:var(--gold);font-size:1.1rem;min-width:30px}
+.streak-rank{font-size:.8rem;color:var(--text-dim);font-style:italic}
+/* Toggle btn */
+.toggle-btn{padding:8px 12px;border:1px solid var(--border);border-radius:4px;background:var(--panel);color:var(--text-dim);cursor:pointer;font-family:var(--font-body);min-height:44px}
+.toggle-btn.on{border-color:var(--gold);color:var(--gold);background:#2e2a1a}
+/* Deck stack */
+.deck{width:140px;height:200px;background:linear-gradient(135deg,#2a2418,#1a1610);border:3px solid var(--gold-dim);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;box-shadow:4px 4px 0 #0a0a06,6px 6px 0 #05050300;margin:10px}
+.deck:active{transform:translateY(2px);box-shadow:2px 2px 0 #0a0a06}
+.deck .deck-icon{font-size:3rem}
+.deck .deck-label{font-family:var(--font-title);color:var(--gold);font-size:.85rem;margin-top:8px}
+/* Star rating */
+.stars{color:var(--gold);letter-spacing:2px}
+/* Responsive 2-col */
+@media(min-width:768px){
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#nav{left:auto;right:auto;width:100%;max-width:800px;margin:0 auto;left:50%;transform:translateX(-50%)}
+}
+/* Scrollbar */
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+/* Loading */
+#loading{display:flex;align-items:center;justify-content:center;height:100vh;font-family:var(--font-title);color:var(--gold);font-size:1.3rem}
+</style>
+</head>
+<body>
+<div id="loading">⚔️ Preparing the Exchequer…</div>
+<div id="app">
+
+<!-- BOTTOM NAV -->
+<nav id="nav" class="hidden">
+<button data-screen="dashboard" class="active"><span class="nav-icon">⚔️</span>Dashboard</button>
+<button data-screen="draw"><span class="nav-icon">🃏</span>Draw</button>
+<button data-screen="log"><span class="nav-icon">📋</span>Log</button>
+<button data-screen="bestiarum"><span class="nav-icon">👹</span>Bestiarum</button>
+<button data-screen="armory"><span class="nav-icon">🛡️</span>Armory</button>
+</nav>
+
+<!-- SESSION ZERO -->
+<div id="sessionZero" class="screen">
+<div class="dots" id="szDots"></div>
+<div id="szPages"></div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="screen">
+<div id="dashContent"></div>
+</div>
+
+<!-- CARD DRAW -->
+<div id="draw" class="screen">
+<h2 style="text-align:center;padding:12px">🃏 Draw a Card</h2>
+<div style="display:flex;justify-content:center;flex-wrap:wrap" id="deckArea"></div>
+<div id="drawnCard"></div>
+</div>
+
+<!-- DAILY LOG -->
+<div id="log" class="screen">
+<div id="logContent"></div>
+</div>
+
+<!-- BESTIARUM -->
+<div id="bestiarum" class="screen">
+<h2 style="text-align:center;padding:12px">👹 Bestiarum Vocabulum</h2>
+<div id="bestiaryGrid" class="grid grid-2"></div>
+</div>
+
+<!-- ARMORY -->
+<div id="armory" class="screen">
+<h2 style="text-align:center;padding:12px">🛡️ The Armory</h2>
+<div class="tabs"><div class="tab active" data-tab="quests">📜 Quests</div><div class="tab" data-tab="powerups">⚡ Power-Ups</div></div>
+<div id="armoryFilter" style="padding:0 8px 8px">
+<select id="tierFilter" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:4px;font-family:var(--font-body)">
+<option value="all">All Tiers</option><option value="Daily">Daily</option><option value="Weekly">Weekly</option><option value="Epic">Epic</option>
+</select>
+</div>
+<div id="armoryContent"></div>
+</div>
+
+</div><!-- /app -->
+
+<script>
+// ============== DATA ==============
+const CLASSES=[
+{name:'Teacher',icon:'📖',desc:'You illuminate minds. Your strength is in clarity and patience.'},
+{name:'Healer',icon:'❤️',desc:'You mend what is broken. Empathy is your superpower.'},
+{name:'Scholar',icon:'🧠',desc:'You seek truth relentlessly. Knowledge is your blade.'},
+{name:'Builder',icon:'🔨',desc:'You create from nothing. Your hands shape the world.'},
+{name:'Prophet',icon:'🔥',desc:'You see what others miss. Vision guides your path.'}
+];
+
+const STAT_NAMES=['Faith','Wisdom','Discipline','Charity','Courage','Creativity','Resilience'];
+const STAT_QUESTIONS=[
+'How strong is your foundation of belief?',
+'How well do you learn from experience?',
+'How consistently do you follow through?',
+'How freely do you give of yourself?',
+'How willing are you to face the hard thing?',
+'How often do you make something from nothing?',
+'How quickly do you recover from setbacks?'
+];
+
+const MONSTERS=[
+{name:'The Noonday Lurker',brood:'Acedian',stars:3,sin:'procrastination',icon:'🦥',moves:['Sopor Fog','Excuse Whisper'],weakness:'Immediate micro-action',flavor:'It whispers "later" until later never comes.',insight:'When you feel the fog descend, do ONE thing — any thing — for 2 minutes.',loot:'Momentum Shard (+1 Discipline)'},
+{name:'The Thousand Mirrors',brood:'Refraction',stars:3,sin:'distraction',icon:'🪞',moves:['Glimmer Cascade','Spark of Novelty'],weakness:'Sharp return to intention',flavor:'Every surface gleams with something more interesting than your task.',insight:'Name what you were doing. Say it aloud. Return.',loot:'Focus Lens (+1 Wisdom)'},
+{name:'The Whispering Archivist',brood:'Accuser',stars:4,sin:'self-doubt',icon:'📚',moves:['Whisper of What If','The Dossier'],weakness:'Evidence and data',flavor:'It keeps meticulous records of every failure and none of your wins.',insight:'Counter with facts. Write three things you actually accomplished.',loot:'Confidence Scroll (+1 Courage)'},
+{name:'Aergia, The Sleeping Colossus',brood:'Torporite',stars:4,sin:'sloth',icon:'🗿',moves:['Gravity Field','Crushing Yawn'],weakness:'Fire, energy, momentum',flavor:'The weight of doing nothing grows heavier each hour.',insight:'Movement breaks the spell. Stand up. Walk. Push.',loot:'Ember Core (+1 Resilience)'},
+{name:'The Veiled Wraith of Black Water',brood:'Melancholic',stars:5,sin:'depression/hopelessness',icon:'🌊',moves:['Drown in Thoughts','Veil of Hopelessness'],weakness:'Genuine human connection',flavor:'The dark water rises silently, convincing you this is all there is.',insight:'Reach out to one person. Speak truth about how you feel.',loot:'Lifeline Thread (+1 Faith)'},
+{name:'The Ascendant Seraphim',brood:'Exalted Fallen',stars:5,sin:'pride',icon:'👼',moves:['Blinding Glory','Accusation of Mediocrity'],weakness:'Genuine humility and selfless service',flavor:'Its light is your own reflection, burning everything else away.',insight:'Do something kind that no one will see or credit you for.',loot:'Humility Stone (+1 Charity)'},
+{name:'The Rust-Tongued Gargoyle',brood:'Corrosive',stars:3,sin:'cynicism',icon:'🗡️',moves:['Rust Breath',"Skeptic's Grin"],weakness:'Sincere gratitude',flavor:'It corrodes every good thing with "yeah, but…"',insight:'Write 5 things you are genuinely thankful for. Mean them.',loot:'Gratitude Gem (+1 Faith)'},
+{name:'The Ember Maw',brood:'Unaligned',stars:4,sin:'craving/restless hunger',icon:'🔥',moves:['Smoldering Desire','Burning Suggestion'],weakness:'Stillness, patience, clarity',flavor:'The hunger never stops. It just changes shape.',insight:'Sit still for 5 minutes. Let the craving pass through you.',loot:'Clarity Crystal (+1 Wisdom)'}
+];
+
+const QUESTS={
+Daily:[
+{name:'The Verse',desc:'Read one passage of scripture.',xp:10,stat:'Faith'},
+{name:'The Honest Prayer',desc:'Pray with real intention — not rote words.',xp:10,stat:'Faith'},
+{name:'The Bridge',desc:'Reach out to one person today.',xp:10,stat:'Charity'},
+{name:'The Patrol',desc:'Go for a walk or exercise.',xp:10,stat:'Resilience'},
+{name:'The Log',desc:'Write in your journal.',xp:10,stat:'Wisdom'},
+{name:'The Drill',desc:'Practice a skill for 20+ minutes.',xp:10,stat:'Discipline'},
+{name:'The Craft',desc:'Create something — anything.',xp:10,stat:'Creativity'},
+{name:'The Sweep',desc:'Clean or organize one area.',xp:10,stat:'Discipline'}
+],
+Weekly:[
+{name:'The Encounter',desc:'Have a meaningful conversation with someone.',xp:25,stat:'Charity'},
+{name:'The Deep Dive',desc:'Study one topic deeply for 2+ hours.',xp:25,stat:'Wisdom'},
+{name:'The Fast',desc:'Abstain from something for 24 hours.',xp:25,stat:'Discipline'},
+{name:'The Secret Service',desc:'Do a kind act anonymously.',xp:25,stat:'Charity'},
+{name:'Memento Mori',desc:'Reflect on mortality. What matters?',xp:25,stat:'Courage'},
+{name:'Ally Recruitment',desc:'Deepen a relationship or make a new one.',xp:25,stat:'Courage'}
+],
+Epic:[
+{name:'The Temple Raid',desc:'Attend the temple.',xp:100,stat:'Faith'},
+{name:'The Tome',desc:'Finish a book.',xp:100,stat:'Wisdom'},
+{name:'The 30-Day Streak',desc:'Maintain any streak for 30 days.',xp:100,stat:'Resilience'},
+{name:'The Confrontation',desc:'Face a fear head-on.',xp:100,stat:'Courage'},
+{name:'The Pilgrimage',desc:'Go somewhere meaningful alone.',xp:100,stat:'Faith'},
+{name:'The Offering',desc:'Give sacrificially of time or resources.',xp:100,stat:'Charity'}
+]
+};
+
+const POWERUPS=[
+{name:'Breath of Stillness',desc:'Take 10 slow breaths. Reset your nervous system.',stat:'Resilience',xp:5},
+{name:'The One Song',desc:'Play one song that moves your soul. Feel it.',stat:'Creativity',xp:5},
+{name:'Skyward Glance',desc:'Go outside. Look up. Remember how small and vast this all is.',stat:'Faith',xp:5},
+{name:'Cold Water Reset',desc:'Splash cold water on your face or take a cold shower.',stat:'Courage',xp:5},
+{name:'Memory Anchor',desc:'Recall a peak moment — a time you felt alive and capable.',stat:'Resilience',xp:5},
+{name:'Twenty & Done',desc:'Set a timer for 20 minutes. Work on ONE thing until it rings.',stat:'Discipline',xp:5},
+{name:'Flash Prayer',desc:'Pray for 30 seconds, right now, wherever you are.',stat:'Faith',xp:5},
+{name:'Single Verse',desc:'Read one verse of scripture. Just one. Let it land.',stat:'Wisdom',xp:5},
+{name:'Ally Ping',desc:'Text someone you care about. No reason needed.',stat:'Charity',xp:5},
+{name:'Micro-Order',desc:'Organize one small thing — a drawer, your desktop, your bag.',stat:'Discipline',xp:5},
+{name:'One True Sentence',desc:'Write one honest sentence about how you feel right now.',stat:'Creativity',xp:5},
+{name:'The War Cry',desc:'Say out loud: "I am not done yet." Mean it.',stat:'Courage',xp:5}
+];
+
+const STREAK_TYPES=['prayer','scripture','service','cleanLiving','exercise','custom'];
+const STREAK_LABELS={prayer:'🙏 Prayer',scripture:'📖 Scripture',service:'🤝 Service',cleanLiving:'🛡️ Clean Living',exercise:'💪 Exercise',custom:'⭐ Custom'};
+const STREAK_RANKS=[[90,'Master'],[30,'Warrior of Light'],[14,'Disciple'],[7,'Apprentice'],[3,'Initiate'],[0,'—']];
+
+function getStreakRank(days){for(const[min,name]of STREAK_RANKS)if(days>=min)return name;return '—';}
+
+// ============== STATE ==============
+const SAVE_KEY='exchequer_save';
+let S=null; // state
+
+function loadState(){try{S=JSON.parse(localStorage.getItem(SAVE_KEY))}catch(e){S=null}}
+function saveState(){localStorage.setItem(SAVE_KEY,JSON.stringify(S))}
+function resetState(){localStorage.removeItem(SAVE_KEY);S=null;location.reload()}
+
+function defaultState(){return{
+  character:{name:'',class_idx:0,stats:[5,5,5,5,5,5,5],level:1,xp:0,hp:10,mp:10,gp:10},
+  loadout:{mainQuest:'',dailyQuests:[],powerups:[],bossIdx:0},
+  allies:[],
+  streaks:{prayer:0,scripture:0,service:0,cleanLiving:0,exercise:0,custom:0},
+  streakBest:{prayer:0,scripture:0,service:0,cleanLiving:0,exercise:0,custom:0},
+  lastCheckIn:null,
+  history:[],
+  monsterRecord:{},
+  weeklyReviews:[]
+}}
+
+// ============== NAV ==============
+let currentScreen='dashboard';
+function showScreen(name){
+  currentScreen=name;
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById(name);if(el)el.classList.add('active');
+  document.querySelectorAll('#nav button').forEach(b=>{b.classList.toggle('active',b.dataset.screen===name)});
+  if(name==='dashboard')renderDashboard();
+  else if(name==='draw')renderDraw();
+  else if(name==='log')renderLog();
+  else if(name==='bestiarum')renderBestiarum();
+  else if(name==='armory')renderArmory();
+}
+
+// ============== SESSION ZERO ==============
+let szStep=0;const SZ_STEPS=6;
+let szData={name:'',classIdx:0,stats:[5,5,5,5,5,5,5],bossIdx:0,mainQuest:'',dailyQuests:[],powerups:[],allies:['']};
+
+function renderSessionZero(){
+  document.getElementById('sessionZero').classList.add('active');
+  document.getElementById('nav').classList.add('hidden');
+  renderSZDots();renderSZPage();
+}
+
+function renderSZDots(){
+  const c=document.getElementById('szDots');
+  c.innerHTML='';
+  for(let i=0;i<SZ_STEPS;i++){const d=document.createElement('div');d.className='dot'+(i<szStep?' done':'')+(i===szStep?' active':'');c.appendChild(d)}
+}
+
+function renderSZPage(){
+  const c=document.getElementById('szPages');
+  if(szStep===0){
+    c.innerHTML=`<div class="panel" style="text-align:center;margin-top:20px">
+      <h1>⚔️ Session Zero</h1><p style="margin:12px 0;color:var(--text-dim)">Every adventure begins with a name.</p>
+      <h3 style="margin-bottom:8px">Secret Identity</h3>
+      <input type="text" id="szName" placeholder="Enter your character name" value="${szData.name}" style="max-width:300px;margin:0 auto;display:block">
+      <br><button class="btn btn-primary" onclick="szNext()">Continue →</button></div>`;
+  } else if(szStep===1){
+    let cards=CLASSES.map((cl,i)=>`<div class="card${szData.classIdx===i?' selected':''}" onclick="szData.classIdx=${i};renderSZPage()">
+      <div style="font-size:2rem;text-align:center">${cl.icon}</div>
+      <div class="card-title" style="text-align:center">${cl.name}</div>
+      <p style="font-size:.9rem;color:var(--text-dim);text-align:center">${cl.desc}</p></div>`).join('');
+    c.innerHTML=`<div class="panel"><h2 style="text-align:center">Choose Your Class</h2>
+      <div class="grid grid-2" style="margin:12px 0">${cards}</div>
+      <div style="text-align:center"><button class="btn" onclick="szPrev()">← Back</button> <button class="btn btn-primary" onclick="szNext()">Continue →</button></div></div>`;
+  } else if(szStep===2){
+    let sliders=STAT_NAMES.map((s,i)=>`<div style="margin:10px 0"><label><strong>${s}</strong> <span style="color:var(--gold)">[${szData.stats[i]}]</span></label>
+      <p style="font-size:.85rem;color:var(--text-dim);margin:2px 0">${STAT_QUESTIONS[i]}</p>
+      <input type="range" min="1" max="10" value="${szData.stats[i]}" oninput="szData.stats[${i}]=+this.value;this.previousElementSibling.previousElementSibling.querySelector('span').textContent='['+this.value+']'"></div>`).join('');
+    c.innerHTML=`<div class="panel"><h2 style="text-align:center">Roll Your Stats</h2>${sliders}
+      <div style="text-align:center;margin-top:12px"><button class="btn" onclick="szPrev()">← Back</button> <button class="btn btn-primary" onclick="szNext()">Continue →</button></div></div>`;
+  } else if(szStep===3){
+    let mcards=MONSTERS.map((m,i)=>`<div class="card${szData.bossIdx===i?' selected':''}" onclick="szData.bossIdx=${i};renderSZPage()">
+      <div style="font-size:2rem;text-align:center">${m.icon}</div>
+      <div class="card-title" style="text-align:center">${m.name}</div>
+      <div style="text-align:center" class="stars">${'★'.repeat(m.stars)}${'☆'.repeat(5-m.stars)}</div>
+      <p style="font-size:.85rem;color:var(--text-dim);text-align:center">${m.sin}</p></div>`).join('');
+    c.innerHTML=`<div class="panel"><h2 style="text-align:center">👹 Pick Your Boss</h2>
+      <p style="text-align:center;color:var(--text-dim);margin:8px">Choose the enemy you face most often.</p>
+      <div class="grid grid-2">${mcards}</div>
+      <div style="text-align:center;margin-top:12px"><button class="btn" onclick="szPrev()">← Back</button> <button class="btn btn-primary" onclick="szNext()">Continue →</button></div></div>`;
+  } else if(szStep===4){
+    const allDaily=QUESTS.Daily;
+    const allPU=POWERUPS;
+    let dq=allDaily.map((q,i)=>`<label class="quest-check"><input type="checkbox" data-dq="${i}" ${szData.dailyQuests.includes(i)?'checked':''}> ${q.name} — <span style="color:var(--text-dim)">${q.desc}</span></label>`).join('');
+    let pu=allPU.map((p,i)=>`<label class="quest-check"><input type="checkbox" data-pu="${i}" ${szData.powerups.includes(i)?'checked':''}> ⚡ ${p.name} — <span style="color:var(--text-dim)">${p.desc}</span></label>`).join('');
+    c.innerHTML=`<div class="panel"><h2 style="text-align:center">⚔️ Set Your Loadout</h2>
+      <h3 style="margin:12px 0">Main Quest</h3>
+      <input type="text" id="szMainQuest" placeholder="Your overarching mission…" value="${szData.mainQuest}">
+      <h3 style="margin:12px 0">Daily Quests (pick 3)</h3><div id="szDQ">${dq}</div>
+      <h3 style="margin:12px 0">Power-Ups (pick 3)</h3><div id="szPU">${pu}</div>
+      <div style="text-align:center;margin-top:12px"><button class="btn" onclick="szPrev()">← Back</button> <button class="btn btn-primary" onclick="szNext()">Continue →</button></div></div>`;
+    c.querySelectorAll('[data-dq]').forEach(cb=>cb.onchange=()=>{
+      szData.dailyQuests=Array.from(c.querySelectorAll('[data-dq]:checked')).map(x=>+x.dataset.dq).slice(0,3);
+    });
+    c.querySelectorAll('[data-pu]').forEach(cb=>cb.onchange=()=>{
+      szData.powerups=Array.from(c.querySelectorAll('[data-pu]:checked')).map(x=>+x.dataset.pu).slice(0,3);
+    });
+  } else if(szStep===5){
+    let allies=szData.allies.map((a,i)=>`<div style="display:flex;gap:8px;margin:6px 0">
+      <input type="text" class="ally-input" data-idx="${i}" value="${a}" placeholder="Ally name">
+      ${i>0?`<button class="btn btn-sm btn-danger" onclick="szData.allies.splice(${i},1);renderSZPage()">✕</button>`:''}</div>`).join('');
+    c.innerHTML=`<div class="panel" style="text-align:center"><h2>🤝 Name Your Allies</h2>
+      <p style="color:var(--text-dim);margin:8px">Who fights alongside you?</p>
+      <div style="max-width:300px;margin:12px auto">${allies}</div>
+      <button class="btn btn-sm" onclick="szData.allies.push('');renderSZPage()">+ Add Ally</button>
+      <br><br><button class="btn" onclick="szPrev()">← Back</button> <button class="btn btn-primary" onclick="finishSZ()">⚔️ Begin Adventure</button></div>`;
+    c.querySelectorAll('.ally-input').forEach(inp=>inp.oninput=()=>{szData.allies[+inp.dataset.idx]=inp.value});
+  }
+}
+
+function szPrev(){if(szStep>0){collectSZInput();szStep--;renderSZDots();renderSZPage()}}
+function szNext(){collectSZInput();if(szStep===0&&!szData.name.trim()){document.getElementById('szName').style.borderColor='var(--red)';return}if(szStep<SZ_STEPS-1){szStep++;renderSZDots();renderSZPage()}}
+
+function collectSZInput(){
+  const n=document.getElementById('szName');if(n)szData.name=n.value;
+  const mq=document.getElementById('szMainQuest');if(mq)szData.mainQuest=mq.value;
+}
+
+function finishSZ(){
+  collectSZInput();
+  szData.allies=szData.allies.filter(a=>a.trim());
+  if(!szData.allies.length)szData.allies=[''];
+  S=defaultState();
+  S.character.name=szData.name.trim()||'Adventurer';
+  S.character.class_idx=szData.classIdx;
+  S.character.stats=[...szData.stats];
+  S.loadout.bossIdx=szData.bossIdx;
+  S.loadout.mainQuest=szData.mainQuest;
+  S.loadout.dailyQuests=szData.dailyQuests.slice(0,3);
+  S.loadout.powerups=szData.powerups.slice(0,3);
+  S.allies=szData.allies;
+  saveState();
+  document.getElementById('sessionZero').classList.remove('active');
+  document.getElementById('nav').classList.remove('hidden');
+  showScreen('dashboard');
+}
+
+// ============== DASHBOARD ==============
+function renderDashboard(){
+  if(!S)return;
+  const ch=S.character;const cl=CLASSES[ch.class_idx];
+  const xpForLevel=500;const xpInLevel=ch.xp%xpForLevel;const pct=Math.round(xpInLevel/xpForLevel*100);
+  const boss=MONSTERS[S.loadout.bossIdx];
+
+  let streaksHTML=STREAK_TYPES.map(k=>{
+    const ct=S.streaks[k]||0;const best=S.streakBest[k]||0;const rank=getStreakRank(ct);
+    return`<div class="streak-item"><span>🔥</span><span class="streak-count">${ct}</span><span>${STREAK_LABELS[k]}</span><span class="streak-rank">${rank}${best>ct?' (best:'+best+')':''}</span></div>`;
+  }).join('');
+
+  let dqHTML=S.loadout.dailyQuests.map(i=>{const q=QUESTS.Daily[i];return q?`<div style="padding:4px 0">📜 ${q.name}</div>`:''}).join('');
+  let puHTML=S.loadout.powerups.map(i=>{const p=POWERUPS[i];return p?`<div style="padding:4px 0">⚡ ${p.name}</div>`:''}).join('');
+
+  document.getElementById('dashContent').innerHTML=`
+    <div class="panel panel-gold" style="text-align:center">
+      <div style="font-size:2rem">${cl.icon}</div>
+      <h1>${ch.name}</h1>
+      <div style="color:var(--text-dim)">${cl.name} — Level ${ch.level}</div>
+      <div style="margin:8px auto;max-width:300px">
+        <div class="bar-track bar-xp"><div class="bar-fill" style="width:${pct}%"></div><div class="bar-label">XP ${xpInLevel}/${xpForLevel}</div></div>
+      </div>
+    </div>
+    <div class="dash-grid">
+      <div class="panel">
+        <h3>❤️ Vitals</h3>
+        <div style="margin:8px 0"><div style="font-size:.8rem;margin-bottom:2px">❤️ HP ${ch.hp}/10</div><div class="bar-track bar-hp"><div class="bar-fill" style="width:${ch.hp*10}%"></div></div></div>
+        <div style="margin:8px 0"><div style="font-size:.8rem;margin-bottom:2px">🧠 MP ${ch.mp}/10</div><div class="bar-track bar-mp"><div class="bar-fill" style="width:${ch.mp*10}%"></div></div></div>
+        <div style="margin:8px 0"><div style="font-size:.8rem;margin-bottom:2px">💰 GP ${ch.gp}/10</div><div class="bar-track bar-gp"><div class="bar-fill" style="width:${ch.gp*10}%"></div></div></div>
+      </div>
+      <div class="panel">
+        <h3 style="text-align:center">📊 Stats</h3>
+        <canvas id="radarCanvas" width="260" height="260"></canvas>
+      </div>
+      <div class="panel">
+        <h3>🔥 Streaks</h3>${streaksHTML}
+      </div>
+      <div class="panel">
+        <h3>⚔️ Loadout</h3>
+        <div style="margin:6px 0"><strong>Main Quest:</strong> ${S.loadout.mainQuest||'<em>None set</em>'}</div>
+        <div style="margin:6px 0"><strong>Daily Quests:</strong>${dqHTML||' <em>None</em>'}</div>
+        <div style="margin:6px 0"><strong>Power-Ups:</strong>${puHTML||' <em>None</em>'}</div>
+        <div style="margin:6px 0"><strong>Active Boss:</strong> ${boss.icon} ${boss.name}</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;padding:12px">
+      <button class="btn btn-primary" onclick="showScreen('draw')">🃏 Draw a Card</button>
+      <button class="btn btn-primary" onclick="showScreen('log')">📋 Check In</button>
+      <button class="btn" onclick="showWeeklyReview()">📊 Weekly Review</button>
+      <button class="btn btn-danger btn-sm" onclick="if(confirm('Reset character? This cannot be undone.'))resetState()">Reset Character</button>
+    </div>`;
+  drawRadar();
+}
+
+function drawRadar(){
+  const canvas=document.getElementById('radarCanvas');if(!canvas)return;
+  const ctx=canvas.getContext('2d');const W=canvas.width,H=canvas.height;
+  const cx=W/2,cy=H/2,r=90;
+  ctx.clearRect(0,0,W,H);
+  const stats=S.character.stats;const n=7;
+  const angles=Array.from({length:n},(_,i)=>((Math.PI*2*i)/n)-Math.PI/2);
+
+  // Grid
+  for(let ring=2;ring<=10;ring+=2){
+    ctx.beginPath();
+    angles.forEach((a,i)=>{const d=r*ring/10;const x=cx+Math.cos(a)*d;const y=cy+Math.sin(a)*d;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
+    ctx.closePath();ctx.strokeStyle='rgba(58,48,32,.6)';ctx.stroke();
+  }
+  // Axes
+  angles.forEach(a=>{ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);ctx.strokeStyle='rgba(58,48,32,.4)';ctx.stroke()});
+  // Data
+  ctx.beginPath();
+  angles.forEach((a,i)=>{const d=r*stats[i]/10;const x=cx+Math.cos(a)*d;const y=cy+Math.sin(a)*d;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y)});
+  ctx.closePath();ctx.fillStyle='rgba(212,175,55,.15)';ctx.fill();ctx.strokeStyle='#d4af37';ctx.lineWidth=2;ctx.stroke();
+  // Labels
+  ctx.fillStyle='#d4c8a0';ctx.font='11px Cinzel,serif';ctx.textAlign='center';
+  angles.forEach((a,i)=>{const d=r+18;const x=cx+Math.cos(a)*d;const y=cy+Math.sin(a)*d+4;ctx.fillText(STAT_NAMES[i],x,y)});
+}
+
+// ============== CARD DRAW ==============
+function renderDraw(){
+  const area=document.getElementById('deckArea');
+  area.innerHTML=`
+    <div class="deck" onclick="drawFromDeck('quest')"><div class="deck-icon">📜</div><div class="deck-label">Quest</div></div>
+    <div class="deck" onclick="drawFromDeck('monster')"><div class="deck-icon">👹</div><div class="deck-label">Monster</div></div>
+    <div class="deck" onclick="drawFromDeck('powerup')"><div class="deck-icon">⚡</div><div class="deck-label">Power-Up</div></div>`;
+  document.getElementById('drawnCard').innerHTML='';
+}
+
+function drawFromDeck(type){
+  let card,html;
+  if(type==='quest'){
+    const tiers=Object.keys(QUESTS);const tier=tiers[Math.floor(Math.random()*tiers.length)];
+    const list=QUESTS[tier];card=list[Math.floor(Math.random()*list.length)];
+    html=`<div class="card-title">${card.name}</div><div class="stars">${tier}</div><p style="margin:8px 0">${card.desc}</p>
+      <div style="color:var(--text-dim);font-size:.85rem">+${card.xp} XP · ${card.stat}</div>`;
+  } else if(type==='monster'){
+    card=MONSTERS[Math.floor(Math.random()*MONSTERS.length)];
+    html=`<div style="font-size:2rem">${card.icon}</div><div class="card-title">${card.name}</div>
+      <div class="stars">${'★'.repeat(card.stars)}${'☆'.repeat(5-card.stars)}</div>
+      <div style="color:var(--text-dim);font-size:.85rem">${card.brood} brood · ${card.sin}</div>
+      <p style="margin:8px 0;font-style:italic;font-size:.9rem">${card.flavor}</p>
+      <p style="font-size:.85rem"><strong>Weakness:</strong> ${card.weakness}</p>`;
+  } else {
+    card=POWERUPS[Math.floor(Math.random()*POWERUPS.length)];
+    html=`<div class="card-title">⚡ ${card.name}</div><p style="margin:8px 0">${card.desc}</p>
+      <div style="color:var(--text-dim);font-size:.85rem">+${card.xp} XP · ${card.stat}</div>`;
+  }
+
+  const dc=document.getElementById('drawnCard');
+  dc.innerHTML=`<div class="flip-container" id="flipCard" onclick="this.classList.add('flipped')">
+    <div class="flip-inner">
+      <div class="flip-front"><span>${type==='quest'?'📜':type==='monster'?'👹':'⚡'}</span><div style="font-size:1rem;color:var(--text-dim);margin-top:8px">Tap to reveal</div></div>
+      <div class="flip-back">${html}</div>
+    </div></div>`;
+}
+
+// ============== DAILY LOG ==============
+function renderLog(){
+  const today=new Date().toISOString().slice(0,10);
+  const boss=MONSTERS[S.loadout.bossIdx];
+  const alreadyLogged=S.lastCheckIn===today;
+
+  let dqChecks=S.loadout.dailyQuests.map(i=>{const q=QUESTS.Daily[i];return q?`<label class="quest-check"><input type="checkbox" data-logdq="${i}"> 📜 ${q.name}</label>`:''}).join('');
+  let puToggles=S.loadout.powerups.map(i=>{const p=POWERUPS[i];return p?`<button class="toggle-btn" data-logpu="${i}">⚡ ${p.name}</button>`:''}).join(' ');
+  let streakChecks=STREAK_TYPES.map(k=>`<label class="quest-check"><input type="checkbox" data-streak="${k}"> ${STREAK_LABELS[k]}</label>`).join('');
+
+  document.getElementById('logContent').innerHTML=`<div class="panel">
+    <h2 style="text-align:center">📋 Battle Log — ${today}</h2>
+    ${alreadyLogged?'<p style="text-align:center;color:var(--gold);margin:8px">✅ Already logged today</p>':''}
+    <h3 style="margin:12px 0">Daily Quests</h3>${dqChecks||'<p style="color:var(--text-dim)">No daily quests equipped</p>'}
+    <h3 style="margin:12px 0">Power-Ups Used</h3><div style="display:flex;flex-wrap:wrap;gap:6px">${puToggles||'<p style="color:var(--text-dim)">No power-ups equipped</p>'}</div>
+    <h3 style="margin:12px 0">Streaks Maintained</h3>${streakChecks}
+    <h3 style="margin:12px 0">Monster Encounter</h3>
+    <textarea id="logMonsterNote" placeholder="What happened with ${boss.name} today?"></textarea>
+    <div style="text-align:center;margin-top:16px"><button class="btn btn-primary" onclick="submitLog()">⚔️ Log Day</button></div>
+  </div>
+  <div class="panel"><h3>📖 History</h3>${renderHistory()}</div>`;
+
+  document.querySelectorAll('.toggle-btn[data-logpu]').forEach(btn=>{btn.onclick=()=>btn.classList.toggle('on')});
+}
+
+function renderHistory(){
+  if(!S.history.length)return'<p style="color:var(--text-dim)">No entries yet.</p>';
+  return S.history.slice(-10).reverse().map(h=>`<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+    <strong>${h.date}</strong> — +${h.xp} XP${h.note?' · <em>'+h.note.slice(0,60)+'</em>':''}</div>`).join('');
+}
+
+function submitLog(){
+  const today=new Date().toISOString().slice(0,10);
+  let xp=0;
+  const completedDQ=Array.from(document.querySelectorAll('[data-logdq]:checked')).map(x=>+x.dataset.logdq);
+  xp+=completedDQ.length*10;
+  const usedPU=Array.from(document.querySelectorAll('.toggle-btn.on[data-logpu]')).map(x=>+x.dataset.logpu);
+  xp+=usedPU.length*5;
+
+  // Streaks
+  const maintainedStreaks=Array.from(document.querySelectorAll('[data-streak]:checked')).map(x=>x.dataset.streak);
+  STREAK_TYPES.forEach(k=>{
+    if(maintainedStreaks.includes(k)){
+      S.streaks[k]=(S.streaks[k]||0)+1;
+      if(S.streaks[k]>=(S.streakBest[k]||0))S.streakBest[k]=S.streaks[k];
+      // Milestone XP
+      if([7,14,30,90].includes(S.streaks[k]))xp+=50;
+    } else {
+      S.streaks[k]=0;
+    }
+  });
+
+  const note=document.getElementById('logMonsterNote').value;
+  S.history.push({date:today,xp,completedDQ,usedPU,note,streaks:{...S.streaks}});
+  S.lastCheckIn=today;
+  addXP(xp);
+  saveState();
+  renderLog();
+}
+
+function addXP(amount){
+  S.character.xp+=amount;
+  const xpPerLevel=500;
+  while(S.character.xp>=S.character.level*xpPerLevel){
+    S.character.xp-=S.character.level*xpPerLevel;
+    S.character.level++;
+    showLevelUp();
+  }
+  saveState();
+}
+
+function showLevelUp(){
+  const el=document.createElement('div');el.className='level-up-flash';
+  el.innerHTML=`<h1>⚔️ LEVEL ${S.character.level}!</h1>`;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),2500);
+  // Give +1 stat choice via prompt
+  setTimeout(()=>{
+    const choice=prompt('LEVEL UP! Choose a stat to increase (+1):\n'+STAT_NAMES.map((s,i)=>`${i+1}. ${s} [${S.character.stats[i]}]`).join('\n'));
+    const idx=parseInt(choice)-1;
+    if(idx>=0&&idx<7&&S.character.stats[idx]<10){S.character.stats[idx]++;saveState()}
+  },500);
+}
+
+// ============== BESTIARUM ==============
+function renderBestiarum(){
+  const grid=document.getElementById('bestiaryGrid');
+  grid.innerHTML=MONSTERS.map((m,i)=>{
+    const rec=S.monsterRecord[i]||{wins:0,losses:0};
+    return`<div class="card" onclick="showMonsterDetail(${i})">
+      <div style="font-size:2.5rem;text-align:center">${m.icon}</div>
+      <div class="card-title" style="text-align:center">${m.name}</div>
+      <div class="stars" style="text-align:center">${'★'.repeat(m.stars)}${'☆'.repeat(5-m.stars)}</div>
+      <div style="text-align:center;color:var(--text-dim);font-size:.85rem">${m.brood} · ${m.sin}</div>
+      <div style="text-align:center;font-size:.8rem;margin-top:4px">W:${rec.wins} / L:${rec.losses}</div>
+      ${S.loadout.bossIdx===i?'<div style="text-align:center;color:var(--gold);font-size:.8rem">⚔️ ACTIVE BOSS</div>':''}</div>`;
+  }).join('');
+}
+
+function showMonsterDetail(idx){
+  const m=MONSTERS[idx];const rec=S.monsterRecord[idx]||{wins:0,losses:0};
+  const overlay=document.createElement('div');overlay.className='modal-overlay';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
+  overlay.innerHTML=`<div class="modal">
+    <div style="text-align:center;font-size:3rem">${m.icon}</div>
+    <h2 style="text-align:center">${m.name}</h2>
+    <div class="stars" style="text-align:center">${'★'.repeat(m.stars)}${'☆'.repeat(5-m.stars)}</div>
+    <div style="text-align:center;color:var(--text-dim)">${m.brood} brood · ${m.sin}</div>
+    <p style="margin:12px 0;font-style:italic;text-align:center">${m.flavor}</p>
+    <p><strong>Signature Moves:</strong> ${m.moves.join(', ')}</p>
+    <p><strong>Weakness:</strong> ${m.weakness}</p>
+    <p><strong>Insight:</strong> ${m.insight}</p>
+    <p><strong>Loot:</strong> ${m.loot}</p>
+    <p style="margin-top:8px"><strong>Record:</strong> W:${rec.wins} / L:${rec.losses}</p>
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="S.loadout.bossIdx=${idx};saveState();this.closest('.modal-overlay').remove();renderBestiarum()">Set as Active Boss</button>
+      <button class="btn btn-sm" onclick="recordMonster(${idx},'win');this.closest('.modal-overlay').remove();renderBestiarum()">✅ Win</button>
+      <button class="btn btn-sm btn-danger" onclick="recordMonster(${idx},'loss');this.closest('.modal-overlay').remove();renderBestiarum()">❌ Loss</button>
+      <button class="btn btn-sm" onclick="this.closest('.modal-overlay').remove()">Close</button>
+    </div></div>`;
+  document.body.appendChild(overlay);
+}
+
+function recordMonster(idx,result){
+  if(!S.monsterRecord[idx])S.monsterRecord[idx]={wins:0,losses:0};
+  if(result==='win')S.monsterRecord[idx].wins++;else S.monsterRecord[idx].losses++;
+  saveState();
+}
+
+// ============== ARMORY ==============
+let armoryTab='quests';
+function renderArmory(){
+  const tier=document.getElementById('tierFilter').value;
+  let html='';
+  if(armoryTab==='quests'){
+    Object.entries(QUESTS).forEach(([t,list])=>{
+      if(tier!=='all'&&tier!==t)return;
+      list.forEach((q,i)=>{
+        const equipped=S.loadout.dailyQuests.includes(i)&&t==='Daily';
+        html+=`<div class="card"><div class="card-title">📜 ${q.name}</div>
+          <div style="color:var(--text-dim);font-size:.85rem">${t} · +${q.xp} XP · ${q.stat}</div>
+          <p style="margin:6px 0">${q.desc}</p>
+          ${t==='Daily'?`<button class="btn btn-sm" onclick="equipQuest(${i})">${equipped?'✅ Equipped':'Equip'}</button>`:''}</div>`;
+      });
+    });
+  } else {
+    POWERUPS.forEach((p,i)=>{
+      const equipped=S.loadout.powerups.includes(i);
+      html+=`<div class="card"><div class="card-title">⚡ ${p.name}</div>
+        <div style="color:var(--text-dim);font-size:.85rem">+${p.xp} XP · ${p.stat}</div>
+        <p style="margin:6px 0">${p.desc}</p>
+        <button class="btn btn-sm" onclick="equipPowerup(${i})">${equipped?'✅ Equipped':'Equip'}</button></div>`;
+    });
+  }
+  document.getElementById('armoryContent').innerHTML=html||'<p style="text-align:center;color:var(--text-dim)">Nothing here.</p>';
+  document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===armoryTab));
+}
+
+function equipQuest(idx){
+  const arr=S.loadout.dailyQuests;
+  const i=arr.indexOf(idx);
+  if(i>=0)arr.splice(i,1);else if(arr.length<3)arr.push(idx);
+  saveState();renderArmory();
+}
+
+function equipPowerup(idx){
+  const arr=S.loadout.powerups;
+  const i=arr.indexOf(idx);
+  if(i>=0)arr.splice(i,1);else if(arr.length<3)arr.push(idx);
+  saveState();renderArmory();
+}
+
+// ============== WEEKLY REVIEW ==============
+function showWeeklyReview(){
+  const last7=S.history.filter(h=>{const d=new Date(h.date);const ago=new Date();ago.setDate(ago.getDate()-7);return d>=ago});
+  const totalXP=last7.reduce((s,h)=>s+h.xp,0);
+  const overlay=document.createElement('div');overlay.className='modal-overlay';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
+  overlay.innerHTML=`<div class="modal">
+    <h2 style="text-align:center">📊 Weekly Review</h2>
+    <p style="text-align:center;margin:8px">Last 7 days: <strong>${last7.length}</strong> logs · <strong>+${totalXP} XP</strong></p>
+    <h3 style="margin:12px 0">🔥 Streak Status</h3>
+    ${STREAK_TYPES.map(k=>`<div class="streak-item"><span>${STREAK_LABELS[k]}</span><span class="streak-count">${S.streaks[k]||0}</span><span class="streak-rank">${getStreakRank(S.streaks[k]||0)}</span></div>`).join('')}
+    <div style="text-align:center;margin-top:16px"><button class="btn" onclick="this.closest('.modal-overlay').remove()">Close</button></div></div>`;
+  document.body.appendChild(overlay);
+}
+
+// ============== INIT ==============
+document.querySelectorAll('#nav button').forEach(btn=>{btn.onclick=()=>showScreen(btn.dataset.screen)});
+document.querySelectorAll('.tabs .tab').forEach(tab=>{tab.onclick=()=>{armoryTab=tab.dataset.tab;renderArmory()}});
+document.getElementById('tierFilter').onchange=()=>renderArmory();
+
+async function init(){
+  // Wait for fonts
+  try{await Promise.race([document.fonts.load('16px Cinzel'),new Promise(r=>setTimeout(r,2000))])}catch(e){}
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='block';
+  loadState();
+  if(!S){
+    renderSessionZero();
+  } else {
+    document.getElementById('nav').classList.remove('hidden');
+    showScreen('dashboard');
+  }
+}
+init();
+</script>
+</body>
+</html>

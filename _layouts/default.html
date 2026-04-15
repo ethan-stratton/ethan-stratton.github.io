@@ -314,6 +314,10 @@
         <canvas class="tile-canvas" data-tile="ironether"></canvas>
         <div class="tile-label">Iron & Ether</div>
       </div>
+      <a href="/lab/exchequer/" class="sidebar-tile" title="Exchequer — Life RPG">
+        <canvas class="tile-canvas" data-tile="exchequer"></canvas>
+        <div class="tile-label">Exchequer</div>
+      </a>
     </div>
   </aside>
 </div>
@@ -580,6 +584,38 @@
         ctx.closePath(); ctx.stroke();
         ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI*2);
         ctx.fillStyle = `rgba(255,140,60,${0.2+0.1*Math.sin(time*2)})`; ctx.fill();
+      } else if (type === 'exchequer') {
+        // D20 die on parchment
+        ctx.fillStyle = '#1a1610'; ctx.fillRect(0, 0, w, h);
+        const ecx = w/2, ecy = h/2, er = 32;
+        const rot = time * 0.3;
+        // Icosahedron-ish shape (d20 as triangular outline)
+        ctx.strokeStyle = `rgba(212,175,55,${0.5+0.2*Math.sin(time*1.2)})`;
+        ctx.lineWidth = 1.5;
+        for (let tri = 0; tri < 3; tri++) {
+          ctx.beginPath();
+          const off = (Math.PI*2/3)*tri + rot;
+          for (let v = 0; v < 3; v++) {
+            const a = off + (Math.PI*2/3)*v;
+            const px = ecx + Math.cos(a)*er, py = ecy + Math.sin(a)*er;
+            v===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+          }
+          ctx.closePath(); ctx.stroke();
+        }
+        // "20" in center
+        ctx.fillStyle = `rgba(212,175,55,${0.6+0.2*Math.sin(time*1.8)})`;
+        ctx.font = 'bold 14px serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('20', ecx, ecy+1);
+        // Ember particles
+        for (let p = 0; p < 5; p++) {
+          const pa = time*0.8 + p*1.3;
+          const px = ecx + Math.sin(pa*1.1+p)*25;
+          const py = ecy - 20 - (time*15+p*12)%45;
+          const po = Math.max(0, 1 - ((time*15+p*12)%45)/45);
+          ctx.fillStyle = `rgba(255,${140+p*20},40,${po*0.4})`;
+          ctx.fillRect(px, py, 2, 2);
+        }
       }
     });
     requestAnimationFrame(drawTiles);
