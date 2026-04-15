@@ -884,20 +884,29 @@ const M2_AFTERMATH=[
 let m2Roads=[],m2Trees=[],m2Hills=[],m2Buildings=[];
 
 function initM2Terrain(){
-  m2Roads=[{x1:0,y1:M2_ROAD_Y,x2:M2_MAP.w,y2:M2_ROAD_Y,w:12}];
+  // Road forks at x≈700: main road south, northern shortcut through hills
+  m2Roads=[
+    {x1:M2_MAP.w,y1:M2_ROAD_Y,x2:700,y2:M2_ROAD_Y,w:12},       // main road east segment
+    {x1:700,y1:M2_ROAD_Y,x2:0,y2:M2_ROAD_Y+30,w:10},            // main road continues south-west
+    {x1:700,y1:M2_ROAD_Y,x2:350,y2:140,w:8},                      // northern shortcut (narrower)
+    {x1:350,y1:140,x2:80,y2:200,w:8},                              // shortcut exits toward wilderness
+  ];
   m2Trees=[];
   m2Hills=[];
   m2Buildings=[];
-  // Forest clusters
-  for(let i=0;i<50;i++)m2Trees.push({x:200+Math.random()*900,y:30+Math.random()*120,s:6+Math.random()*5});
+  // Forest clusters — north (denser around shortcut)
+  for(let i=0;i<50;i++)m2Trees.push({x:200+Math.random()*500,y:30+Math.random()*120,s:6+Math.random()*5});
   for(let i=0;i<8;i++)m2Trees.push({x:250+Math.random()*800,y:40+Math.random()*100,s:11+Math.random()*5});
   // Southern forest
   for(let i=0;i<35;i++)m2Trees.push({x:300+Math.random()*600,y:380+Math.random()*100,s:6+Math.random()*5});
   // Wilderness border (left)
   for(let i=0;i<25;i++)m2Trees.push({x:20+Math.random()*80,y:Math.random()*M2_MAP.h,s:7+Math.random()*6});
-  // Hills in the north
+  // Hills — northern range + narrow pass
   m2Hills.push({x:500,y:80,r:55});
   m2Hills.push({x:750,y:100,r:40});
+  m2Hills.push({x:400,y:60,r:35});
+  m2Hills.push({x:300,y:200,r:30});  // forms south wall of narrow pass
+  m2Hills.push({x:280,y:80,r:35});   // forms north wall of narrow pass
   // Zarahemla buildings
   m2Buildings.push({x:1220,y:230,w:40,h:30,color:'#4a4032'});
   m2Buildings.push({x:1270,y:260,w:50,h:40,color:'#3a3428'});
@@ -949,6 +958,9 @@ let m2={
   rallyDone:false,
   dissenters:[],
   dissenterExtra:0,
+  rearguardSpawned:false,
+  forkSplit:false,
+  passWarning:false,
 };
 
 // ── M2 rally phase ──
@@ -1079,18 +1091,27 @@ function m2StartPursuit(){
   // Spawn Amalickiah's dissenters on the road heading west
   m2.enemies=[];m2.capturedCount=0;m2.escapedCount=0;m2.amalickiahEscaped=false;m2.amalickiahBrokenOff=false;
   m2.surrenderWaves=0;
-  for(let i=0;i<m2.totalDissenters;i++){
-    const e=makeUnit(950+i*5+Math.random()*10,M2_ROAD_Y-8+Math.random()*16,'lamanite');
+  m2.rearguardSpawned=false;m2.forkSplit=false;m2.passWarning=false;
+  const total=m2.totalDissenters;
+  for(let i=0;i<total;i++){
+    const e=makeUnit(950-i*5+Math.random()*10,M2_ROAD_Y-8+Math.random()*16,'lamanite');
     e.speed=38+Math.random()*8;
     e.morale=30+Math.random()*10;
     e.state='flee';e.surrendered=false;
-    e.isAmalickiah=false;
+    e.isAmalickiah=false;e._route='main';e._rearguard=false;
     S.enemies.push(e);m2.enemies.push(e);
   }
-  // Mark Amalickiah (last unit, slightly larger, faster)
-  const amal=m2.enemies[m2.enemies.length-1];
+  // Mark Amalickiah (FIRST in column = furthest west = leading the flee)
+  const amal=m2.enemies[0];
   amal.isAmalickiah=true;amal.size=3.5;amal.speed=48;amal.morale=90;
   m2.amalickiah=amal;
+  // Assign rearguard — last 8 units (closest to player)
+  for(let i=Math.max(0,total-8);i<total;i++){
+    m2.enemies[i]._rearguard=true;
+    m2.enemies[i].morale=50+Math.random()*20;
+    m2.enemies[i].speed=30; // slower — they hold position
+    m2.enemies[i].hp=3;m2.enemies[i].maxHp=3;
+  }
   
   showCallout('Pursue Amalickiah! Do not let the dissenters escape west!',5);
   setObjective('Chase Amalickiah\'s forces west. Capture as many dissenters as possible!');
@@ -1136,44 +1157,96 @@ function updateM2(dt){
   m2.phaseTimer+=dt;
   m2.gameTimer+=dt;
   
-  // Update fleeing enemies
+  // ── Fork split: when Amalickiah reaches x≈700, he takes the northern shortcut ──
+  if(!m2.forkSplit&&m2.amalickiah&&!m2.amalickiah.dead&&m2.amalickiah.x<=720){
+    m2.forkSplit=true;
+    showCallout('The column splits! Amalickiah takes the northern path!',5);
+    // Amalickiah + ~40% of remaining flee north
+    let taken=0;const maxTake=Math.floor(m2.enemies.filter(e=>!e.dead&&!e.surrendered&&!e._rearguard).length*0.4);
+    m2.enemies.forEach(e=>{
+      if(!e.dead&&!e.surrendered&&!e._rearguard&&!e.isAmalickiah&&e._route==='main'&&taken<maxTake){
+        e._route='north';taken++;
+      }
+    });
+    m2.amalickiah._route='north';
+  }
+  
+  // ── Rearguard activation: when player gets within 200px of rearguard units ──
+  if(!m2.rearguardSpawned){
+    const rg=m2.enemies.filter(e=>e._rearguard&&!e.dead&&!e.surrendered);
+    if(rg.length>0){
+      const nearest=rg.reduce((best,e)=>{const d=Math.sqrt((e.x-S.cx)**2+(e.y-S.cy)**2);return d<best.d?{d,e}:best;},{d:9999,e:null});
+      if(nearest.d<200){
+        m2.rearguardSpawned=true;
+        rg.forEach(e=>{e.state='rearguard';e.speed=0;});
+        showCallout('A rearguard holds the road! They fight to buy Amalickiah time!',4);
+        if(typeof SND!=='undefined')SND.warCry();addTrauma(0.1);
+      }
+    }
+  }
+  
+  // ── Update fleeing enemies ──
   m2.enemies.forEach(e=>{
     if(e.dead||e.surrendered)return;
-    if(e.state==='flee'){
-      // Move west on road
-      let tx=e.x-50,ty=M2_ROAD_Y;
-      // Amalickiah breakoff
-      if(e.isAmalickiah&&e.x<=M2_BREAKOFF_X&&!m2.amalickiahBrokenOff){
-        m2.amalickiahBrokenOff=true;
-        showCallout('Amalickiah breaks from the column! He flees into the wilderness!',5);
-        // Take ~8 units with him
-        let taken=0;
-        m2.enemies.forEach(f=>{
-          if(!f.dead&&!f.surrendered&&!f.isAmalickiah&&f.state==='flee'&&taken<8){
-            f._followAmal=true;taken++;
-          }
-        });
+    
+    // Rearguard: hold position and fight
+    if(e.state==='rearguard'){
+      const ne=findNearest(e.x,e.y,60,S.soldiers.filter(s=>!s.dead));
+      if(ne){
+        const dx=ne.x-e.x,dy=ne.y-e.y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<15)doCombat(e,ne,dt);
+        else{e.x+=dx/d*20*dt;e.y+=dy/d*20*dt;}
+        e.facing=Math.atan2(dy,dx);
       }
+      if(e.morale<=0){e.surrendered=true;e.state='surrendered';e.speed=0;}
+      return;
+    }
+    
+    if(e.state==='flee'){
+      let tx,ty;
+      if(e._route==='north'){
+        // Northern shortcut waypoints
+        if(e.x>700){tx=700;ty=M2_ROAD_Y;}        // reach the fork
+        else if(e.x>350){tx=350;ty=140;}           // shortcut through hills
+        else{tx=80;ty=200;}                          // exit to wilderness
+      }else{
+        // Main road south-west
+        if(e.x>700){tx=700;ty=M2_ROAD_Y;}
+        else{tx=0;ty=M2_ROAD_Y+30;}
+      }
+      
+      // Amalickiah breakoff into deep wilderness
       if(e.isAmalickiah&&m2.amalickiahBrokenOff){
-        tx=e.x-40;ty=e.y+20; // southwest into wilderness
+        tx=e.x-40;ty=e.y-15; // northwest into trees
       }else if(e._followAmal&&m2.amalickiahBrokenOff&&m2.amalickiah){
         tx=m2.amalickiah.x+Math.random()*10;ty=m2.amalickiah.y+Math.random()*10;
       }
+      
       const spd=e.speed*(m2OnRoad(e.x,e.y)?1.4:0.8);
       const ddx=tx-e.x,ddy=ty-e.y,d=Math.sqrt(ddx*ddx+ddy*ddy);
       if(d>2){e.x+=ddx/d*spd*dt;e.y+=ddy/d*spd*dt;}
       e.x=Math.max(2,Math.min(M2_MAP.w-2,e.x));
       e.y=Math.max(2,Math.min(M2_MAP.h-2,e.y));
       
-      // Amalickiah escape
-      if(e.isAmalickiah&&e.x<M2_ESCAPE_X){
-        m2.amalickiahEscaped=true;e.dead=true;m2.escapedCount++;
-        // His followers also escape
-        m2.enemies.forEach(f=>{if(f._followAmal&&!f.dead&&!f.surrendered){f.dead=true;m2.escapedCount++;}});
-        showCallout('Amalickiah has escaped into the wilderness!',5);
+      // Amalickiah breakoff at x≈300 on northern route
+      if(e.isAmalickiah&&e.x<=300&&!m2.amalickiahBrokenOff){
+        m2.amalickiahBrokenOff=true;
+        showCallout('Amalickiah breaks into the wilderness! He cannot be caught!',5);
+        let taken=0;
+        m2.enemies.forEach(f=>{
+          if(!f.dead&&!f.surrendered&&!f.isAmalickiah&&f._route==='north'&&f.state==='flee'&&taken<6){
+            f._followAmal=true;taken++;
+          }
+        });
       }
-      // Regular dissenter escape
-      if(!e.isAmalickiah&&!e._followAmal&&e.x<M2_ESCAPE_X){
+      
+      // Escape check
+      if(e.isAmalickiah&&(e.x<M2_ESCAPE_X||e.y<30)){
+        m2.amalickiahEscaped=true;e.dead=true;m2.escapedCount++;
+        m2.enemies.forEach(f=>{if(f._followAmal&&!f.dead&&!f.surrendered){f.dead=true;m2.escapedCount++;}});
+        showCallout('Amalickiah has escaped into the land of Nephi!',5);
+      }
+      if(!e.isAmalickiah&&!e._followAmal&&(e.x<M2_ESCAPE_X||(e._route==='north'&&e.x<100&&e.y<220))){
         e.dead=true;m2.escapedCount++;
       }
     }
@@ -3244,6 +3317,16 @@ function render(){
       ctx.fillText('A',Math.floor(d.x-2),Math.floor(d.y-5));
       return;
     }
+    // M2 rearguard: darker, shield icon
+    if(currentMission===1&&e._rearguard&&e.state==='rearguard'){
+      const rf=e._hitFlash>0?(e._hitFlash-=1/60,'rgba(255,255,255,0.9)'):'rgba(100,40,30,0.9)';
+      ctx.fillStyle=rf;
+      ctx.fillRect(Math.floor(d.x-1),Math.floor(d.y-2),3,4);
+      // HP bar
+      ctx.fillStyle='rgba(200,50,30,0.8)';
+      ctx.fillRect(Math.floor(d.x-1),Math.floor(d.y-4),Math.ceil(3*(e.hp/e.maxHp)),1);
+      return;
+    }
     const a=e.state==='rout'?0.3:d.a;
     const eFlash=e._hitFlash>0?(e._hitFlash-=1/60,'rgba(255,255,255,0.9)'):`rgba(140,60,40,${a})`;
     ctx.fillStyle=eFlash;
@@ -3950,6 +4033,10 @@ function buildM2TerrainCache(){
   tctx.fillText('Zarahemla',M2_ZARAHEMLA_X+10,220);
   tctx.fillStyle='rgba(120,100,80,0.5)';tctx.font="5px 'Press Start 2P'";
   tctx.fillText('← Wilderness (Lamanite Territory)',10,M2_ROAD_Y-20);
+  // Fork label
+  tctx.fillStyle='rgba(150,130,90,0.5)';tctx.font="4px 'Press Start 2P'";
+  tctx.fillText('Northern Shortcut',450,125);
+  tctx.fillText('Main Road',550,M2_ROAD_Y+50);
   // Wilderness border indicator
   tctx.fillStyle='rgba(80,50,30,0.15)';tctx.fillRect(0,0,100,M2_MAP.h);
   tctx.strokeStyle='rgba(100,60,30,0.3)';tctx.lineWidth=1;tctx.setLineDash([4,4]);
@@ -4567,6 +4654,7 @@ function beginMission(idx){
     m2.capturedCount=0;m2.escapedCount=0;m2.amalickiahEscaped=false;m2.amalickiahBrokenOff=false;
     m2.vanguardSent=false;m2.vanguardSize=0;m2.gameTimer=0;m2.surrenderWaves=0;m2.showingTab=false;
     m2.rallyPoints=[];m2.ralliedCount=0;m2.rallyDone=false;m2.dissenters=[];m2.dissenterExtra=0;
+    m2.rearguardSpawned=false;m2.forkSplit=false;m2.passWarning=false;
     document.getElementById('event-log').innerHTML='';
     document.getElementById('callout').style.opacity='0';
     document.getElementById('results').style.display='none';
