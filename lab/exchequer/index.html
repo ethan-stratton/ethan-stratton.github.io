@@ -125,6 +125,33 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;heigh
 ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 /* Loading */
 #loading{display:flex;align-items:center;justify-content:center;height:100vh;font-family:var(--font-title);color:var(--gold);font-size:1.3rem}
+/* FORTRESS */
+@keyframes surgeSwell{0%{d:path('M0,40 Q30,40 60,40 T120,40 T180,40 T240,40 T300,40')}25%{d:path('M0,40 Q30,10 60,40 T120,40 T180,40 T240,40 T300,40')}50%{d:path('M0,40 Q30,40 60,10 T120,40 T180,10 T240,40 T300,40')}75%{d:path('M0,40 Q30,40 60,40 T120,10 T180,40 T240,40 T300,40')}100%{d:path('M0,40 Q30,40 60,40 T120,40 T180,40 T240,40 T300,40')}}
+.wave-container{width:100%;height:80px;position:relative;overflow:hidden;border-radius:8px;background:linear-gradient(180deg,#0a1a2a,#102030)}
+.wave-container svg{width:100%;height:100%}
+.wave-container path{fill:none;stroke:#3ab5b0;stroke-width:2.5;animation:waveMove 4s ease-in-out infinite}
+@keyframes waveMove{0%{transform:translateX(0)}50%{transform:translateX(-20px)}100%{transform:translateX(0)}}
+.halt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.halt-btn{background:var(--panel);border:2px solid var(--border);border-radius:8px;padding:16px 12px;cursor:pointer;text-align:center;font-family:var(--font-body);color:var(--text);font-size:.95rem;transition:all .2s;min-height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.halt-btn:active{border-color:var(--gold);box-shadow:0 0 15px rgba(212,175,55,.3)}
+.halt-btn .halt-icon{font-size:1.8rem}
+.halt-btn .halt-label{font-family:var(--font-title);color:var(--gold);font-size:.9rem}
+.recal-grid{display:flex;flex-wrap:wrap;gap:4px;margin:12px 0}
+.recal-day{width:32px;height:32px;border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.8rem;background:var(--bg)}
+.recal-day.clean{border-color:var(--gold);background:#2e2a1a}
+.recal-day.milestone{border-color:#3ab5b0}
+.pathway-bar{height:28px;border-radius:14px;background:var(--bg);border:1px solid var(--border);position:relative;overflow:hidden;margin:8px 0}
+.pathway-fill{height:100%;border-radius:14px;background:linear-gradient(90deg,#8b2020,#d4af37,#3ab5b0);transition:width .5s}
+.pathway-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-title);font-size:.75rem;color:var(--text);text-shadow:0 1px 2px #000}
+.intention-card{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;margin:8px 0;position:relative}
+.intention-card .del-btn{position:absolute;top:6px;right:8px;background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem}
+.surge-timer{font-family:var(--font-title);font-size:3rem;color:#3ab5b0;text-align:center;text-shadow:0 0 20px rgba(58,181,176,.3)}
+.surge-phase{text-align:center;color:var(--text-dim);font-style:italic;margin:8px 0}
+.affirmation-btn{background:var(--panel);border:1px solid var(--gold-dim);border-radius:6px;padding:10px 16px;cursor:pointer;color:var(--gold);font-family:var(--font-body);font-size:.95rem;transition:all .2s;text-align:center}
+.affirmation-btn:active{background:#3a3010;box-shadow:0 0 20px rgba(212,175,55,.4);transform:scale(1.05)}
+@keyframes goldPulse{0%{box-shadow:0 0 0 rgba(212,175,55,0)}50%{box-shadow:0 0 30px rgba(212,175,55,.5)}100%{box-shadow:0 0 0 rgba(212,175,55,0)}}
+.gold-flash{animation:goldPulse .6s ease-out}
+#nav button{font-size:.65rem}
 </style>
 </head>
 <body>
@@ -138,6 +165,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;heigh
 <button data-screen="log"><span class="nav-icon">📋</span>Log</button>
 <button data-screen="bestiarum"><span class="nav-icon">👹</span>Bestiarum</button>
 <button data-screen="armory"><span class="nav-icon">🛡️</span>Armory</button>
+<button data-screen="fortress"><span class="nav-icon">🏰</span>Fortress</button>
 </nav>
 
 <!-- SESSION ZERO -->
@@ -179,6 +207,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;heigh
 </select>
 </div>
 <div id="armoryContent"></div>
+</div><!-- /armory -->
+
+<!-- FORTRESS -->
+<div id="fortress" class="screen">
+<div id="fortressContent"></div>
 </div>
 
 </div><!-- /app -->
@@ -212,7 +245,8 @@ const MONSTERS=[
 {name:'The Veiled Wraith of Black Water',brood:'Melancholic',stars:5,sin:'depression/hopelessness',icon:'🌊',moves:['Drown in Thoughts','Veil of Hopelessness'],weakness:'Genuine human connection',flavor:'The dark water rises silently, convincing you this is all there is.',insight:'Reach out to one person. Speak truth about how you feel.',loot:'Lifeline Thread (+1 Faith)'},
 {name:'The Ascendant Seraphim',brood:'Exalted Fallen',stars:5,sin:'pride',icon:'👼',moves:['Blinding Glory','Accusation of Mediocrity'],weakness:'Genuine humility and selfless service',flavor:'Its light is your own reflection, burning everything else away.',insight:'Do something kind that no one will see or credit you for.',loot:'Humility Stone (+1 Charity)'},
 {name:'The Rust-Tongued Gargoyle',brood:'Corrosive',stars:3,sin:'cynicism',icon:'🗡️',moves:['Rust Breath',"Skeptic's Grin"],weakness:'Sincere gratitude',flavor:'It corrodes every good thing with "yeah, but…"',insight:'Write 5 things you are genuinely thankful for. Mean them.',loot:'Gratitude Gem (+1 Faith)'},
-{name:'The Ember Maw',brood:'Unaligned',stars:4,sin:'craving/restless hunger',icon:'🔥',moves:['Smoldering Desire','Burning Suggestion'],weakness:'Stillness, patience, clarity',flavor:'The hunger never stops. It just changes shape.',insight:'Sit still for 5 minutes. Let the craving pass through you.',loot:'Clarity Crystal (+1 Wisdom)'}
+{name:'The Ember Maw',brood:'Unaligned',stars:4,sin:'craving/restless hunger',icon:'🔥',moves:['Smoldering Desire','Burning Suggestion'],weakness:'Stillness, patience, clarity',flavor:'The hunger never stops. It just changes shape.',insight:'Sit still for 5 minutes. Let the craving pass through you.',loot:'Clarity Crystal (+1 Wisdom)'},
+{name:'The Siren of the Deep',brood:'Abyssal',stars:5,sin:'lust',icon:'🧜',moves:['The Undertow','Shame Spiral'],weakness:'Connection, daylight, naming the real need',flavor:'It sings loudest when you are alone, tired, or hurting. The song is not about desire — it is about escape.',insight:'HALT: Am I Hungry, Angry, Lonely, or Tired? Name the real need. Then meet it.',loot:'Self-Knowledge (+1 Wisdom, +1 Resilience)'}
 ];
 
 const QUESTS={
@@ -224,7 +258,9 @@ Daily:[
 {name:'The Log',desc:'Write in your journal.',xp:10,stat:'Wisdom'},
 {name:'The Drill',desc:'Practice a skill for 20+ minutes.',xp:10,stat:'Discipline'},
 {name:'The Craft',desc:'Create something — anything.',xp:10,stat:'Creativity'},
-{name:'The Sweep',desc:'Clean or organize one area.',xp:10,stat:'Discipline'}
+{name:'The Sweep',desc:'Clean or organize one area.',xp:10,stat:'Discipline'},
+{name:'The Fortress',desc:'Check in with your HALT status today.',xp:10,stat:'Wisdom'},
+{name:'The Replacement',desc:'Choose a healthy dopamine source over the easy one.',xp:10,stat:'Discipline'}
 ],
 Weekly:[
 {name:'The Encounter',desc:'Have a meaningful conversation with someone.',xp:25,stat:'Charity'},
@@ -232,7 +268,8 @@ Weekly:[
 {name:'The Fast',desc:'Abstain from something for 24 hours.',xp:25,stat:'Discipline'},
 {name:'The Secret Service',desc:'Do a kind act anonymously.',xp:25,stat:'Charity'},
 {name:'Memento Mori',desc:'Reflect on mortality. What matters?',xp:25,stat:'Courage'},
-{name:'Ally Recruitment',desc:'Deepen a relationship or make a new one.',xp:25,stat:'Courage'}
+{name:'Ally Recruitment',desc:'Deepen a relationship or make a new one.',xp:25,stat:'Courage'},
+{name:'The Recalibration',desc:'7 consecutive clean days on the 30-day tracker.',xp:25,stat:'Resilience'}
 ],
 Epic:[
 {name:'The Temple Raid',desc:'Attend the temple.',xp:100,stat:'Faith'},
@@ -240,7 +277,8 @@ Epic:[
 {name:'The 30-Day Streak',desc:'Maintain any streak for 30 days.',xp:100,stat:'Resilience'},
 {name:'The Confrontation',desc:'Face a fear head-on.',xp:100,stat:'Courage'},
 {name:'The Pilgrimage',desc:'Go somewhere meaningful alone.',xp:100,stat:'Faith'},
-{name:'The Offering',desc:'Give sacrificially of time or resources.',xp:100,stat:'Charity'}
+{name:'The Offering',desc:'Give sacrificially of time or resources.',xp:100,stat:'Charity'},
+{name:'The 30-Day Recalibration',desc:'Complete the full 30-day neural reset.',xp:100,stat:'Resilience'}
 ]
 };
 
@@ -256,7 +294,11 @@ const POWERUPS=[
 {name:'Ally Ping',desc:'Text someone you care about. No reason needed.',stat:'Charity',xp:5},
 {name:'Micro-Order',desc:'Organize one small thing — a drawer, your desktop, your bag.',stat:'Discipline',xp:5},
 {name:'One True Sentence',desc:'Write one honest sentence about how you feel right now.',stat:'Creativity',xp:5},
-{name:'The War Cry',desc:'Say out loud: "I am not done yet." Mean it.',stat:'Courage',xp:5}
+{name:'The War Cry',desc:'Say out loud: "I am not done yet." Mean it.',stat:'Courage',xp:5},
+{name:'HALT Check',desc:'Ask yourself: Hungry, Angry, Lonely, or Tired? Name it.',stat:'Wisdom',xp:5},
+{name:'Urge Surf',desc:'Set a 20-min timer. Watch the wave rise and fall. Outlast it.',stat:'Resilience',xp:5},
+{name:'Cold Exposure',desc:'30 seconds of cold water. Resets the nervous system instantly.',stat:'Courage',xp:5},
+{name:'The Replacement',desc:'Do the dopamine alternative: pushups, create, connect, go outside.',stat:'Discipline',xp:5}
 ];
 
 const STREAK_TYPES=['prayer','scripture','service','cleanLiving','exercise','custom'];
@@ -269,7 +311,8 @@ function getStreakRank(days){for(const[min,name]of STREAK_RANKS)if(days>=min)ret
 const SAVE_KEY='exchequer_save';
 let S=null; // state
 
-function loadState(){try{S=JSON.parse(localStorage.getItem(SAVE_KEY))}catch(e){S=null}}
+function loadState(){try{S=JSON.parse(localStorage.getItem(SAVE_KEY))}catch(e){S=null}
+if(S&&!S.fortress){S.fortress={haltLog:[],surgeSurvived:0,intentions:[],recalDays:[],affirmations:0};saveState()}}
 function saveState(){localStorage.setItem(SAVE_KEY,JSON.stringify(S))}
 function resetState(){localStorage.removeItem(SAVE_KEY);S=null;location.reload()}
 
@@ -306,7 +349,8 @@ function defaultState(){return{
   history:[],
   monsterRecord:{},
   weeklyReviews:[],
-  customMonsters:[]
+  customMonsters:[],
+  fortress:{haltLog:[],surgeSurvived:0,intentions:[],recalDays:[],affirmations:0}
 }}
 
 // ============== NAV ==============
@@ -321,6 +365,7 @@ function showScreen(name){
   else if(name==='log')renderLog();
   else if(name==='bestiarum')renderBestiarum();
   else if(name==='armory')renderArmory();
+  else if(name==='fortress')renderFortress();
 }
 
 // ============== SESSION ZERO ==============
@@ -812,6 +857,257 @@ function equipPowerup(idx){
   const i=arr.indexOf(idx);
   if(i>=0)arr.splice(i,1);else if(arr.length<3)arr.push(idx);
   saveState();renderArmory();
+}
+
+// ============== FORTRESS ==============
+let surgeTimer=null;let surgeStart=null;
+const SURGE_DURATION=20*60*1000;
+const HALT_TRIGGERS=[
+{key:'hungry',icon:'🍽️',label:'Hungry',action:'Eat something. Your body needs fuel, not escape.'},
+{key:'angry',icon:'😤',label:'Angry',action:'Name what\'s frustrating you. Write it down. Process it.'},
+{key:'lonely',icon:'🫂',label:'Lonely',action:'Text someone. Right now. "Hey, thinking about you." That\'s enough.'},
+{key:'tired',icon:'😴',label:'Tired',action:'Rest. Nap. Go to bed. Fatigue is not a moral failing.'}
+];
+const DEFAULT_INTENTIONS=[
+{when:"I'm alone and bored at night",then:"20 pushups, then text a friend"},
+{when:"I feel the pull after a stressful day",then:"Cold shower, then journal one paragraph"},
+{when:"I've been scrolling mindlessly",then:"Close everything. Walk outside. 5 minutes."}
+];
+const DOPAMINE_ALTS=['🏋️ Exercise (strongest natural dopamine boost)','🎨 Creating something','🤝 Real human connection','🎮 Flow-state activities','🌿 Nature / sunlight','📖 Deep reading'];
+
+function renderFortress(){
+  if(!S)return;
+  const f=S.fortress;
+  if(!f.intentions||!f.intentions.length){f.intentions=[...DEFAULT_INTENTIONS];saveState();}
+  const today=new Date().toISOString().slice(0,10);
+  const todayClean=f.recalDays.includes(today);
+
+  // HALT summary
+  let haltSummary='';
+  if(f.haltLog.length){
+    const counts={};f.haltLog.forEach(h=>{counts[h.trigger]=(counts[h.trigger]||0)+1});
+    const total=f.haltLog.length;
+    const top=Object.entries(counts).sort((a,b)=>b[1]-a[1])[0];
+    haltSummary=`<div style="color:var(--text-dim);font-size:.85rem;margin-top:8px;text-align:center">Most common trigger: <strong style="color:var(--gold)">${top[0]}</strong> (${Math.round(top[1]/total*100)}%) · ${total} total check-ins</div>`;
+  }
+
+  // Recalibration streak
+  let streak=0;
+  const d=new Date();
+  for(let i=0;i<30;i++){const ds=new Date(d);ds.setDate(ds.getDate()-i);const dk=ds.toISOString().slice(0,10);if(f.recalDays.includes(dk))streak++;else break;}
+
+  // Recal grid (last 30 days)
+  let recalHTML='';
+  for(let i=29;i>=0;i--){
+    const ds=new Date();ds.setDate(ds.getDate()-i);
+    const dk=ds.toISOString().slice(0,10);
+    const clean=f.recalDays.includes(dk);
+    const dayNum=30-i;
+    const isMilestone=[7,14,30].includes(dayNum);
+    recalHTML+=`<div class="recal-day${clean?' clean':''}${isMilestone?' milestone':''}" title="Day ${dayNum} — ${dk}">${clean?'✅':dayNum}</div>`;
+  }
+
+  // Milestone text
+  let milestoneText='';
+  if(streak>=30)milestoneText='🏆 Recalibrated. The circuit is rewired.';
+  else if(streak>=14)milestoneText='🧠 New patterns forming. Keep going.';
+  else if(streak>=7)milestoneText='⚡ Neural pathways weakening. You\'re winning.';
+
+  // Pathway strength
+  const pathScore=Math.min(100,f.surgeSurvived*3+f.recalDays.length*2+f.haltLog.length);
+  const pathLabels=[['Fragile',0],['Forming',20],['Strengthening',40],['Solid',60],['Fortified',80]];
+  let pathLabel='Fragile';for(const[l,min]of pathLabels)if(pathScore>=min)pathLabel=l;
+
+  // Intentions
+  let intentHTML=f.intentions.map((it,i)=>`<div class="intention-card">
+    <button class="del-btn" onclick="deleteFortressIntention(${i})">✕</button>
+    <div style="color:var(--gold);font-family:var(--font-title);font-size:.85rem">WHEN</div>
+    <div style="margin:2px 0">${it.when}</div>
+    <div style="color:var(--gold);font-family:var(--font-title);font-size:.85rem;margin-top:6px">THEN</div>
+    <div>${it.then}</div></div>`).join('');
+
+  // Connection counter (this week)
+  const weekAgo=new Date();weekAgo.setDate(weekAgo.getDate()-7);
+  const weekHistory=S.history.filter(h=>new Date(h.date)>=weekAgo);
+  let connections=0;
+  weekHistory.forEach(h=>{
+    if(h.usedPU){const allyIdx=POWERUPS.findIndex(p=>p.name==='Ally Ping');if(allyIdx>=0&&h.usedPU.includes(allyIdx))connections++;}
+    if(h.completedDQ){
+      const bridgeIdx=QUESTS.Daily.findIndex(q=>q.name==='The Bridge');if(bridgeIdx>=0&&h.completedDQ.includes(bridgeIdx))connections++;
+      const encIdx=QUESTS.Weekly.findIndex(q=>q.name==='The Encounter');/* weekly not in completedDQ */
+    }
+  });
+
+  document.getElementById('fortressContent').innerHTML=`
+    <h2 style="text-align:center;padding:12px">🏰 The Fortress</h2>
+
+    <div class="panel panel-gold">
+      <h3>🛡️ The Shame Shield</h3>
+      <p style="margin:8px 0;font-style:italic">Shame is the Siren's strongest weapon. A slip is data, not identity. You are not your worst moment. The cycle breaks when you stop feeding it shame.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">
+        <button class="affirmation-btn" onclick="fortressAffirm(this)">I am not this struggle</button>
+        <button class="affirmation-btn" onclick="fortressAffirm(this)">A setback is not a reset</button>
+        <button class="affirmation-btn" onclick="fortressAffirm(this)">I choose to keep going</button>
+      </div>
+      <div style="color:var(--text-dim);font-size:.8rem;margin-top:6px;text-align:center">Affirmations spoken: ${f.affirmations}</div>
+    </div>
+
+    <div class="panel">
+      <h3>🚨 HALT Check-In</h3>
+      <p style="color:var(--text-dim);font-size:.9rem;margin:4px 0">What's really going on? Name it.</p>
+      <div class="halt-grid">
+        ${HALT_TRIGGERS.map(h=>`<div class="halt-btn" onclick="fortressHalt('${h.key}',this)">
+          <span class="halt-icon">${h.icon}</span>
+          <span class="halt-label">${h.label}</span>
+        </div>`).join('')}
+      </div>
+      <div id="haltResponse" style="display:none;text-align:center;padding:12px;margin-top:8px;background:var(--bg);border-radius:6px;border:1px solid var(--gold-dim)"></div>
+      ${haltSummary}
+    </div>
+
+    <div class="panel">
+      <h3>🌊 Urge Surfing</h3>
+      <p style="color:var(--text-dim);font-size:.9rem;margin:4px 0">Every urge is a wave. It rises, peaks, and falls. You don't have to act on it — just ride it out.</p>
+      <div id="surgeArea" style="text-align:center;margin:12px 0">
+        <button class="btn btn-primary" onclick="startSurge()">🌊 Start Urge Surf</button>
+      </div>
+      <div style="text-align:center;color:var(--text-dim);font-size:.85rem">Waves surfed: <strong style="color:var(--gold)">${f.surgeSurvived}</strong></div>
+    </div>
+
+    <div class="panel">
+      <h3>⚔️ Battle Plans — When/Then Rules</h3>
+      <p style="color:var(--text-dim);font-size:.9rem;margin:4px 0">Pre-decided responses. When the moment comes, you don't think — you execute.</p>
+      ${intentHTML}
+      <button class="btn btn-sm" style="margin-top:8px" onclick="addFortressIntention()">+ Add Battle Plan</button>
+    </div>
+
+    <div class="panel">
+      <h3>🧠 30-Day Recalibration</h3>
+      ${milestoneText?`<div style="text-align:center;color:var(--gold);margin:8px 0;font-family:var(--font-title)">${milestoneText}</div>`:''}
+      <div style="text-align:center;font-family:var(--font-title);color:var(--gold);font-size:1.3rem;margin:8px 0">🔥 ${streak}-day streak</div>
+      <div class="recal-grid">${recalHTML}</div>
+      <div style="text-align:center;margin:12px 0">
+        <button class="btn btn-primary${todayClean?' btn-sm':''}" onclick="markClean()" ${todayClean?'disabled style="opacity:.5;cursor:default"':''}>${todayClean?'✅ Today marked clean':'Mark Today Clean'}</button>
+      </div>
+      <h3 style="margin-top:12px">⚡ Dopamine Alternatives</h3>
+      <div style="margin:8px 0">${DOPAMINE_ALTS.map(d=>`<div style="padding:4px 0">${d}</div>`).join('')}</div>
+    </div>
+
+    <div class="panel">
+      <h3>🔗 Neural Pathway Strength</h3>
+      <div class="pathway-bar"><div class="pathway-fill" style="width:${pathScore}%"></div><div class="pathway-label">${pathLabel} (${pathScore}/100)</div></div>
+      <p style="color:var(--text-dim);font-size:.9rem;margin-top:8px">Every urge you ride out without acting rewires the circuit. It gets easier — not linearly, but it does.</p>
+    </div>
+
+    <div class="panel" style="text-align:center">
+      <h3>🤝 Connections This Week: ${connections}</h3>
+      <p style="color:var(--text-dim);font-size:.9rem">The Siren cannot survive genuine human connection.</p>
+    </div>`;
+
+  // Resume active surge timer if any
+  if(surgeStart){renderSurgeActive();}
+}
+
+function fortressHalt(trigger,el){
+  const ht=HALT_TRIGGERS.find(h=>h.key===trigger);
+  S.fortress.haltLog.push({date:new Date().toISOString().slice(0,10),trigger:ht.label,timestamp:Date.now()});
+  addXP(5);saveState();
+  const resp=document.getElementById('haltResponse');
+  resp.style.display='block';
+  resp.innerHTML=`<div style="font-size:1.5rem;margin-bottom:6px">${ht.icon}</div><div style="font-family:var(--font-title);color:var(--gold);margin-bottom:4px">${ht.label}</div><div>${ht.action}</div><div style="color:var(--gold);font-size:.8rem;margin-top:6px">+5 XP</div>`;
+  el.style.borderColor='var(--gold)';el.style.boxShadow='0 0 15px rgba(212,175,55,.3)';
+  setTimeout(()=>{el.style.borderColor='';el.style.boxShadow=''},1500);
+}
+
+function fortressAffirm(el){
+  S.fortress.affirmations++;addXP(2);saveState();
+  el.classList.add('gold-flash');
+  const orig=el.style.fontSize;el.style.fontSize='1.1rem';
+  setTimeout(()=>{el.classList.remove('gold-flash');el.style.fontSize=orig},600);
+}
+
+function startSurge(){
+  surgeStart=Date.now();
+  renderSurgeActive();
+}
+
+function renderSurgeActive(){
+  const area=document.getElementById('surgeArea');
+  if(!area)return;
+  area.innerHTML=`
+    <div class="wave-container"><svg viewBox="0 0 300 80" preserveAspectRatio="none">
+      <path d="M0,40 Q15,20 30,40 T60,40 T90,40 T120,40 T150,40 T180,40 T210,40 T240,40 T270,40 T300,40" stroke="#3ab5b0" stroke-width="2.5" fill="none">
+        <animate attributeName="d" dur="3s" repeatCount="indefinite" values="M0,40 Q15,20 30,40 T60,40 T90,40 T120,40 T150,40 T180,40 T210,40 T240,40 T270,40 T300,40;M0,40 Q15,40 30,20 T60,40 T90,20 T120,40 T150,20 T180,40 T210,20 T240,40 T270,20 T300,40;M0,40 Q15,20 30,40 T60,40 T90,40 T120,40 T150,40 T180,40 T210,40 T240,40 T270,40 T300,40"/>
+      </path></svg></div>
+    <div class="surge-timer" id="surgeTime">20:00</div>
+    <div class="surge-phase" id="surgePhase">The wave is building…</div>
+    <button class="btn btn-sm" onclick="stopSurge(false)" style="margin-top:8px">I need to stop</button>`;
+  updateSurge();
+}
+
+function updateSurge(){
+  if(!surgeStart)return;
+  const elapsed=Date.now()-surgeStart;
+  const remaining=Math.max(0,SURGE_DURATION-elapsed);
+  const min=Math.floor(remaining/60000);
+  const sec=Math.floor((remaining%60000)/1000);
+  const timeEl=document.getElementById('surgeTime');
+  const phaseEl=document.getElementById('surgePhase');
+  if(!timeEl)return;
+  timeEl.textContent=`${min}:${sec.toString().padStart(2,'0')}`;
+  const elMin=elapsed/60000;
+  if(elMin<5)phaseEl.textContent='The wave is building…';
+  else if(elMin<10)phaseEl.textContent='Hold steady. This is the peak.';
+  else if(elMin<15)phaseEl.textContent='It\'s receding…';
+  else phaseEl.textContent='Almost through. You\'re winning.';
+  if(remaining<=0){stopSurge(true);return;}
+  surgeTimer=requestAnimationFrame(()=>setTimeout(updateSurge,250));
+}
+
+function stopSurge(completed){
+  surgeStart=null;if(surgeTimer){cancelAnimationFrame(surgeTimer);surgeTimer=null;}
+  const area=document.getElementById('surgeArea');
+  if(!area)return;
+  if(completed){
+    S.fortress.surgeSurvived++;addXP(15);saveState();
+    area.innerHTML=`<div style="font-size:2rem">🏆</div><div style="font-family:var(--font-title);color:var(--gold);font-size:1.2rem;margin:8px 0">Wave Survived</div><div style="color:var(--text-dim)">+15 XP · The circuit rewires.</div><button class="btn btn-sm" style="margin-top:12px" onclick="renderFortress()">Continue</button>`;
+  } else {
+    area.innerHTML=`<div style="color:var(--text-dim);margin:12px 0">No shame. You showed up. That matters.</div><button class="btn btn-primary" onclick="startSurge()">🌊 Start Urge Surf</button>`;
+  }
+}
+
+function markClean(){
+  const today=new Date().toISOString().slice(0,10);
+  if(!S.fortress.recalDays.includes(today)){S.fortress.recalDays.push(today);addXP(10);saveState();}
+  renderFortress();
+}
+
+function deleteFortressIntention(idx){
+  S.fortress.intentions.splice(idx,1);saveState();renderFortress();
+}
+
+function addFortressIntention(){
+  const overlay=document.createElement('div');overlay.className='modal-overlay';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
+  overlay.innerHTML=`<div class="modal">
+    <h2 style="text-align:center">⚔️ New Battle Plan</h2>
+    <label class="field-label">WHEN (the trigger)</label>
+    <input id="fi-when" class="field-input" placeholder="I'm alone and bored at night…">
+    <label class="field-label">THEN (the response)</label>
+    <input id="fi-then" class="field-input" placeholder="20 pushups, then text a friend">
+    <div style="display:flex;gap:8px;justify-content:center;margin-top:16px">
+      <button class="btn btn-primary" onclick="saveFortressIntention(this)">Save</button>
+      <button class="btn btn-sm" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+    </div></div>`;
+  document.body.appendChild(overlay);
+}
+
+function saveFortressIntention(btn){
+  const w=document.getElementById('fi-when').value.trim();
+  const t=document.getElementById('fi-then').value.trim();
+  if(!w||!t){alert('Fill in both fields.');return;}
+  S.fortress.intentions.push({when:w,then:t});saveState();
+  btn.closest('.modal-overlay').remove();renderFortress();
 }
 
 // ============== WEEKLY REVIEW ==============
