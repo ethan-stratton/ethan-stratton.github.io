@@ -297,8 +297,21 @@
       <div class="ctrl-section">
         <h3>Base</h3>
         <div class="ctrl-row">
+          <span class="ctrl-label">style</span>
+          <select id="baseStyle" style="flex:1;font-family:'JetBrains Mono',monospace;font-size:0.65rem;background:#0a0a0f;color:#a898c8;border:1px solid rgba(184,156,255,0.2);border-radius:4px;padding:3px 6px;">
+            <option value="solid">Solid Color</option>
+            <option value="checker">Checkerboard</option>
+            <option value="stone">Stone Floor</option>
+            <option value="gradient">Radial Gradient</option>
+          </select>
+        </div>
+        <div class="ctrl-row">
           <span class="ctrl-label">color</span>
           <input type="color" id="baseColor" value="#b43c0f">
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">color 2</span>
+          <input type="color" id="baseColor2" value="#801a00">
         </div>
       </div>
 
@@ -560,37 +573,37 @@ function noiseToImageData(noiseData, size) {
 
   const presets = {
     lava: {
-      base: '#b43c0f',
+      base: '#b43c0f', base2: '#801a00', baseStyle: 'solid',
       l1: { color: '#c8460f', alpha: 0.9, scale: 5, sx: -3, sy: -2 },
       l2: { color: '#ff8c1e', alpha: 0.6, scale: 3, sx: 2, sy: -1.5 },
       l3: { color: '#ffc83c', alpha: 0.35, scale: 2, sx: 1.5, sy: 2.5 },
     },
     water: {
-      base: '#0f2346',
+      base: '#0f2346', base2: '#122d50', baseStyle: 'stone',
       l1: { color: '#3282b4', alpha: 0.6, scale: 4, sx: -1.4, sy: -0.9 },
       l2: { color: '#286eaa', alpha: 0.5, scale: 3, sx: -1.1, sy: 1.2 },
       l3: { color: '#5ab4e0', alpha: 0.3, scale: 2, sx: 0.8, sy: -0.6 },
     },
     acid: {
-      base: '#0a2a0a',
+      base: '#0a2a0a', base2: '#061806', baseStyle: 'solid',
       l1: { color: '#1e8c1e', alpha: 0.8, scale: 4.5, sx: -1.5, sy: -1 },
       l2: { color: '#3cdc3c', alpha: 0.5, scale: 2.5, sx: 1, sy: -2 },
       l3: { color: '#a0ff50', alpha: 0.4, scale: 1.8, sx: 2, sy: 1.5 },
     },
     blood: {
-      base: '#2a0808',
+      base: '#2a0808', base2: '#180404', baseStyle: 'solid',
       l1: { color: '#6e1010', alpha: 0.85, scale: 5.5, sx: -0.8, sy: -0.5 },
       l2: { color: '#a02020', alpha: 0.5, scale: 3, sx: 0.6, sy: -1 },
       l3: { color: '#c83030', alpha: 0.3, scale: 2, sx: 1.2, sy: 0.8 },
     },
     void: {
-      base: '#06050f',
+      base: '#06050f', base2: '#0a0818', baseStyle: 'gradient',
       l1: { color: '#1a1040', alpha: 0.8, scale: 6, sx: -0.5, sy: -0.3 },
       l2: { color: '#3020a0', alpha: 0.45, scale: 3.5, sx: 0.4, sy: -0.8 },
       l3: { color: '#7040ff', alpha: 0.25, scale: 2, sx: 1, sy: 1.2 },
     },
     mercury: {
-      base: '#2a2a30',
+      base: '#2a2a30', base2: '#1e1e24', baseStyle: 'checker',
       l1: { color: '#8888a0', alpha: 0.7, scale: 5, sx: -1, sy: -0.6 },
       l2: { color: '#b0b0c8', alpha: 0.5, scale: 3, sx: 0.8, sy: -1.2 },
       l3: { color: '#e0e0f0', alpha: 0.3, scale: 2, sx: 1.5, sy: 1 },
@@ -635,6 +648,8 @@ function noiseToImageData(noiseData, size) {
   function applyPreset(name) {
     const p = presets[name];
     document.getElementById('baseColor').value = p.base;
+    document.getElementById('baseColor2').value = p.base2;
+    document.getElementById('baseStyle').value = p.baseStyle;
     setLayerParams(1, p.l1);
     setLayerParams(2, p.l2);
     setLayerParams(3, p.l3);
@@ -664,10 +679,46 @@ function noiseToImageData(noiseData, size) {
     time += 1 / 60;
     ctx.clearRect(0, 0, W, H);
 
-    // Base color
+    // Base layer
     if (layerVisible[0]) {
-      ctx.fillStyle = document.getElementById('baseColor').value;
-      ctx.fillRect(0, 0, W, H);
+      const style = document.getElementById('baseStyle').value;
+      const c1 = document.getElementById('baseColor').value;
+      const c2 = document.getElementById('baseColor2').value;
+      
+      if (style === 'solid') {
+        ctx.fillStyle = c1;
+        ctx.fillRect(0, 0, W, H);
+      } else if (style === 'checker') {
+        const tile = 32;
+        for (let y = 0; y < H; y += tile) {
+          for (let x = 0; x < W; x += tile) {
+            const light = ((x / tile) + (y / tile)) % 2 === 0;
+            ctx.fillStyle = light ? c1 : c2;
+            ctx.fillRect(x, y, tile, tile);
+          }
+        }
+      } else if (style === 'stone') {
+        ctx.fillStyle = c1;
+        ctx.fillRect(0, 0, W, H);
+        const tile = 32;
+        for (let y = 0; y < H; y += tile) {
+          for (let x = 0; x < W; x += tile) {
+            const light = ((x / tile) + (y / tile)) % 2 === 0;
+            ctx.fillStyle = light ? c2 : c1;
+            ctx.fillRect(x, y, tile, tile);
+            // Grout lines
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillRect(x, y, tile, 1);
+            ctx.fillRect(x, y, 1, tile);
+          }
+        }
+      } else if (style === 'gradient') {
+        const grd = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) * 0.6);
+        grd.addColorStop(0, c1);
+        grd.addColorStop(1, c2);
+        ctx.fillStyle = grd;
+        ctx.fillRect(0, 0, W, H);
+      }
     } else {
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, W, H);
