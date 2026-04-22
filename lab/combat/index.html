@@ -664,7 +664,7 @@ function updateUI() {
     $eAction.textContent = enemy.chosenAction.name;
     const wPct = enemy.maxWait > 0 ? (enemy.wait / enemy.maxWait * 100) : 0;
     $eWaitBar.style.width = wPct + '%';
-    $eWaitLabel.textContent = `Wait: ${enemy.wait}`;
+    $eWaitLabel.textContent = `Wait: ${enemy.wait}` + (waitingForPlayer ? ' (paused)' : '');
   } else {
     $eAction.textContent = 'choosing...';
     $eWaitBar.style.width = '0%';
@@ -706,16 +706,18 @@ function choosePlayerAction(item) {
   player.maxWait = item.wait;
   player.def = item.def;
 
-  // Enemy picks simultaneously
-  const enData = ENEMIES[currentEnemyIdx];
-  const eAction = enData.ai(enData, player);
-  enemy.chosenAction = eAction;
-  enemy.wait = eAction.wait;
-  enemy.maxWait = eAction.wait;
-  enemy.def = eAction.def;
+  // Enemy picks only if it doesn't already have a pending action
+  if (!enemy.chosenAction) {
+    const enData = ENEMIES[currentEnemyIdx];
+    const eAction = enData.ai(enData, player);
+    enemy.chosenAction = eAction;
+    enemy.wait = eAction.wait;
+    enemy.maxWait = eAction.wait;
+    enemy.def = eAction.def;
+    log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
+  }
 
   log(`You ready ${item.name} (Eff:${item.eff} Def:${item.def} W:${item.wait})`, 'info');
-  log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
 
   buildItemGrid();
   updateUI();
@@ -739,32 +741,54 @@ function tick() {
   if (enemy.wait > 0) enemy.wait--;
   updateUI();
 
-  // Check who fires (ties = player first)
+  // Both hit zero — player goes first (Helen's rule), then enemy
   if (player.wait <= 0 && enemy.wait <= 0) {
     stopTicking();
+    // Player fires
+    let pAct = player.chosenAction;
     resolveAction('player');
-    if (!gameOver) resolveAction('enemy');
-    if (!gameOver) { waitingForPlayer = true; player.chosenAction = null; enemy.chosenAction = null; buildItemGrid(); updateUI(); }
+    if (gameOver) return;
+    // Enemy fires
+    resolveAction('enemy');
+    if (gameOver) return;
+    // Both need new actions — enemy picks, player chooses
+    pickEnemyAction();
+    player.chosenAction = null;
+    player.def = 0;
+    waitingForPlayer = true;
+    buildItemGrid();
+    updateUI();
   } else if (player.wait <= 0) {
     stopTicking();
     resolveAction('player');
-    if (!gameOver) { waitingForPlayer = true; player.chosenAction = null; buildItemGrid(); updateUI(); startTicking(); }
+    if (gameOver) return;
+    // Player needs new action, enemy keeps ticking
+    player.chosenAction = null;
+    player.def = 0;
+    waitingForPlayer = true;
+    buildItemGrid();
+    updateUI();
+    // DON'T restart ticking — wait for player to pick, enemy wait is paused
+    // (In Helen's, time only advances when both sides have chosen)
   } else if (enemy.wait <= 0) {
     stopTicking();
     resolveAction('enemy');
-    if (!gameOver) {
-      // Enemy picks next action immediately
-      const enData = ENEMIES[currentEnemyIdx];
-      const eAction = enData.ai(enData, player);
-      enemy.chosenAction = eAction;
-      enemy.wait = eAction.wait;
-      enemy.maxWait = eAction.wait;
-      enemy.def = eAction.def;
-      log(`${enemy.name} readies ${eAction.name}`, 'info');
-      updateUI();
-      startTicking();
-    }
+    if (gameOver) return;
+    // Enemy picks next action immediately, player keeps their action
+    pickEnemyAction();
+    updateUI();
+    startTicking();
   }
+}
+
+function pickEnemyAction() {
+  const enData = ENEMIES[currentEnemyIdx];
+  const eAction = enData.ai(enData, player);
+  enemy.chosenAction = eAction;
+  enemy.wait = eAction.wait;
+  enemy.maxWait = eAction.wait;
+  enemy.def = eAction.def;
+  log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
 }
 
 function resolveAction(who) {
