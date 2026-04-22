@@ -352,25 +352,34 @@
     <p>
       <strong>Damage</strong> = attacker's <code>Effectiveness</code> − defender's <code>Defend</code>.
       If Defend ≥ Effect, the attack is fully blocked (0 damage).
-      <strong>Piercing</strong> attacks (magic and the Trusty Dagger) ignore defense entirely.
-      The dagger's low damage but piercing property makes it the anti-shield tool —
-      use it when the enemy guards.
+      <strong>Piercing</strong> attacks (Thunder, Trusty Dagger) ignore defense entirely —
+      the anti-turtle tools.
     </p>
     <p>
       <strong>Wait</strong> counts down simultaneously for both sides. The first to hit 0 acts,
       then picks a new action. If both hit 0 on the same tick, <strong>you go first</strong>.
-      A <strong>Metronome</strong> (Wait: 1) lets you peek at the enemy's choice before committing.
     </p>
     <p>
-      <strong>The tension:</strong> A heavy sword hits hard but its high Wait means you eat
-      multiple fast attacks while charging. A dagger is safe but tickles armored enemies.
-      A shield blocks everything but deals no damage. A spell ignores armor but leaves you
-      at 0 Defend. Every pick is a tradeoff.
+      <strong>Stun</strong> adds wait ticks to the target — delays their action. Use it
+      to buy time for a heal, or to keep a boss locked down while you chip away.
     </p>
     <p>
-      Enemies have <strong>AI patterns</strong> — some react to your choices. The Lizardman
-      raises its guard when it sees you winding up an attack. The Dark Knight punishes
-      slow spells with fast counters.
+      <strong>Absorb</strong> heals the attacker for damage dealt. Drain Touch is weaker
+      than Longsword but sustains you through long fights.
+    </p>
+    <p>
+      <strong>Seal</strong> locks the target's current action — they can't use it next turn.
+      Seal the Dragon's Fire Breath to force it into melee. Seal the Skeleton's Reassemble
+      to prevent healing. The Lizardman can seal YOUR shield.
+    </p>
+    <p>
+      <strong>Invigorate</strong> gives +5 Effect to ALL your weapons permanently (stacks).
+      High risk: Wait 10, 0 Def. But two casts turns your Longbow from 10 to 20 damage.
+    </p>
+    <p>
+      <strong>The tension:</strong> No single strategy dominates. Shield walls get pierced.
+      Slow spells get stunned. Heals get rushed down. Turtling gets sealed.
+      Read the enemy, count the ticks, adapt every turn.
     </p>
   </div>
 </div>
@@ -493,10 +502,14 @@ const ITEMS = [
   { name: 'Longbow', eff: 10, def: 2, wait: 5, desc: 'Fast and reliable', type: 'ranged' },
   { name: 'Longsword', eff: 15, def: 7, wait: 10, desc: 'Balanced offense & defense', type: 'melee' },
   { name: 'Broadsword', eff: 22, def: 16, wait: 14, desc: 'Heavy but well-guarded', type: 'melee' },
-  { name: 'Trusty Dagger', eff: 2, def: 0, wait: 6, desc: 'Pierces defense!', type: 'magic' },
+  { name: 'Trusty Dagger', eff: 2, def: 0, wait: 6, desc: 'Pierces defense', type: 'pierce' },
   { name: 'Wooden Shield', eff: 0, def: 18, wait: 8, desc: 'Pure defense wall', type: 'shield' },
-  { name: 'Thunder', eff: 35, def: 0, wait: 20, desc: 'Devastating. Pierces defense!', type: 'magic' },
-  { name: 'Heal', eff: 30, def: 0, wait: 15, desc: 'Restore HP, no defense while casting', type: 'heal' },
+  { name: 'Thunder', eff: 35, def: 0, wait: 20, desc: 'Devastating — pierces defense', type: 'pierce' },
+  { name: 'Heal', eff: 30, def: 0, wait: 15, desc: 'Restore HP, totally exposed', type: 'heal' },
+  { name: 'Stun Mace', eff: 6, def: 4, wait: 8, stun: 5, desc: 'Low damage but stuns +5 Wait', type: 'melee' },
+  { name: 'Drain Touch', eff: 12, def: 0, wait: 12, absorb: true, desc: 'Absorb — heals for damage dealt', type: 'melee' },
+  { name: 'Seal Rune', eff: 0, def: 3, wait: 7, seal: true, desc: 'Seals enemy\'s current action!', type: 'seal' },
+  { name: 'Invigorate', eff: 0, def: 0, wait: 10, buff: { stat: 'eff', amount: 5 }, desc: 'Buff: +5 Effect on all weapons', type: 'buff' },
   { name: 'Metronome', eff: 0, def: 0, wait: 1, desc: 'Wait 1 tick and observe', type: 'tool' },
 ];
 
@@ -507,9 +520,15 @@ const ENEMIES = [
     actions: [
       { name: 'Tackle', eff: 8, def: 2, wait: 6 },
       { name: 'Bounce', eff: 4, def: 5, wait: 4 },
+      { name: 'Sticky Spit', eff: 3, def: 1, wait: 5, stun: 3 },
     ],
-    ai: (enemy, player) => enemy.actions[Math.random() < 0.6 ? 0 : 1],
-    desc: 'Simple and predictable.'
+    ai: (enemy, player) => {
+      // Stun when player is casting something slow
+      if (player.chosenAction && player.chosenAction.wait >= 10)
+        return enemy.actions[2]; // sticky spit stun
+      return enemy.actions[Math.random() < 0.6 ? 0 : 1];
+    },
+    desc: 'Simple — but watch the stun spit.'
   },
   {
     name: 'Lizardman', hp: 55, sprite: 'Lizardman',
@@ -517,14 +536,18 @@ const ENEMIES = [
       { name: 'Slash', eff: 14, def: 4, wait: 8 },
       { name: 'Guard Stance', eff: 5, def: 20, wait: 10 },
       { name: 'Quick Jab', eff: 7, def: 6, wait: 4 },
+      { name: 'Tongue Lash', eff: 4, def: 0, wait: 5, seal: true },
     ],
     ai: (enemy, player) => {
-      // If player chose high-wait action, guard up to tank it
+      // Seal the player's shield to force vulnerability
+      if (player.chosenAction && player.chosenAction.type === 'shield' && Math.random() < 0.6)
+        return enemy.actions[3]; // tongue lash seal
+      // Guard up against heavy attacks
       if (player.chosenAction && player.chosenAction.wait >= 10)
-        return enemy.actions[1]; // guard
+        return enemy.actions[1];
       return enemy.actions[Math.random() < 0.5 ? 0 : 2];
     },
-    desc: 'Guards when you wind up.'
+    desc: 'Guards heavy attacks. Seals your shield.'
   },
   {
     name: 'Skeleton', hp: 50, sprite: 'Skeleton',
@@ -532,13 +555,17 @@ const ENEMIES = [
       { name: 'Bone Slash', eff: 12, def: 3, wait: 7 },
       { name: 'Bone Throw', eff: 9, def: 0, wait: 4 },
       { name: 'Reassemble', eff: 15, def: 8, wait: 12, type: 'heal' },
+      { name: 'Cursed Touch', eff: 8, def: 0, wait: 8, absorb: true },
     ],
     ai: (enemy, player) => {
-      if (enemy.hp < enemy.maxHp * 0.35 && Math.random() < 0.5)
-        return enemy.actions[2]; // heal
+      if (enemy.hp < enemy.maxHp * 0.5) {
+        // When hurt: heal OR absorb
+        if (Math.random() < 0.35) return enemy.actions[2]; // heal
+        if (Math.random() < 0.4) return enemy.actions[3]; // absorb
+      }
       return enemy.actions[Math.random() < 0.5 ? 0 : 1];
     },
-    desc: 'Heals when wounded.'
+    desc: 'Heals and drains life when wounded.'
   },
   {
     name: 'Dark Knight', hp: 80, sprite: 'DarkKnight',
@@ -546,48 +573,58 @@ const ENEMIES = [
       { name: 'Dark Blade', eff: 20, def: 8, wait: 10 },
       { name: 'Quick Slash', eff: 10, def: 5, wait: 5 },
       { name: 'Black Shield', eff: 0, def: 22, wait: 8 },
-      { name: 'Counter', eff: 15, def: 10, wait: 7 },
+      { name: 'Void Rend', eff: 18, def: 0, wait: 14, type: 'pierce' },
+      { name: 'Soul Drain', eff: 12, def: 3, wait: 9, absorb: true },
     ],
     ai: (enemy, player) => {
-      // Punishes slow spells with quick attacks
-      if (player.chosenAction && player.chosenAction.type === 'magic' && player.chosenAction.wait >= 15)
-        return enemy.actions[1]; // quick slash — rush down while defenseless
+      // Pierce when player is shielding
+      if (player.chosenAction && player.chosenAction.type === 'shield')
+        return enemy.actions[3]; // void rend pierces
+      // Rush down slow actions
       if (player.chosenAction && player.chosenAction.wait >= 12)
-        return enemy.actions[1]; // rush down slow actions
+        return enemy.actions[1];
+      // Absorb when hurt
+      if (enemy.hp < enemy.maxHp * 0.4 && Math.random() < 0.4)
+        return enemy.actions[4];
       let r = Math.random();
       if (r < 0.35) return enemy.actions[0];
-      if (r < 0.6) return enemy.actions[3];
+      if (r < 0.55) return enemy.actions[1];
       return enemy.actions[2];
     },
-    desc: 'Counters magic and slow attacks.'
+    desc: 'Pierces shields. Drains life. Punishes slow play.'
   },
   {
     name: 'Dragon', hp: 120, sprite: 'Dragon',
     actions: [
       { name: 'Claw', eff: 18, def: 8, wait: 8 },
-      { name: 'Fire Breath', eff: 30, def: 0, wait: 16, type: 'magic' },
+      { name: 'Fire Breath', eff: 30, def: 0, wait: 16, type: 'pierce' },
       { name: 'Tail Sweep', eff: 12, def: 10, wait: 6 },
-      { name: 'Roar', eff: 0, def: 14, wait: 4 },
+      { name: 'Roar', eff: 0, def: 4, wait: 4, stun: 6 },
+      { name: 'Devour', eff: 20, def: 0, wait: 12, absorb: true },
     ],
     ai: (enemy, player) => {
-      // Fire breath when player shields (pierces!)
+      // Fire breath when player shields
       if (player.chosenAction && player.chosenAction.type === 'shield')
-        return enemy.actions[1]; // fire breath
-      if (enemy.hp < enemy.maxHp * 0.3)
-        return enemy.actions[Math.random() < 0.5 ? 1 : 0]; // aggressive when low
+        return enemy.actions[1];
+      // Roar stun when player is casting a long spell
+      if (player.chosenAction && player.chosenAction.wait >= 14)
+        return enemy.actions[3]; // stun delays them even more
+      // Devour when hurt
+      if (enemy.hp < enemy.maxHp * 0.35)
+        return enemy.actions[Math.random() < 0.5 ? 4 : 1];
       let r = Math.random();
       if (r < 0.3) return enemy.actions[0];
       if (r < 0.5) return enemy.actions[2];
-      if (r < 0.7) return enemy.actions[3];
+      if (r < 0.65) return enemy.actions[3];
       return enemy.actions[1];
     },
-    desc: 'Breathes fire when you turtle.'
+    desc: 'Fire pierces shields. Roar stuns. Devour heals.'
   },
 ];
 
 // ── State ──
-let player = { hp: 50, maxHp: 50, wait: 0, maxWait: 0, chosenAction: null, def: 0 };
-let enemy = { hp: 0, maxHp: 0, wait: 0, maxWait: 0, chosenAction: null, def: 0, actions: [], ai: null, name: '' };
+let player = { hp: 50, maxHp: 50, wait: 0, maxWait: 0, chosenAction: null, def: 0, effBuff: 0, sealedActions: [] };
+let enemy = { hp: 0, maxHp: 0, wait: 0, maxWait: 0, chosenAction: null, def: 0, actions: [], ai: null, name: '', sealedActions: [] };
 let tickSpeed = 200;
 let tickTimer = null;
 let gameOver = false;
@@ -631,12 +668,19 @@ function buildItemGrid() {
   $itemGrid.innerHTML = '';
   ITEMS.forEach((item, i) => {
     const btn = document.createElement('button');
+    const isSealed = player.sealedActions.includes(item.name);
     btn.className = 'item-btn';
-    btn.disabled = !waitingForPlayer || gameOver;
-    let statsHtml = `<span class="stat-eff">Eff ${item.eff}</span> · <span class="stat-def">Def ${item.def}</span> · <span class="stat-wait">Wait ${item.wait}</span>`;
-    if (item.type === 'magic') statsHtml += ` · <span class="stat-special">pierces def</span>`;
+    btn.disabled = !waitingForPlayer || gameOver || isSealed;
+    let statsHtml = `<span class="stat-eff">Eff ${item.eff + player.effBuff}${player.effBuff ? ' (+'+player.effBuff+')' : ''}</span> · <span class="stat-def">Def ${item.def}</span> · <span class="stat-wait">Wait ${item.wait}</span>`;
+    if (item.type === 'pierce') statsHtml += ` · <span class="stat-special">pierces</span>`;
     if (item.type === 'heal') statsHtml += ` · <span class="stat-special">heals</span>`;
-    btn.innerHTML = `<div class="item-name">${item.name}</div><div class="item-stats">${statsHtml}</div><div class="item-desc">${item.desc}</div>`;
+    if (item.stun) statsHtml += ` · <span class="stat-special">stun +${item.stun}</span>`;
+    if (item.absorb) statsHtml += ` · <span class="stat-special">absorb</span>`;
+    if (item.seal) statsHtml += ` · <span class="stat-special">seals</span>`;
+    if (item.buff) statsHtml += ` · <span class="stat-special">+${item.buff.amount} ${item.buff.stat}</span>`;
+    let desc = item.desc;
+    if (isSealed) desc = '🔒 SEALED — cannot use this turn';
+    btn.innerHTML = `<div class="item-name">${item.name}${isSealed ? ' 🔒' : ''}</div><div class="item-stats">${statsHtml}</div><div class="item-desc">${desc}</div>`;
     btn.onclick = () => choosePlayerAction(item);
     $itemGrid.appendChild(btn);
   });
@@ -784,7 +828,12 @@ function tick() {
 
 function pickEnemyAction() {
   const enData = ENEMIES[currentEnemyIdx];
-  const eAction = enData.ai(enData, player);
+  let eAction = enData.ai(enData, player);
+  // If the chosen action is sealed, pick a random unsealed one
+  if (enemy.sealedActions.includes(eAction.name)) {
+    const available = enData.actions.filter(a => !enemy.sealedActions.includes(a.name));
+    eAction = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : eAction;
+  }
   enemy.chosenAction = eAction;
   enemy.wait = eAction.wait;
   enemy.maxWait = eAction.wait;
@@ -796,64 +845,128 @@ function resolveAction(who) {
   if (who === 'player') {
     const act = player.chosenAction;
     if (!act) return;
+    const eff = act.eff + player.effBuff;
+
     if (act.type === 'heal') {
-      const healed = Math.min(act.eff, player.maxHp - player.hp);
+      const healed = Math.min(eff, player.maxHp - player.hp);
       player.hp += healed;
       log(`You heal ${healed} HP!`, 'heal');
       showDmgPopup('playerFig', '+' + healed, '#6aca6a');
     } else if (act.type === 'tool') {
       log(`You wait and observe...`, 'info');
+    } else if (act.type === 'buff') {
+      player.effBuff += act.buff.amount;
+      log(`Invigorate! All weapons gain +${act.buff.amount} Effect (total +${player.effBuff})`, 'info');
+      showDmgPopup('playerFig', '+' + act.buff.amount + ' EFF', '#b89cff');
+    } else if (act.seal) {
+      // Seal enemy's current action
+      if (enemy.chosenAction && !enemy.sealedActions.includes(enemy.chosenAction.name)) {
+        enemy.sealedActions.push(enemy.chosenAction.name);
+        log(`Sealed ${enemy.name}'s ${enemy.chosenAction.name}! It can't use it again.`, 'info');
+        showDmgPopup('enemyFig', 'SEALED', '#b89cff');
+      } else {
+        log(`Seal Rune fizzles — nothing to seal.`, 'info');
+      }
     } else {
+      // Damage action
       let dmg;
-      if (act.type === 'magic') {
-        dmg = act.eff; // pierces defense
-        if (dmg > 0) {
-          enemy.hp -= dmg;
-          log(`${act.name} pierces for ${dmg} damage!`, 'dmg');
-          showDmgPopup('enemyFig', '-' + dmg, '#ca6a6a');
+      if (act.type === 'pierce') {
+        dmg = eff;
+      } else {
+        dmg = Math.max(0, eff - enemy.def);
+      }
+
+      if (dmg > 0) {
+        enemy.hp -= dmg;
+        let msg = act.type === 'pierce' ? `${act.name} pierces for ${dmg}!` : `${act.name} hits for ${dmg}!` + (enemy.def > 0 ? ` (${enemy.def} blocked)` : '');
+        log(msg, 'dmg');
+        showDmgPopup('enemyFig', '-' + dmg, '#ca6a6a');
+
+        // Absorb: heal player for damage dealt
+        if (act.absorb) {
+          const absorbed = Math.min(dmg, player.maxHp - player.hp);
+          if (absorbed > 0) {
+            player.hp += absorbed;
+            log(`Absorbed ${absorbed} HP!`, 'heal');
+            showDmgPopup('playerFig', '+' + absorbed, '#6aca6a');
+          }
         }
       } else {
-        dmg = Math.max(0, act.eff - enemy.def);
-        if (dmg > 0) {
-          enemy.hp -= dmg;
-          log(`${act.name} hits for ${dmg} damage!` + (enemy.def > 0 ? ` (${enemy.def} blocked)` : ''), 'dmg');
-          showDmgPopup('enemyFig', '-' + dmg, '#ca6a6a');
-        } else {
-          log(`${act.name} is fully blocked! (Def ${enemy.def} ≥ Eff ${act.eff})`, 'block');
-          showDmgPopup('enemyFig', 'BLOCK', '#6a8aca');
-        }
+        log(`${act.name} is fully blocked! (Def ${enemy.def} ≥ Eff ${eff})`, 'block');
+        showDmgPopup('enemyFig', 'BLOCK', '#6a8aca');
+      }
+
+      // Stun: add wait to enemy
+      if (act.stun && enemy.chosenAction) {
+        enemy.wait += act.stun;
+        enemy.maxWait = Math.max(enemy.maxWait, enemy.wait);
+        log(`Stunned! ${enemy.name}'s wait +${act.stun} (now ${enemy.wait})`, 'info');
+        showDmgPopup('enemyFig', 'STUN +' + act.stun, '#caba6a');
       }
     }
+
+    // Clear sealed actions after player acts (seals last one turn)
+    player.sealedActions = [];
+
     if (enemy.hp <= 0) { victory(); return; }
   } else {
     const act = enemy.chosenAction;
     if (!act) return;
+
     if (act.type === 'heal') {
       const healed = Math.min(act.eff, enemy.maxHp - enemy.hp);
       enemy.hp += healed;
       log(`${enemy.name} heals ${healed} HP!`, 'heal');
       showDmgPopup('enemyFig', '+' + healed, '#6aca6a');
+    } else if (act.seal) {
+      // Enemy seals player's current action
+      if (player.chosenAction && !player.sealedActions.includes(player.chosenAction.name)) {
+        player.sealedActions.push(player.chosenAction.name);
+        log(`${enemy.name} sealed your ${player.chosenAction.name}!`, 'info');
+        showDmgPopup('playerFig', 'SEALED', '#b89cff');
+      } else {
+        log(`${enemy.name}'s seal fizzles.`, 'info');
+      }
     } else {
       let dmg;
-      if (act.type === 'magic') {
+      if (act.type === 'pierce') {
         dmg = act.eff;
-        if (dmg > 0) {
-          player.hp -= dmg;
-          log(`${act.name} pierces for ${dmg} damage!`, 'dmg');
-          showDmgPopup('playerFig', '-' + dmg, '#ca6a6a');
-        }
       } else {
         dmg = Math.max(0, act.eff - player.def);
-        if (dmg > 0) {
-          player.hp -= dmg;
-          log(`${enemy.name}'s ${act.name} hits for ${dmg}!` + (player.def > 0 ? ` (${player.def} blocked)` : ''), 'dmg');
-          showDmgPopup('playerFig', '-' + dmg, '#ca6a6a');
-        } else {
-          log(`${enemy.name}'s ${act.name} blocked! (Your Def ${player.def} ≥ Eff ${act.eff})`, 'block');
-          showDmgPopup('playerFig', 'BLOCK', '#6a8aca');
+      }
+
+      if (dmg > 0) {
+        player.hp -= dmg;
+        let msg = act.type === 'pierce' ? `${act.name} pierces for ${dmg}!` : `${enemy.name}'s ${act.name} hits for ${dmg}!` + (player.def > 0 ? ` (${player.def} blocked)` : '');
+        log(msg, 'dmg');
+        showDmgPopup('playerFig', '-' + dmg, '#ca6a6a');
+
+        // Enemy absorb
+        if (act.absorb) {
+          const absorbed = Math.min(dmg, enemy.maxHp - enemy.hp);
+          if (absorbed > 0) {
+            enemy.hp += absorbed;
+            log(`${enemy.name} absorbed ${absorbed} HP!`, 'heal');
+            showDmgPopup('enemyFig', '+' + absorbed, '#6aca6a');
+          }
         }
+      } else {
+        log(`${enemy.name}'s ${act.name} blocked! (Your Def ${player.def} ≥ Eff ${act.eff})`, 'block');
+        showDmgPopup('playerFig', 'BLOCK', '#6a8aca');
+      }
+
+      // Enemy stun on player
+      if (act.stun && player.chosenAction) {
+        player.wait += act.stun;
+        player.maxWait = Math.max(player.maxWait, player.wait);
+        log(`Stunned! Your wait +${act.stun} (now ${player.wait})`, 'info');
+        showDmgPopup('playerFig', 'STUN +' + act.stun, '#caba6a');
       }
     }
+
+    // Clear enemy sealed actions after it acts
+    enemy.sealedActions = [];
+
     if (player.hp <= 0) { defeat(); return; }
   }
 }
@@ -881,8 +994,10 @@ function startFight() {
   enemy.wait = 0; enemy.maxWait = 0;
   enemy.chosenAction = null; enemy.def = 0;
   enemy.actions = en.actions; enemy.ai = en.ai; enemy.name = en.name;
+  enemy.sealedActions = [];
   player.wait = 0; player.maxWait = 0;
   player.chosenAction = null; player.def = 0;
+  player.effBuff = 0; player.sealedActions = [];
   waitingForPlayer = true;
   gameOver = false;
   $eName.textContent = en.name;
