@@ -367,6 +367,31 @@
     font-size: 0.75rem; color: #6aca6a; margin-bottom: 16px;
   }
 
+  /* ── Campfire Companion ── */
+  .campfire {
+    background: rgba(25, 20, 15, 0.9);
+    border: 1px solid #4a3a20; border-radius: 8px;
+    padding: 20px; margin-bottom: 20px; text-align: left;
+    position: relative;
+  }
+  .campfire::before {
+    content: '🔥';
+    position: absolute; top: -12px; left: 50%;
+    transform: translateX(-50%); font-size: 1.2rem;
+  }
+  .campfire .companion-name {
+    font-family: 'Cinzel', serif; font-weight: 400;
+    font-size: 0.8rem; color: #ca9a5a; margin-bottom: 8px;
+  }
+  .campfire .companion-line {
+    font-size: 0.8rem; color: #c8b8a0; line-height: 1.7;
+    font-style: italic; min-height: 2.4em;
+  }
+  .campfire .companion-line .aside {
+    color: #686060; font-size: 0.7rem; display: block;
+    margin-top: 6px; font-style: normal;
+  }
+
   /* ── Run Over ── */
   .run-over {
     background: rgba(20, 18, 25, 0.85);
@@ -554,6 +579,13 @@
       <h3>Victory — Rest</h3>
       <p id="restHpDisplay"></p>
       <div class="rest-heal" id="restHealMsg"></div>
+
+      <!-- Campfire Companion -->
+      <div class="campfire" id="campfire">
+        <div class="companion-name">Milo</div>
+        <div class="companion-line" id="companionLine"></div>
+      </div>
+
       <div class="loadout-screen">
         <h3>Adjust loadout <span style="font-family:'JetBrains Mono';font-size:0.7rem;color:#686060">(max 6)</span></h3>
         <div class="loadout-presets">
@@ -1423,6 +1455,111 @@ function showRunCombat() {
   buildOrbMap();
 }
 
+// ── Campfire Companion: Milo ──
+// Milo is a kid who sits at the campfire between fights.
+// He's here because he's curious. He's not a fighter.
+// He says what he's thinking — which isn't always useful.
+// He's aware this is a demo. He's aware you might get bored.
+// He's trying not to be boring. He's failing sometimes. He knows it.
+
+function getMiloLine() {
+  const node = runState.node; // just finished this node (0-indexed)
+  const hp = runState.hp;
+  const maxHp = runState.maxHp;
+  const hpPct = hp / maxHp;
+  const lastEnemy = ENEMIES[runState.enemies[node]].name;
+  const nextEnemy = node < 6 ? ENEMIES[runState.enemies[node + 1]].name : null;
+  const isBoss = node === 5; // next fight is the dragon
+
+  // Milo reacts to what just happened, how you're doing, and where you're going.
+  // Every line is max 2 sentences. Most are 1.
+
+  // ── Critical HP lines (always take priority) ──
+  if (hpPct <= 0.2) {
+    const critical = [
+      `You look terrible. Like, genuinely awful. <span class="aside">He's staring at your HP bar.</span>`,
+      `I'm not gonna say "be careful" because clearly that ship has sailed.`,
+      `${hp} HP. I've seen stronger breezes.`,
+      `If you die, can I have your ${runState.loadout[0] || 'stuff'}?`,
+      `You're running on fumes and stubbornness. I respect it.`,
+    ];
+    return critical[Math.floor(Math.random() * critical.length)];
+  }
+
+  // ── Low HP lines ──
+  if (hpPct <= 0.5) {
+    const low = [
+      `That ${lastEnemy} got you pretty good, huh.`,
+      `You're doing that thing where you pretend you're fine. You're not fine.`,
+      `Maybe bring a shield next time? Just a thought. I'll shut up.`,
+      `10 HP isn't much of a heal, is it. Sorry. I don't make the rules.`,
+      `You've got this look in your eyes. Either determination or panic. Can't tell.`,
+    ];
+    return low[Math.floor(Math.random() * low.length)];
+  }
+
+  // ── Boss is next ──
+  if (isBoss) {
+    const bossLines = [
+      `Next one's the Dragon. <span class="aside">He says it like he's reading a weather report.</span>`,
+      `So... the Dragon. I'll just... stay here. By the fire. Where it's safe.`,
+      `I believe in you. I mean, statistically one of us has to.`,
+      `The Dragon doesn't know you're coming. That's your only advantage. Well, that and all those weapons.`,
+      `This is the part in the story where I'd say something inspiring. I've got nothing. Just don't die.`,
+    ];
+    return bossLines[Math.floor(Math.random() * bossLines.length)];
+  }
+
+  // ── Node-specific + general lines ──
+  const nodeLines = {
+    0: [ // just beat first enemy
+      `Not bad. The ${lastEnemy} didn't know what hit it. <span class="aside">He's poking the fire with a stick.</span>`,
+      `First fight's always the easiest. That's not me being negative, that's just... how it works.`,
+      `You know, I thought about fighting too. Then I thought about not fighting. Second option won.`,
+      `The fire's warm. You should sit for a second. <span class="aside">You're already sitting.</span>`,
+    ],
+    1: [
+      `Two down. Five to go. I'm counting for you. You're welcome.`,
+      `I found this stick. It's a good stick. Not weapon-good. Just... stick-good.`,
+      `You fight like someone who reads the tooltips. That's a compliment.`,
+    ],
+    2: [
+      `Halfway-ish. The enemies don't get easier. <span class="aside">Long pause.</span> Sorry, was that too honest?`,
+      `I keep thinking about what's past the Dragon. Probably more fighting. There's always more fighting.`,
+      `You ever wonder if the ${lastEnemy} had somewhere to be? Like, plans it was looking forward to?`,
+    ],
+    3: [
+      `You're actually going to make it, aren't you. <span class="aside">He sounds surprised.</span>`,
+      `Four fights in. Most people would've closed the tab by now.`,
+      `I like watching you think. You do this thing where you stare at the numbers. It's very intense.`,
+    ],
+    4: [
+      `One more and then the Dragon. No pressure.`,
+      `I've been sitting by this fire for a while now. My back hurts. But I'm not complaining. <span class="aside">He's complaining.</span>`,
+      `You're different than the others. The others gave up around fight two.`,
+    ],
+  };
+
+  const pool = nodeLines[node] || [
+    `Still here. Both of us. That's something.`,
+    `The fire's getting low. Doesn't mean anything. Just... observationally.`,
+    `I'd offer advice but I genuinely don't understand how you're doing this.`,
+  ];
+
+  // Mix in some general lines occasionally
+  const general = [
+    `... <span class="aside">He's just watching the fire.</span>`,
+    `You ever play Helen's Mysterious Castle? You remind me of Helen. That's good. She won.`,
+    `This is a demo, by the way. In case you forgot. There's more coming. Probably.`,
+    `I'm not a tutorial NPC. I'm just a guy. At a fire. Talking.`,
+    `Don't mind me. I'm just here for the warmth and the company. Mostly the warmth.`,
+    `The next one's a ${nextEnemy || 'mystery'}. I've heard things. None of them helpful.`,
+  ];
+
+  if (Math.random() < 0.3) return general[Math.floor(Math.random() * general.length)];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 function showRestScreen() {
   document.getElementById('runLoadout').classList.add('hidden');
   document.getElementById('runLayout').classList.add('hidden');
@@ -1436,6 +1573,9 @@ function showRestScreen() {
   document.getElementById('restHpDisplay').textContent = `HP: ${runState.hp} / ${runState.maxHp}`;
   document.getElementById('restHealMsg').textContent = healAmt > 0 ? `Restored ${healAmt} HP at the campfire.` : 'Already at full health.';
   document.getElementById('continueRunBtn').textContent = `Continue to Node ${runState.node + 2}`;
+
+  // Milo speaks
+  document.getElementById('companionLine').innerHTML = getMiloLine();
 
   buildLoadoutGrid('restLoadoutGrid', 'restLoadoutCount');
 }
