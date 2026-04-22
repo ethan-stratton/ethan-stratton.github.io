@@ -856,7 +856,7 @@ const ITEMS = [
   { name: 'Drain Touch', eff: 12, def: 0, wait: 12, absorb: true, desc: 'Absorb — heals for damage dealt', type: 'melee' },
   { name: 'Seal Rune', eff: 0, def: 3, wait: 7, seal: true, desc: 'Seals enemy\'s current action!', type: 'seal' },
   { name: 'Invigorate', eff: 0, def: 0, wait: 10, buff: { stat: 'eff', amount: 5 }, desc: 'Buff: +5 Effect on all weapons', type: 'buff' },
-  { name: 'Metronome', eff: 0, def: 0, wait: 1, desc: 'Wait 1 tick and observe', type: 'tool' },
+  { name: 'Metronome', eff: 0, def: 0, wait: 1, desc: 'Scout — act first, see what they chose', type: 'tool' },
 ];
 
 // ── Enemies ──
@@ -867,13 +867,19 @@ const ENEMIES = [
       { name: 'Tackle', eff: 8, def: 2, wait: 6 },
       { name: 'Bounce', eff: 4, def: 5, wait: 4 },
       { name: 'Sticky Spit', eff: 3, def: 1, wait: 5, stun: 3 },
+      { name: 'Engulf', eff: 6, def: 0, wait: 8, absorb: true },
     ],
     ai: (enemy, player) => {
+      // Sticky Spit only when player is far away (slow/long wait action)
       if (player.chosenAction && player.chosenAction.wait >= 10)
         return enemy.actions[2];
-      return enemy.actions[Math.random() < 0.6 ? 0 : 1];
+      // Engulf when hurt — try to sustain
+      if (enemy.hp < enemy.maxHp * 0.5 && Math.random() < 0.4)
+        return enemy.actions[3];
+      // Close range: Tackle or Bounce
+      return enemy.actions[Math.random() < 0.55 ? 0 : 1];
     },
-    desc: 'Simple — but watch the stun spit.'
+    desc: 'Spits from range. Engulfs up close when hurt.'
   },
   {
     name: 'Lizardman', hp: 55, sprite: 'Lizardman',
@@ -1012,7 +1018,8 @@ function createCombatEngine(cfg) {
     }
 
     if (enemy && enemy.chosenAction) {
-      $(cfg.eAction).textContent = enemy.chosenAction.name;
+      // Hide action name — show only "..." and wait bar. Action revealed on resolve.
+      $(cfg.eAction).textContent = '...';
       const wPct = enemy.maxWait > 0 ? (enemy.wait / enemy.maxWait * 100) : 0;
       $(cfg.eWaitBar).style.width = wPct + '%';
       $(cfg.eWaitLabel).textContent = `Wait: ${enemy.wait}` + (waitingForPlayer ? ' (paused)' : '');
@@ -1090,9 +1097,9 @@ function createCombatEngine(cfg) {
       enemy.wait = eAction.wait;
       enemy.maxWait = eAction.wait;
       enemy.def = eAction.def;
-      log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
+      log(`${enemy.name} is preparing something... (Wait: ${eAction.wait})`, 'info');
     }
-    log(`You ready ${item.name} (Eff:${item.eff} Def:${item.def} W:${item.wait})`, 'info');
+    log(`You ready ${item.name}`, 'info');
     buildItemGrid();
     updateUI();
     startTicking();
@@ -1139,7 +1146,7 @@ function createCombatEngine(cfg) {
     enemy.sealedActions = [];
     enemy.chosenAction = eAction;
     enemy.wait = eAction.wait; enemy.maxWait = eAction.wait; enemy.def = eAction.def;
-    log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
+    log(`${enemy.name} is preparing something... (Wait: ${eAction.wait})`, 'info');
   }
 
   function resolveAction(who) {
