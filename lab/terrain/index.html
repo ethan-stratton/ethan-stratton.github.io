@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alien Terrain — strattao</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400&family=JetBrains+Mono:wght@300;400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    color: #c8c0b8;
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  canvas#starfield {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  .back {
+    display: inline-block;
+    font-size: 0.8rem;
+    color: #706860;
+    text-decoration: none;
+    margin-bottom: 24px;
+    letter-spacing: 0.04em;
+    transition: color 0.3s;
+  }
+  .back:hover { color: #b89cff; }
+
+  h1 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 2rem;
+    color: #e8e0d8;
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 30px rgba(180, 140, 255, 0.3);
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+    color: #706860;
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+
+  .demo-area {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+  }
+
+  .canvas-wrap { flex: 1; min-width: 0; }
+
+  canvas#terrain {
+    width: 100%;
+    aspect-ratio: 16/10;
+    border-radius: 8px;
+    border: 1px solid rgba(184, 156, 255, 0.12);
+    display: block;
+    background: #050508;
+  }
+
+  .controls {
+    width: 260px;
+    flex-shrink: 0;
+  }
+
+  .preset-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 24px;
+  }
+
+  .preset-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border: 1px solid rgba(184, 156, 255, 0.15);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #a898c8;
+    cursor: pointer;
+    transition: all 0.25s;
+  }
+  .preset-btn:hover {
+    border-color: rgba(184, 156, 255, 0.5);
+    background: rgba(184, 156, 255, 0.08);
+  }
+  .preset-btn.active {
+    background: rgba(184, 156, 255, 0.15);
+    border-color: rgba(184, 156, 255, 0.5);
+    color: #dcc8ff;
+  }
+
+  .ctrl-section { margin-bottom: 20px; }
+
+  .ctrl-section h3 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: #a898c8;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .ctrl-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: #706860;
+    width: 68px;
+    flex-shrink: 0;
+    letter-spacing: 0.04em;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    background: rgba(184, 156, 255, 0.12);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #b89cff;
+    border: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #b89cff;
+    border: none;
+    cursor: pointer;
+  }
+
+  .ctrl-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    color: #585050;
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .action-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .action-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    padding: 6px 14px;
+    border: 1px solid rgba(184, 156, 255, 0.25);
+    border-radius: 4px;
+    background: rgba(184, 156, 255, 0.08);
+    color: #b89cff;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.04em;
+  }
+  .action-btn:hover {
+    border-color: rgba(184, 156, 255, 0.6);
+    background: rgba(184, 156, 255, 0.15);
+  }
+
+  .explanation {
+    margin-top: 40px;
+    padding-top: 32px;
+    border-top: 1px solid rgba(184, 156, 255, 0.06);
+  }
+
+  .explanation h2 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 1.1rem;
+    color: #e0d8f0;
+    letter-spacing: 0.04em;
+    margin-bottom: 16px;
+  }
+
+  .explanation p {
+    font-size: 0.88rem;
+    line-height: 1.75;
+    color: #a8a098;
+    margin-bottom: 14px;
+  }
+
+  .explanation code {
+    background: rgba(184, 156, 255, 0.08);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+  }
+
+  footer {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    color: #403838;
+    font-size: 0.75rem;
+    padding: 40px 0;
+    letter-spacing: 0.04em;
+    border-top: 1px solid rgba(184, 156, 255, 0.06);
+  }
+
+  @media (max-width: 768px) {
+    .demo-area { flex-direction: column; }
+    .controls { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<div class="content">
+  <a href="/" class="back">← back</a>
+  <h1>Alien Terrain</h1>
+  <p class="subtitle">Procedural isometric landscapes from Perlin noise. Adjust the world and watch it reshape.</p>
+
+  <div class="demo-area">
+    <div class="canvas-wrap">
+      <canvas id="terrain" width="960" height="600"></canvas>
+    </div>
+
+    <div class="controls">
+      <div class="preset-row">
+        <button class="preset-btn active" data-preset="fungal">Fungal</button>
+        <button class="preset-btn" data-preset="volcanic">Volcanic</button>
+        <button class="preset-btn" data-preset="arctic">Arctic</button>
+        <button class="preset-btn" data-preset="ocean">Deep Ocean</button>
+        <button class="preset-btn" data-preset="mars">Mars</button>
+        <button class="preset-btn" data-preset="crystal">Crystal</button>
+        <button class="preset-btn" data-preset="flesh">Flesh</button>
+      </div>
+
+      <div class="ctrl-section">
+        <h3>Terrain</h3>
+        <div class="ctrl-row">
+          <span class="ctrl-label">octaves</span>
+          <input type="range" id="octaves" min="1" max="8" value="6" step="1">
+          <span class="ctrl-val" id="octavesVal">6</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">frequency</span>
+          <input type="range" id="frequency" min="10" max="120" value="40">
+          <span class="ctrl-val" id="frequencyVal">4.0</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">height</span>
+          <input type="range" id="heightScale" min="10" max="200" value="80">
+          <span class="ctrl-val" id="heightScaleVal">80</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">lacunarity</span>
+          <input type="range" id="lacunarity" min="15" max="35" value="20">
+          <span class="ctrl-val" id="lacunarityVal">2.0</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">persistence</span>
+          <input type="range" id="persistence" min="20" max="80" value="50">
+          <span class="ctrl-val" id="persistenceVal">0.50</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">water</span>
+          <input type="range" id="waterLevel" min="0" max="80" value="25">
+          <span class="ctrl-val" id="waterLevelVal">0.25</span>
+        </div>
+      </div>
+
+      <div class="ctrl-section">
+        <h3>View</h3>
+        <div class="ctrl-row">
+          <span class="ctrl-label">rotation</span>
+          <input type="range" id="rotation" min="0" max="360" value="45">
+          <span class="ctrl-val" id="rotationVal">45°</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">tilt</span>
+          <input type="range" id="tilt" min="15" max="70" value="35">
+          <span class="ctrl-val" id="tiltVal">35°</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">grid</span>
+          <input type="range" id="gridSize" min="40" max="120" value="80" step="4">
+          <span class="ctrl-val" id="gridSizeVal">80</span>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="action-btn" id="regenerate">↻ New Seed</button>
+        <button class="action-btn" id="animate">▶ Animate</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="explanation">
+    <h2>How It Works</h2>
+    <p>A 2D heightmap is generated using <strong>fractional Brownian motion</strong> (fBm) — multiple octaves of Perlin noise layered at increasing frequencies and decreasing amplitudes. Low octaves create the broad continental shapes; high octaves add craggy detail.</p>
+    <p><strong>Lacunarity</strong> controls how quickly frequency increases per octave (higher = more detail variation). <strong>Persistence</strong> controls how quickly amplitude decreases (higher = rougher terrain, lower = smoother).</p>
+    <p>The heightmap is rendered as an <strong>isometric column grid</strong>. Each cell is projected into 2D isometric space, then extruded downward based on its height value. Columns are drawn back-to-front for correct occlusion. Faces are shaded — top faces get full color, side faces are darkened to sell the 3D illusion.</p>
+    <p>Colors are mapped from height using gradient stops — each preset defines a different palette that evokes a specific alien biome. The water plane is a flat layer drawn at a configurable threshold, with slight transparency.</p>
+    <p>The same Perlin noise from the <a href="/lab/liquid/" style="color:#b89cff;">Liquid Noise</a> demo powers the heightmap generation. Same math, completely different application.</p>
+  </div>
+</div>
+
+<footer>built by hand</footer>
+
+<script>
+// ── Starfield ──
+(function() {
+  const canvas = document.getElementById('starfield');
+  const ctx = canvas.getContext('2d');
+  let w, h, stars;
+  function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+  function createStars() {
+    stars = [];
+    for (let i = 0; i < 200; i++) {
+      stars.push({
+        x: Math.random() * w, y: Math.random() * h,
+        size: 0.4 + Math.random() * 1.6,
+        speed: 0.1 + Math.random() * 0.4,
+        alpha: 0.2 + Math.random() * 0.5,
+        twinkleSpeed: 0.005 + Math.random() * 0.02,
+        twinkleOffset: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+  let time = 0;
+  function draw() {
+    ctx.clearRect(0, 0, w, h); time++;
+    for (const s of stars) {
+      s.y -= s.speed;
+      if (s.y < -4) { s.y = h + 4; s.x = Math.random() * w; }
+      const twinkle = 0.5 + 0.5 * Math.sin(time * s.twinkleSpeed + s.twinkleOffset);
+      const a = s.alpha * (0.4 + 0.6 * twinkle);
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(260, 20%, 88%, ${a})`; ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize', () => { resize(); createStars(); });
+  resize(); createStars(); draw();
+})();
+
+// ── Perlin Noise (tileable, fBm) ──
+function makePerlin(seed) {
+  const perm = new Uint8Array(512);
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  let rng = (seed * 2654435761) >>> 0;
+  for (let i = 255; i > 0; i--) {
+    rng = (rng * 1664525 + 1013904223) >>> 0;
+    const j = rng % (i + 1);
+    [p[i], p[j]] = [p[j], p[i]];
+  }
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+
+  const grads = [[1,1],[-1,1],[1,-1],[-1,-1],[1,0],[-1,0],[0,1],[0,-1]];
+  function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+
+  return function(x, y) {
+    const xi = Math.floor(x) & 255;
+    const yi = Math.floor(y) & 255;
+    const xf = x - Math.floor(x);
+    const yf = y - Math.floor(y);
+    const u = fade(xf), v = fade(yf);
+    const aa = perm[perm[xi] + yi];
+    const ab = perm[perm[xi] + yi + 1];
+    const ba = perm[perm[xi + 1] + yi];
+    const bb = perm[perm[xi + 1] + yi + 1];
+    const g = grads;
+    const dot = (h, dx, dy) => { const gr = g[h & 7]; return gr[0]*dx + gr[1]*dy; };
+    const x1 = xf, x0 = xf - 1, y1 = yf, y0 = yf - 1;
+    return (
+      (1-v) * ((1-u) * dot(aa, x1, y1) + u * dot(ba, x0, y1)) +
+      v     * ((1-u) * dot(ab, x1, y0) + u * dot(bb, x0, y0))
+    );
+  };
+}
+
+function fbm(perlin, x, y, octaves, lacunarity, persistence) {
+  let val = 0, amp = 1, freq = 1, maxAmp = 0;
+  for (let o = 0; o < octaves; o++) {
+    val += perlin(x * freq, y * freq) * amp;
+    maxAmp += amp;
+    amp *= persistence;
+    freq *= lacunarity;
+  }
+  return (val / maxAmp + 1) * 0.5; // normalize to 0-1
+}
+
+// ── Terrain Renderer ──
+(function() {
+  const canvas = document.getElementById('terrain');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  let currentSeed = 42;
+  let perlin = makePerlin(currentSeed);
+  let animating = false;
+  let animTime = 0;
+
+  // Palettes: array of [threshold, r, g, b] sorted by threshold
+  const palettes = {
+    fungal: [
+      [0.00, 15, 8, 25],
+      [0.20, 30, 20, 50],
+      [0.30, 60, 40, 80],
+      [0.40, 80, 120, 60],
+      [0.50, 60, 160, 80],
+      [0.60, 120, 180, 80],
+      [0.70, 180, 140, 200],
+      [0.80, 220, 160, 255],
+      [0.90, 255, 200, 220],
+      [1.00, 255, 240, 250],
+    ],
+    volcanic: [
+      [0.00, 10, 5, 5],
+      [0.15, 40, 10, 5],
+      [0.30, 100, 20, 10],
+      [0.45, 180, 60, 15],
+      [0.55, 255, 120, 20],
+      [0.65, 255, 180, 40],
+      [0.75, 80, 60, 50],
+      [0.85, 50, 40, 35],
+      [0.95, 30, 25, 25],
+      [1.00, 20, 18, 18],
+    ],
+    arctic: [
+      [0.00, 10, 15, 30],
+      [0.20, 20, 40, 70],
+      [0.35, 40, 80, 110],
+      [0.45, 100, 130, 150],
+      [0.55, 160, 180, 200],
+      [0.65, 200, 210, 220],
+      [0.75, 220, 230, 240],
+      [0.85, 235, 240, 248],
+      [0.95, 248, 250, 255],
+      [1.00, 255, 255, 255],
+    ],
+    ocean: [
+      [0.00, 5, 5, 20],
+      [0.15, 10, 15, 50],
+      [0.30, 15, 30, 80],
+      [0.45, 20, 60, 120],
+      [0.55, 30, 100, 140],
+      [0.65, 40, 140, 130],
+      [0.70, 60, 160, 100],
+      [0.80, 100, 180, 80],
+      [0.90, 180, 200, 120],
+      [1.00, 220, 230, 180],
+    ],
+    mars: [
+      [0.00, 40, 15, 10],
+      [0.15, 80, 30, 15],
+      [0.30, 140, 60, 30],
+      [0.45, 180, 90, 50],
+      [0.55, 200, 120, 70],
+      [0.65, 180, 100, 60],
+      [0.75, 160, 80, 50],
+      [0.85, 140, 65, 40],
+      [0.95, 200, 140, 100],
+      [1.00, 230, 200, 170],
+    ],
+    crystal: [
+      [0.00, 5, 5, 15],
+      [0.15, 15, 10, 40],
+      [0.25, 30, 20, 80],
+      [0.35, 50, 40, 140],
+      [0.45, 80, 60, 200],
+      [0.55, 120, 100, 230],
+      [0.65, 160, 140, 255],
+      [0.75, 200, 180, 255],
+      [0.85, 60, 200, 220],
+      [1.00, 180, 255, 240],
+    ],
+    flesh: [
+      [0.00, 30, 8, 12],
+      [0.15, 60, 15, 20],
+      [0.30, 100, 30, 35],
+      [0.40, 140, 50, 50],
+      [0.50, 180, 80, 70],
+      [0.60, 200, 120, 100],
+      [0.70, 220, 160, 140],
+      [0.80, 200, 140, 130],
+      [0.88, 160, 80, 90],
+      [1.00, 240, 200, 190],
+    ],
+  };
+
+  const presetParams = {
+    fungal:   { octaves: 6, frequency: 40, height: 80, lacunarity: 20, persistence: 50, water: 25, rotation: 45, tilt: 35 },
+    volcanic: { octaves: 5, frequency: 35, height: 120, lacunarity: 22, persistence: 55, water: 35, rotation: 45, tilt: 35 },
+    arctic:   { octaves: 6, frequency: 45, height: 60, lacunarity: 20, persistence: 45, water: 20, rotation: 45, tilt: 35 },
+    ocean:    { octaves: 7, frequency: 30, height: 70, lacunarity: 20, persistence: 50, water: 55, rotation: 45, tilt: 35 },
+    mars:     { octaves: 5, frequency: 50, height: 100, lacunarity: 25, persistence: 45, water: 10, rotation: 45, tilt: 35 },
+    crystal:  { octaves: 4, frequency: 60, height: 110, lacunarity: 18, persistence: 60, water: 15, rotation: 45, tilt: 35 },
+    flesh:    { octaves: 5, frequency: 35, height: 70, lacunarity: 20, persistence: 55, water: 30, rotation: 45, tilt: 35 },
+  };
+
+  let currentPalette = 'fungal';
+
+  function samplePalette(t, name) {
+    const pal = palettes[name || currentPalette];
+    t = Math.max(0, Math.min(1, t));
+    for (let i = 1; i < pal.length; i++) {
+      if (t <= pal[i][0]) {
+        const prev = pal[i-1], next = pal[i];
+        const f = (t - prev[0]) / (next[0] - prev[0]);
+        return [
+          Math.round(prev[1] + (next[1] - prev[1]) * f),
+          Math.round(prev[2] + (next[2] - prev[2]) * f),
+          Math.round(prev[3] + (next[3] - prev[3]) * f),
+        ];
+      }
+    }
+    const last = pal[pal.length - 1];
+    return [last[1], last[2], last[3]];
+  }
+
+  function getParams() {
+    return {
+      octaves: parseInt(document.getElementById('octaves').value),
+      frequency: parseInt(document.getElementById('frequency').value) / 10,
+      heightScale: parseInt(document.getElementById('heightScale').value),
+      lacunarity: parseInt(document.getElementById('lacunarity').value) / 10,
+      persistence: parseInt(document.getElementById('persistence').value) / 100,
+      waterLevel: parseInt(document.getElementById('waterLevel').value) / 100,
+      rotation: parseInt(document.getElementById('rotation').value) * Math.PI / 180,
+      tilt: parseInt(document.getElementById('tilt').value) * Math.PI / 180,
+      gridSize: parseInt(document.getElementById('gridSize').value),
+    };
+  }
+
+  function updateLabels() {
+    document.getElementById('octavesVal').textContent = document.getElementById('octaves').value;
+    document.getElementById('frequencyVal').textContent = (parseInt(document.getElementById('frequency').value) / 10).toFixed(1);
+    document.getElementById('heightScaleVal').textContent = document.getElementById('heightScale').value;
+    document.getElementById('lacunarityVal').textContent = (parseInt(document.getElementById('lacunarity').value) / 10).toFixed(1);
+    document.getElementById('persistenceVal').textContent = (parseInt(document.getElementById('persistence').value) / 100).toFixed(2);
+    document.getElementById('waterLevelVal').textContent = (parseInt(document.getElementById('waterLevel').value) / 100).toFixed(2);
+    document.getElementById('rotationVal').textContent = document.getElementById('rotation').value + '°';
+    document.getElementById('tiltVal').textContent = document.getElementById('tilt').value + '°';
+    document.getElementById('gridSizeVal').textContent = document.getElementById('gridSize').value;
+  }
+
+  function applyPreset(name) {
+    currentPalette = name;
+    const p = presetParams[name];
+    document.getElementById('octaves').value = p.octaves;
+    document.getElementById('frequency').value = p.frequency;
+    document.getElementById('heightScale').value = p.height;
+    document.getElementById('lacunarity').value = p.lacunarity;
+    document.getElementById('persistence').value = p.persistence;
+    document.getElementById('waterLevel').value = p.water;
+    document.getElementById('rotation').value = p.rotation;
+    document.getElementById('tilt').value = p.tilt;
+    updateLabels();
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
+    render();
+  }
+
+  function render() {
+    const p = getParams();
+    const grid = p.gridSize;
+    const cellW = 10; // isometric cell width in pixels
+    
+    ctx.fillStyle = '#050508';
+    ctx.fillRect(0, 0, W, H);
+
+    // Generate heightmap
+    const heights = [];
+    for (let y = 0; y < grid; y++) {
+      heights[y] = [];
+      for (let x = 0; x < grid; x++) {
+        const nx = x / grid * p.frequency;
+        const ny = y / grid * p.frequency;
+        heights[y][x] = fbm(perlin, nx + animTime * 0.3, ny + animTime * 0.2, p.octaves, p.lacunarity, p.persistence);
+      }
+    }
+
+    // Isometric projection
+    const cosR = Math.cos(p.rotation), sinR = Math.sin(p.rotation);
+    const cosT = Math.cos(p.tilt);
+    const sinT = Math.sin(p.tilt);
+
+    // Project a grid point to screen
+    function project(gx, gy, h) {
+      // Center grid
+      const cx = gx - grid / 2;
+      const cy = gy - grid / 2;
+      // Rotate around Y axis
+      const rx = cx * cosR - cy * sinR;
+      const ry = cx * sinR + cy * cosR;
+      // Isometric: x maps to screen x, y+z maps to screen y
+      const screenX = rx * cellW;
+      const screenY = (ry * cosT - h * sinT) * cellW;
+      return [W / 2 + screenX, H / 2 + screenY + 40];
+    }
+
+    // Build render list (columns sorted back to front)
+    const columns = [];
+    for (let y = 0; y < grid - 1; y++) {
+      for (let x = 0; x < grid - 1; x++) {
+        // Depth for sorting (distance from camera in rotated space)
+        const cx = x - grid / 2, cy = y - grid / 2;
+        const depth = cx * sinR + cy * cosR;
+        const h = heights[y][x];
+        columns.push({ x, y, h, depth });
+      }
+    }
+    // Sort back to front (furthest first)
+    columns.sort((a, b) => a.depth - b.depth);
+
+    for (const col of columns) {
+      const { x, y, h } = col;
+      const elevation = Math.max(h, p.waterLevel);
+      const pillarH = elevation * p.heightScale / cellW;
+      const isWater = h < p.waterLevel;
+
+      // Get color from height
+      let rgb;
+      if (isWater) {
+        // Water color — blend between deep and surface
+        const waterDepth = (p.waterLevel - h) / Math.max(p.waterLevel, 0.01);
+        const deepRgb = samplePalette(0);
+        const surfRgb = samplePalette(p.waterLevel);
+        rgb = [
+          Math.round(deepRgb[0] + (surfRgb[0] - deepRgb[0]) * (1 - waterDepth * 0.7)),
+          Math.round(deepRgb[1] + (surfRgb[1] - deepRgb[1]) * (1 - waterDepth * 0.7)),
+          Math.round(deepRgb[2] + (surfRgb[2] - deepRgb[2]) * (1 - waterDepth * 0.7)),
+        ];
+      } else {
+        rgb = samplePalette(h);
+      }
+
+      // Top face
+      const tl = project(x, y, pillarH);
+      const tr = project(x + 1, y, pillarH);
+      const br = project(x + 1, y + 1, pillarH);
+      const bl = project(x, y + 1, pillarH);
+
+      // Bottom (ground level 0)
+      const blBot = project(x, y + 1, 0);
+      const brBot = project(x + 1, y + 1, 0);
+      const trBot = project(x + 1, y, 0);
+
+      // Right face (x+1 side)
+      ctx.beginPath();
+      ctx.moveTo(tr[0], tr[1]);
+      ctx.lineTo(br[0], br[1]);
+      ctx.lineTo(brBot[0], brBot[1]);
+      ctx.lineTo(trBot[0], trBot[1]);
+      ctx.closePath();
+      const rShade = isWater ? 0.5 : 0.55;
+      ctx.fillStyle = `rgb(${Math.round(rgb[0]*rShade)},${Math.round(rgb[1]*rShade)},${Math.round(rgb[2]*rShade)})`;
+      ctx.fill();
+
+      // Front face (y+1 side)
+      ctx.beginPath();
+      ctx.moveTo(bl[0], bl[1]);
+      ctx.lineTo(br[0], br[1]);
+      ctx.lineTo(brBot[0], brBot[1]);
+      ctx.lineTo(blBot[0], blBot[1]);
+      ctx.closePath();
+      const fShade = isWater ? 0.35 : 0.4;
+      ctx.fillStyle = `rgb(${Math.round(rgb[0]*fShade)},${Math.round(rgb[1]*fShade)},${Math.round(rgb[2]*fShade)})`;
+      ctx.fill();
+
+      // Top face
+      ctx.beginPath();
+      ctx.moveTo(tl[0], tl[1]);
+      ctx.lineTo(tr[0], tr[1]);
+      ctx.lineTo(br[0], br[1]);
+      ctx.lineTo(bl[0], bl[1]);
+      ctx.closePath();
+      if (isWater) {
+        ctx.fillStyle = `rgba(${rgb[0]},${rgb[1]},${rgb[2]},0.75)`;
+      } else {
+        ctx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      }
+      ctx.fill();
+    }
+
+    // Atmosphere — subtle fog at edges
+    const fogGrad = ctx.createRadialGradient(W/2, H/2, Math.min(W,H) * 0.25, W/2, H/2, Math.min(W,H) * 0.55);
+    fogGrad.addColorStop(0, 'rgba(5,5,8,0)');
+    fogGrad.addColorStop(1, 'rgba(5,5,8,0.85)');
+    ctx.fillStyle = fogGrad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Animation loop
+  let animFrame = null;
+  function animLoop() {
+    if (!animating) return;
+    animTime += 0.015;
+    render();
+    animFrame = requestAnimationFrame(animLoop);
+  }
+
+  // Events
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+  });
+
+  document.getElementById('regenerate').addEventListener('click', () => {
+    currentSeed = Math.floor(Math.random() * 100000);
+    perlin = makePerlin(currentSeed);
+    render();
+  });
+
+  document.getElementById('animate').addEventListener('click', function() {
+    animating = !animating;
+    this.textContent = animating ? '■ Stop' : '▶ Animate';
+    if (animating) animLoop();
+  });
+
+  document.querySelectorAll('input[type="range"]').forEach(input => {
+    input.addEventListener('input', () => {
+      updateLabels();
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      if (!animating) render();
+    });
+  });
+
+  updateLabels();
+  render();
+})();
+</script>
+
+</body>
+</html>

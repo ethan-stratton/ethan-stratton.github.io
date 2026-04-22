@@ -314,6 +314,10 @@
         <canvas class="tile-canvas" data-tile="liquid"></canvas>
         <div class="tile-label">Liquid Noise</div>
       </a>
+      <a href="/lab/terrain/" class="sidebar-tile" title="Alien Terrain — Isometric Perlin Landscapes">
+        <canvas class="tile-canvas" data-tile="terrain"></canvas>
+        <div class="tile-label">Alien Terrain</div>
+      </a>
       <div class="sidebar-tile" title="Iron & Ether — In Development">
         <canvas class="tile-canvas" data-tile="ironether"></canvas>
         <div class="tile-label">Iron & Ether</div>
@@ -576,6 +580,24 @@
         ctx.strokeStyle = `rgba(200,160,64,${0.15+Math.sin(time*2)*0.1})`;
         ctx.lineWidth = 0.5;
         ctx.beginPath(); ctx.arc(cx, cy, 22+Math.sin(time*1.5)*4, 0, Math.PI*2); ctx.stroke();
+      } else if (type === 'terrain') {
+        // Mini isometric terrain
+        ctx.fillStyle = '#050508'; ctx.fillRect(0, 0, w, h);
+        const cols = 12, cellSz = w / cols * 0.7;
+        const cx = w/2, cy = h/2 + 10;
+        for (let gy = 0; gy < cols; gy++) {
+          for (let gx = 0; gx < cols; gx++) {
+            const nx = gx - cols/2, ny = gy - cols/2;
+            const iso_x = (nx - ny) * cellSz * 0.5;
+            const hgt = (Math.sin(gx*0.8+time*0.5) * Math.cos(gy*0.6+time*0.3) + 1) * 0.4;
+            const iso_y = (nx + ny) * cellSz * 0.25 - hgt * 30;
+            const r = 30 + hgt * 180, g = 60 + hgt * 100, b = 80 + hgt * 80;
+            ctx.fillStyle = `rgb(${r|0},${g|0},${b|0})`;
+            ctx.fillRect(cx + iso_x - 3, cy + iso_y - 2, 6, 4);
+            ctx.fillStyle = `rgb(${r*0.5|0},${g*0.5|0},${b*0.5|0})`;
+            ctx.fillRect(cx + iso_x - 3, cy + iso_y + 2, 6, hgt * 12 + 2);
+          }
+        }
       } else if (type === 'liquid') {
         // Mini lava — scrolling noise layers
         const imgData = ctx.createImageData(w, h);
