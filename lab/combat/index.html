@@ -58,34 +58,35 @@
   .mode-tab:hover { border-color: #b89cff; color: #c8c0b8; }
   .mode-tab.active { border-color: #b89cff; background: rgba(60, 50, 80, 0.5); color: #e8e0d8; }
 
-  /* ── Arena ── */
-  .arena {
-    display: flex; gap: 24px; align-items: flex-start;
-    margin-bottom: 24px; flex-wrap: wrap;
+  /* ── Combat Screen (Helen's style) ── */
+  .combat-screen {
+    background: rgba(12, 10, 18, 0.95);
+    border: 2px solid #3a3540; border-radius: 8px;
+    overflow: hidden; margin-bottom: 24px;
   }
 
-  .combatant {
-    flex: 1; min-width: 250px;
-    background: rgba(20, 18, 25, 0.85);
-    border: 1px solid #2a2530;
-    border-radius: 8px; padding: 20px;
+  /* Top bar: enemy info left, player info right */
+  .combat-top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 12px 16px; gap: 16px;
   }
-  .combatant.player { border-color: #3a4a3a; }
-  .combatant.enemy { border-color: #4a2a2a; }
+  .combat-top-side { flex: 1; min-width: 0; }
+  .combat-top-side.enemy-side { text-align: left; }
+  .combat-top-side.player-side { text-align: right; }
 
-  .combatant h2 {
+  .combatant-name {
     font-family: 'Cinzel', serif; font-weight: 400;
-    font-size: 1.1rem; color: #e8e0d8; margin-bottom: 12px;
+    font-size: 0.85rem; color: #e8e0d8; margin-bottom: 6px;
   }
 
   .hp-bar-wrap {
-    width: 100%; height: 18px;
-    background: #1a1520; border-radius: 4px;
-    overflow: hidden; margin-bottom: 8px;
+    width: 100%; height: 14px;
+    background: #1a1520; border-radius: 3px;
+    overflow: hidden; margin-bottom: 4px;
     position: relative;
   }
   .hp-bar {
-    height: 100%; border-radius: 4px;
+    height: 100%; border-radius: 3px;
     transition: width 0.4s ease;
   }
   .hp-bar.player-bar { background: linear-gradient(90deg, #3a6a3a, #5a9a5a); }
@@ -93,79 +94,137 @@
   .hp-text {
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
     display: flex; align-items: center; justify-content: center;
-    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
     color: #e8e0d8; text-shadow: 0 1px 2px #000;
   }
 
   .wait-bar-wrap {
-    width: 100%; height: 10px;
-    background: #1a1520; border-radius: 3px;
-    overflow: hidden; margin-bottom: 4px;
+    width: 100%; height: 6px;
+    background: #1a1520; border-radius: 2px;
+    overflow: hidden;
   }
   .wait-bar {
-    height: 100%; border-radius: 3px;
+    height: 100%; border-radius: 2px;
     transition: width 0.15s linear;
   }
   .wait-bar.player-wait { background: linear-gradient(90deg, #4a6a8a, #6a9aca); }
   .wait-bar.enemy-wait { background: linear-gradient(90deg, #8a6a4a, #ca9a6a); }
+
+  .enemy-action-display {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem; color: #ca8a6a; margin-top: 4px;
+    min-height: 1em;
+  }
   .wait-label {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem; color: #686060; margin-bottom: 12px;
+    font-size: 0.6rem; color: #585050; margin-top: 2px;
   }
 
-  .action-name {
+  /* Middle: sprite stage */
+  .combat-stage {
+    display: flex; justify-content: center; align-items: flex-end;
+    gap: 100px; padding: 16px 24px 12px;
+    min-height: 100px; position: relative;
+    background: rgba(8, 6, 14, 0.5);
+    border-top: 1px solid #1a1520; border-bottom: 1px solid #1a1520;
+  }
+  .sprite-fig { text-align: center; position: relative; }
+  .sprite-fig canvas { image-rendering: pixelated; }
+  .sprite-label {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.75rem; color: #a898b0; margin-bottom: 4px;
-    min-height: 1.2em;
+    font-size: 0.55rem; color: #585050; margin-top: 2px;
+  }
+  .dmg-popup {
+    position: absolute; font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem; font-weight: bold; pointer-events: none;
+    animation: popUp 0.8s ease-out forwards;
+  }
+  @keyframes popUp {
+    0% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-40px); }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(2px); }
+  }
+  .shake { animation: shake 0.3s ease; }
+
+  /* Speed controls - compact, top-right of stage */
+  .speed-sel {
+    position: absolute; top: 4px; right: 8px;
+    display: flex; gap: 4px; align-items: center;
+  }
+  .speed-sel label { font-size: 0.55rem; color: #484040; }
+  .speed-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.55rem; padding: 2px 6px;
+    background: rgba(30, 28, 35, 0.9); border: 1px solid #2a2530;
+    border-radius: 2px; color: #686060; cursor: pointer;
+  }
+  .speed-btn.active { border-color: #b89cff; color: #c8c0b8; }
+
+  /* Bottom: RPG text box */
+  .combat-textbox {
+    padding: 12px 16px; min-height: 120px;
+    position: relative;
   }
 
-  /* ── Items ── */
-  .items { margin-bottom: 24px; }
-  .items h3 {
-    font-family: 'Cinzel', serif; font-weight: 400;
-    font-size: 0.9rem; color: #c8c0b8; margin-bottom: 10px;
+  .textbox-items {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 2px 16px;
   }
+  .textbox-item {
+    font-family: 'Cinzel', serif; font-size: 0.8rem;
+    color: #c8c0b8; padding: 4px 8px; cursor: pointer;
+    border-radius: 3px; transition: all 0.15s;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .textbox-item:hover { color: #e8e0d8; background: rgba(184, 156, 255, 0.15); }
+  .textbox-item.selected { color: #e8e0d8; background: rgba(184, 156, 255, 0.2); }
+  .textbox-item.sealed { color: #585050; cursor: not-allowed; }
+  .textbox-item.sealed:hover { background: none; color: #585050; }
+  .textbox-item:disabled, .textbox-item[disabled] { color: #383030; cursor: not-allowed; }
 
-  .item-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 8px;
-  }
-
-  .item-btn {
-    background: rgba(30, 28, 35, 0.9);
-    border: 1px solid #2a2530; border-radius: 6px;
-    padding: 10px 12px; cursor: pointer;
-    transition: all 0.2s; text-align: left;
-  }
-  .item-btn:hover { border-color: #b89cff; background: rgba(40, 35, 50, 0.9); }
-  .item-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-  .item-btn .item-name {
-    font-family: 'Cinzel', serif; font-size: 0.85rem;
-    color: #e8e0d8; margin-bottom: 4px;
-  }
-  .item-btn .item-stats {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
-    color: #908880;
-  }
-  .item-btn .item-desc {
-    font-size: 0.65rem; color: #686060; margin-top: 4px;
-    font-style: italic;
+  .textbox-stats {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; color: #908880;
+    padding: 8px 8px 0; border-top: 1px solid #2a2530;
+    margin-top: 8px; min-height: 1.5em;
   }
   .stat-eff { color: #ca6a6a; }
   .stat-def { color: #6a8aca; }
   .stat-wait { color: #caba6a; }
   .stat-special { color: #b89cff; }
 
-  /* ── Log ── */
+  /* Log (shown in textbox when not player turn) */
+  .combat-log {
+    max-height: 110px; overflow-y: auto;
+  }
+  .combat-log p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem; line-height: 1.5;
+    color: #908880; margin: 0;
+  }
+  .combat-log p.dmg { color: #ca6a6a; }
+  .combat-log p.heal { color: #6aca6a; }
+  .combat-log p.block { color: #6a8aca; }
+  .combat-log p.info { color: #caba6a; }
+  .combat-log p.victory { color: #b89cff; font-weight: 400; }
+  .combat-log p.defeat { color: #ca4a4a; font-weight: 400; }
+
+  /* Legacy log-wrap for compat */
   .log-wrap {
     background: rgba(15, 13, 20, 0.9);
     border: 1px solid #2a2530; border-radius: 8px;
-    padding: 16px; max-height: 240px; overflow-y: auto;
-    margin-bottom: 24px;
+    padding: 12px; max-height: 160px; overflow-y: auto;
+    margin-bottom: 16px;
   }
   .log-wrap p {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem; line-height: 1.6;
+    font-size: 0.65rem; line-height: 1.5;
     color: #908880; margin: 0;
   }
   .log-wrap p.dmg { color: #ca6a6a; }
@@ -188,17 +247,6 @@
   .ctrl-btn.active { border-color: #b89cff; background: rgba(60, 50, 80, 0.5); }
   .ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
   .ctrl-btn:disabled:hover { border-color: #3a3540; color: #c8c0b8; }
-
-  /* ── Speed selector ── */
-  .speed-sel { display: flex; gap: 6px; align-items: center; margin-bottom: 16px; }
-  .speed-sel label { font-size: 0.7rem; color: #686060; }
-  .speed-btn {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem; padding: 4px 10px;
-    background: rgba(30, 28, 35, 0.9); border: 1px solid #2a2530;
-    border-radius: 3px; color: #908880; cursor: pointer;
-  }
-  .speed-btn.active { border-color: #b89cff; color: #e8e0d8; }
 
   /* ── Enemy select ── */
   .enemy-select { margin-bottom: 24px; }
@@ -437,57 +485,59 @@
       <div class="enemy-grid" id="enemyGrid"></div>
     </div>
 
-    <div class="sprite-area">
-      <div class="sprite-fig" id="playerFig">
-        <canvas id="playerSprite" width="48" height="48"></canvas>
-        <div class="sprite-label">Helen</div>
+    <div class="combat-screen">
+      <!-- Top: HP bars -->
+      <div class="combat-top">
+        <div class="combat-top-side enemy-side">
+          <div class="combatant-name" id="enemyName">Slime</div>
+          <div class="hp-bar-wrap">
+            <div class="hp-bar enemy-bar" id="enemyHpBar"></div>
+            <!-- no hp-text for enemy — hidden -->
+          </div>
+          <div class="wait-bar-wrap">
+            <div class="wait-bar enemy-wait" id="enemyWaitBar"></div>
+          </div>
+          <div class="enemy-action-display" id="enemyAction">&nbsp;</div>
+          <div class="wait-label" id="enemyWaitLabel"></div>
+        </div>
+        <div class="combat-top-side player-side">
+          <div class="combatant-name">Helen</div>
+          <div class="hp-bar-wrap">
+            <div class="hp-bar player-bar" id="playerHpBar"></div>
+            <div class="hp-text" id="playerHpText"></div>
+          </div>
+          <div class="wait-bar-wrap">
+            <div class="wait-bar player-wait" id="playerWaitBar"></div>
+          </div>
+          <div class="wait-label" id="playerWaitLabel"></div>
+        </div>
       </div>
-      <div class="sprite-fig" id="enemyFig">
-        <canvas id="enemySprite" width="48" height="48"></canvas>
-        <div class="sprite-label" id="enemySpriteLabel">Slime</div>
+
+      <!-- Middle: Sprites — enemy LEFT, Helen RIGHT -->
+      <div class="combat-stage">
+        <div class="speed-sel">
+          <label>Spd:</label>
+          <button class="speed-btn" data-speed="400">▸</button>
+          <button class="speed-btn active" data-speed="200">▸▸</button>
+          <button class="speed-btn" data-speed="80">▸▸▸</button>
+        </div>
+        <div class="sprite-fig" id="enemyFig">
+          <canvas id="enemySprite" width="48" height="48"></canvas>
+          <div class="sprite-label" id="enemySpriteLabel">Slime</div>
+        </div>
+        <div class="sprite-fig" id="playerFig">
+          <canvas id="playerSprite" width="48" height="48"></canvas>
+          <div class="sprite-label">Helen</div>
+        </div>
+      </div>
+
+      <!-- Bottom: RPG text box -->
+      <div class="combat-textbox">
+        <div class="textbox-items" id="itemGrid"></div>
+        <div class="textbox-stats" id="itemStats">&nbsp;</div>
+        <div class="combat-log hidden" id="log"></div>
       </div>
     </div>
-
-    <div class="arena">
-      <div class="combatant player">
-        <h2>Helen</h2>
-        <div class="hp-bar-wrap">
-          <div class="hp-bar player-bar" id="playerHpBar"></div>
-          <div class="hp-text" id="playerHpText"></div>
-        </div>
-        <div class="action-name" id="playerAction">&nbsp;</div>
-        <div class="wait-bar-wrap">
-          <div class="wait-bar player-wait" id="playerWaitBar"></div>
-        </div>
-        <div class="wait-label" id="playerWaitLabel">Wait: —</div>
-      </div>
-      <div class="combatant enemy">
-        <h2 id="enemyName">Slime</h2>
-        <div class="hp-bar-wrap">
-          <div class="hp-bar enemy-bar" id="enemyHpBar"></div>
-          <div class="hp-text" id="enemyHpText"></div>
-        </div>
-        <div class="action-name" id="enemyAction">&nbsp;</div>
-        <div class="wait-bar-wrap">
-          <div class="wait-bar enemy-wait" id="enemyWaitBar"></div>
-        </div>
-        <div class="wait-label" id="enemyWaitLabel">Wait: —</div>
-      </div>
-    </div>
-
-    <div class="speed-sel">
-      <label>Speed:</label>
-      <button class="speed-btn" data-speed="400">Slow</button>
-      <button class="speed-btn active" data-speed="200">Normal</button>
-      <button class="speed-btn" data-speed="80">Fast</button>
-    </div>
-
-    <div class="items">
-      <h3>Choose your action</h3>
-      <div class="item-grid" id="itemGrid"></div>
-    </div>
-
-    <div class="log-wrap" id="log"></div>
 
     <div class="controls">
       <button class="ctrl-btn" id="restartBtn">Restart Fight</button>
@@ -519,58 +569,58 @@
     <div class="run-layout hidden" id="runLayout">
       <div class="orb-map" id="orbMap"></div>
       <div class="run-main">
-        <!-- Run sprites -->
-        <div class="sprite-area">
-          <div class="sprite-fig" id="runPlayerFig">
-            <canvas id="runPlayerSprite" width="48" height="48"></canvas>
-            <div class="sprite-label">Helen</div>
+        <div class="combat-screen">
+          <!-- Top: HP bars -->
+          <div class="combat-top">
+            <div class="combat-top-side enemy-side">
+              <div class="combatant-name" id="runEnemyName">?</div>
+              <div class="hp-bar-wrap">
+                <div class="hp-bar enemy-bar" id="runEnemyHpBar"></div>
+              </div>
+              <div class="wait-bar-wrap">
+                <div class="wait-bar enemy-wait" id="runEnemyWaitBar"></div>
+              </div>
+              <div class="enemy-action-display" id="runEnemyAction">&nbsp;</div>
+              <div class="wait-label" id="runEnemyWaitLabel"></div>
+            </div>
+            <div class="combat-top-side player-side">
+              <div class="combatant-name">Helen</div>
+              <div class="hp-bar-wrap">
+                <div class="hp-bar player-bar" id="runPlayerHpBar"></div>
+                <div class="hp-text" id="runPlayerHpText"></div>
+              </div>
+              <div class="wait-bar-wrap">
+                <div class="wait-bar player-wait" id="runPlayerWaitBar"></div>
+              </div>
+              <div class="wait-label" id="runPlayerWaitLabel"></div>
+            </div>
           </div>
-          <div class="sprite-fig" id="runEnemyFig">
-            <canvas id="runEnemySprite" width="48" height="48"></canvas>
-            <div class="sprite-label" id="runEnemySpriteLabel">?</div>
+
+          <!-- Middle: Sprites -->
+          <div class="combat-stage">
+            <div class="speed-sel">
+              <label>Spd:</label>
+              <button class="speed-btn run-speed" data-speed="400">▸</button>
+              <button class="speed-btn run-speed active" data-speed="200">▸▸</button>
+              <button class="speed-btn run-speed" data-speed="80">▸▸▸</button>
+            </div>
+            <div class="sprite-fig" id="runEnemyFig">
+              <canvas id="runEnemySprite" width="48" height="48"></canvas>
+              <div class="sprite-label" id="runEnemySpriteLabel">?</div>
+            </div>
+            <div class="sprite-fig" id="runPlayerFig">
+              <canvas id="runPlayerSprite" width="48" height="48"></canvas>
+              <div class="sprite-label">Helen</div>
+            </div>
+          </div>
+
+          <!-- Bottom: RPG text box -->
+          <div class="combat-textbox">
+            <div class="textbox-items" id="runItemGrid"></div>
+            <div class="textbox-stats" id="runItemStats">&nbsp;</div>
+            <div class="combat-log hidden" id="runLog"></div>
           </div>
         </div>
-
-        <div class="arena">
-          <div class="combatant player">
-            <h2>Helen</h2>
-            <div class="hp-bar-wrap">
-              <div class="hp-bar player-bar" id="runPlayerHpBar"></div>
-              <div class="hp-text" id="runPlayerHpText"></div>
-            </div>
-            <div class="action-name" id="runPlayerAction">&nbsp;</div>
-            <div class="wait-bar-wrap">
-              <div class="wait-bar player-wait" id="runPlayerWaitBar"></div>
-            </div>
-            <div class="wait-label" id="runPlayerWaitLabel">Wait: —</div>
-          </div>
-          <div class="combatant enemy">
-            <h2 id="runEnemyName">?</h2>
-            <div class="hp-bar-wrap">
-              <div class="hp-bar enemy-bar" id="runEnemyHpBar"></div>
-              <div class="hp-text" id="runEnemyHpText"></div>
-            </div>
-            <div class="action-name" id="runEnemyAction">&nbsp;</div>
-            <div class="wait-bar-wrap">
-              <div class="wait-bar enemy-wait" id="runEnemyWaitBar"></div>
-            </div>
-            <div class="wait-label" id="runEnemyWaitLabel">Wait: —</div>
-          </div>
-        </div>
-
-        <div class="speed-sel">
-          <label>Speed:</label>
-          <button class="speed-btn run-speed" data-speed="400">Slow</button>
-          <button class="speed-btn run-speed active" data-speed="200">Normal</button>
-          <button class="speed-btn run-speed" data-speed="80">Fast</button>
-        </div>
-
-        <div class="items">
-          <h3>Choose your action</h3>
-          <div class="item-grid" id="runItemGrid"></div>
-        </div>
-
-        <div class="log-wrap" id="runLog"></div>
       </div>
     </div>
 
@@ -582,7 +632,7 @@
 
       <!-- Campfire Companion -->
       <div class="campfire" id="campfire">
-        <div class="companion-name">Milo</div>
+        <div class="companion-name">Evan</div>
         <div class="companion-line" id="companionLine"></div>
       </div>
 
@@ -1409,9 +1459,9 @@ const PRESETS = {
 
 function createCombatEngine(cfg) {
   // cfg: { playerFigId, enemyFigId, playerSpriteId, enemySpriteId, enemySpriteLabelId,
-  //         pHpBar, pHpText, pWaitBar, pWaitLabel, pAction,
-  //         eHpBar, eHpText, eWaitBar, eWaitLabel, eAction, eName,
-  //         logEl, itemGridEl, getItems, onVictory, onDefeat }
+  //         pHpBar, pHpText, pWaitBar, pWaitLabel,
+  //         eHpBar, eWaitBar, eWaitLabel, eAction, eName,
+  //         logEl, itemGridEl, itemStatsEl, getItems, onVictory, onDefeat }
 
   const eng = {};
   let player, enemy, tickSpeed = 200, tickTimer = null, gameOver = false;
@@ -1431,32 +1481,44 @@ function createCombatEngine(cfg) {
   function updateUI() {
     const pPct = Math.max(0, player.hp / player.maxHp * 100);
     $(cfg.pHpBar).style.width = pPct + '%';
-    $(cfg.pHpText).textContent = `${Math.max(0,player.hp)} / ${player.maxHp}`;
+    $(cfg.pHpText).textContent = `HP ${Math.max(0,player.hp)} / ${player.maxHp}`;
 
     const ePct = enemy ? Math.max(0, enemy.hp / enemy.maxHp * 100) : 0;
     $(cfg.eHpBar).style.width = ePct + '%';
-    $(cfg.eHpText).textContent = enemy ? `${Math.max(0,enemy.hp)} / ${enemy.maxHp}` : '';
+    // Enemy HP number hidden — bar only
 
     if (player.chosenAction) {
-      $(cfg.pAction).textContent = player.chosenAction.name;
       const wPct = player.maxWait > 0 ? (player.wait / player.maxWait * 100) : 0;
       $(cfg.pWaitBar).style.width = wPct + '%';
-      $(cfg.pWaitLabel).textContent = `Wait: ${player.wait}`;
+      $(cfg.pWaitLabel).textContent = `${player.chosenAction.name} · Wait: ${player.wait}`;
     } else {
-      $(cfg.pAction).textContent = waitingForPlayer ? '⟵ choose an action' : '';
       $(cfg.pWaitBar).style.width = '0%';
-      $(cfg.pWaitLabel).textContent = 'Wait: —';
+      $(cfg.pWaitLabel).textContent = '';
     }
 
     if (enemy && enemy.chosenAction) {
-      $(cfg.eAction).textContent = enemy.chosenAction.name;
+      $(cfg.eAction).textContent = `${enemy.chosenAction.name}  Eff:${enemy.chosenAction.eff} Def:${enemy.chosenAction.def} W:${enemy.chosenAction.wait}`;
       const wPct = enemy.maxWait > 0 ? (enemy.wait / enemy.maxWait * 100) : 0;
       $(cfg.eWaitBar).style.width = wPct + '%';
       $(cfg.eWaitLabel).textContent = `Wait: ${enemy.wait}` + (waitingForPlayer ? ' (paused)' : '');
     } else {
-      $(cfg.eAction).textContent = enemy ? 'choosing...' : '';
+      $(cfg.eAction).textContent = '';
       $(cfg.eWaitBar).style.width = '0%';
-      $(cfg.eWaitLabel).textContent = 'Wait: —';
+      $(cfg.eWaitLabel).textContent = '';
+    }
+
+    // Show/hide items vs log
+    const grid = $(cfg.itemGridEl);
+    const logEl = $(cfg.logEl);
+    const statsEl = cfg.itemStatsEl ? $(cfg.itemStatsEl) : null;
+    if (waitingForPlayer && !gameOver) {
+      grid.classList.remove('hidden');
+      if (statsEl) statsEl.classList.remove('hidden');
+      logEl.classList.add('hidden');
+    } else {
+      grid.classList.add('hidden');
+      if (statsEl) statsEl.classList.add('hidden');
+      logEl.classList.remove('hidden');
     }
   }
 
@@ -1489,24 +1551,38 @@ function createCombatEngine(cfg) {
   function buildItemGrid() {
     const grid = $(cfg.itemGridEl);
     grid.innerHTML = '';
+    const statsEl = cfg.itemStatsEl ? $(cfg.itemStatsEl) : null;
+    if (statsEl) statsEl.innerHTML = '&nbsp;';
     const items = cfg.getItems();
     items.forEach((item) => {
-      const btn = document.createElement('button');
+      const div = document.createElement('div');
       const isSealed = player.sealedActions.includes(item.name);
-      btn.className = 'item-btn';
-      btn.disabled = !waitingForPlayer || gameOver || isSealed;
-      let statsHtml = `<span class="stat-eff">Eff ${item.eff + player.effBuff}${player.effBuff ? ' (+'+player.effBuff+')' : ''}</span> · <span class="stat-def">Def ${item.def}</span> · <span class="stat-wait">Wait ${item.wait}</span>`;
-      if (item.type === 'pierce') statsHtml += ` · <span class="stat-special">pierces</span>`;
-      if (item.type === 'heal') statsHtml += ` · <span class="stat-special">heals</span>`;
-      if (item.stun) statsHtml += ` · <span class="stat-special">stun +${item.stun}</span>`;
-      if (item.absorb) statsHtml += ` · <span class="stat-special">absorb</span>`;
-      if (item.seal) statsHtml += ` · <span class="stat-special">seals</span>`;
-      if (item.buff) statsHtml += ` · <span class="stat-special">+${item.buff.amount} ${item.buff.stat}</span>`;
-      let desc = item.desc;
-      if (isSealed) desc = '🔒 SEALED — cannot use this turn';
-      btn.innerHTML = `<div class="item-name">${item.name}${isSealed ? ' 🔒' : ''}</div><div class="item-stats">${statsHtml}</div><div class="item-desc">${desc}</div>`;
-      btn.onclick = () => choosePlayerAction(item);
-      grid.appendChild(btn);
+      div.className = 'textbox-item' + (isSealed ? ' sealed' : '');
+      if (!waitingForPlayer || gameOver || isSealed) {
+        div.style.pointerEvents = isSealed ? 'none' : '';
+        if (!waitingForPlayer || gameOver) div.style.color = '#383030';
+      }
+      div.textContent = isSealed ? `🔒 ${item.name}` : item.name;
+      // Hover: show stats
+      div.onmouseenter = () => {
+        if (!statsEl) return;
+        const eff = item.eff + player.effBuff;
+        let html = `<span class="stat-eff">Eff ${eff}${player.effBuff ? ' (+'+player.effBuff+')' : ''}</span> · <span class="stat-def">Def ${item.def}</span> · <span class="stat-wait">Wait ${item.wait}</span>`;
+        if (item.type === 'pierce') html += ` · <span class="stat-special">pierces</span>`;
+        if (item.type === 'heal') html += ` · <span class="stat-special">heals</span>`;
+        if (item.stun) html += ` · <span class="stat-special">stun +${item.stun}</span>`;
+        if (item.absorb) html += ` · <span class="stat-special">absorb</span>`;
+        if (item.seal) html += ` · <span class="stat-special">seals</span>`;
+        if (item.buff) html += ` · <span class="stat-special">+${item.buff.amount} ${item.buff.stat}</span>`;
+        if (isSealed) html = '<span class="stat-special">🔒 SEALED — cannot use this turn</span>';
+        statsEl.innerHTML = html;
+      };
+      div.onmouseleave = () => { if (statsEl) statsEl.innerHTML = '&nbsp;'; };
+      div.onclick = () => {
+        if (isSealed || !waitingForPlayer || gameOver) return;
+        choosePlayerAction(item);
+      };
+      grid.appendChild(div);
     });
   }
   eng.buildItemGrid = buildItemGrid;
@@ -1718,10 +1794,10 @@ const sandboxEngine = createCombatEngine({
   playerSpriteId: 'playerSprite', enemySpriteId: 'enemySprite',
   enemySpriteLabelId: 'enemySpriteLabel',
   pHpBar: 'playerHpBar', pHpText: 'playerHpText',
-  pWaitBar: 'playerWaitBar', pWaitLabel: 'playerWaitLabel', pAction: 'playerAction',
-  eHpBar: 'enemyHpBar', eHpText: 'enemyHpText',
+  pWaitBar: 'playerWaitBar', pWaitLabel: 'playerWaitLabel',
+  eHpBar: 'enemyHpBar',
   eWaitBar: 'enemyWaitBar', eWaitLabel: 'enemyWaitLabel', eAction: 'enemyAction',
-  eName: 'enemyName', logEl: 'log', itemGridEl: 'itemGrid',
+  eName: 'enemyName', logEl: 'log', itemGridEl: 'itemGrid', itemStatsEl: 'itemStats',
   getItems: () => ITEMS,
   onVictory: null, onDefeat: null,
 });
@@ -1785,10 +1861,10 @@ function initRunEngine() {
     playerSpriteId: 'runPlayerSprite', enemySpriteId: 'runEnemySprite',
     enemySpriteLabelId: 'runEnemySpriteLabel',
     pHpBar: 'runPlayerHpBar', pHpText: 'runPlayerHpText',
-    pWaitBar: 'runPlayerWaitBar', pWaitLabel: 'runPlayerWaitLabel', pAction: 'runPlayerAction',
-    eHpBar: 'runEnemyHpBar', eHpText: 'runEnemyHpText',
+    pWaitBar: 'runPlayerWaitBar', pWaitLabel: 'runPlayerWaitLabel',
+    eHpBar: 'runEnemyHpBar',
     eWaitBar: 'runEnemyWaitBar', eWaitLabel: 'runEnemyWaitLabel', eAction: 'runEnemyAction',
-    eName: 'runEnemyName', logEl: 'runLog', itemGridEl: 'runItemGrid',
+    eName: 'runEnemyName', logEl: 'runLog', itemGridEl: 'runItemGrid', itemStatsEl: 'runItemStats',
     getItems: () => ITEMS.filter(it => runState.loadout.includes(it.name)),
     onVictory: () => {
       runState.hp = runEngine.getPlayer().hp;
