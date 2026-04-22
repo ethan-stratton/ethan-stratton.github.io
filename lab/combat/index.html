@@ -856,7 +856,6 @@ const ITEMS = [
   { name: 'Drain Touch', eff: 12, def: 0, wait: 12, absorb: true, desc: 'Absorb — heals for damage dealt', type: 'melee' },
   { name: 'Seal Rune', eff: 0, def: 3, wait: 7, seal: true, desc: 'Seals enemy\'s current action!', type: 'seal' },
   { name: 'Invigorate', eff: 0, def: 0, wait: 10, buff: { stat: 'eff', amount: 5 }, desc: 'Buff: +5 Effect on all weapons', type: 'buff' },
-  { name: 'Metronome', eff: 0, def: 0, wait: 1, desc: 'Scout — act first, see what they chose', type: 'tool' },
 ];
 
 // ── Enemies ──
@@ -966,10 +965,10 @@ const ENEMIES = [
 
 // ── Presets ──
 const PRESETS = {
-  warrior: ['Longsword', 'Broadsword', 'Wooden Shield', 'Heal', 'Stun Mace', 'Metronome'],
-  ranger: ['Longbow', 'Trusty Dagger', 'Thunder', 'Seal Rune', 'Heal', 'Metronome'],
-  vampire: ['Drain Touch', 'Trusty Dagger', 'Longbow', 'Invigorate', 'Stun Mace', 'Metronome'],
-  glasscannon: ['Thunder', 'Invigorate', 'Longbow', 'Longsword', 'Metronome', 'Seal Rune'],
+  warrior: ['Longsword', 'Broadsword', 'Wooden Shield', 'Heal', 'Stun Mace', 'Drain Touch'],
+  ranger: ['Longbow', 'Trusty Dagger', 'Thunder', 'Seal Rune', 'Heal', 'Invigorate'],
+  vampire: ['Drain Touch', 'Trusty Dagger', 'Longbow', 'Invigorate', 'Stun Mace', 'Heal'],
+  glasscannon: ['Thunder', 'Invigorate', 'Longbow', 'Longsword', 'Trusty Dagger', 'Seal Rune'],
 };
 
 // ═══════════════════════════════════════
@@ -1018,8 +1017,7 @@ function createCombatEngine(cfg) {
     }
 
     if (enemy && enemy.chosenAction) {
-      // Hide action name — show only "..." and wait bar. Action revealed on resolve.
-      $(cfg.eAction).textContent = '...';
+      $(cfg.eAction).textContent = enemy.chosenAction.name;
       const wPct = enemy.maxWait > 0 ? (enemy.wait / enemy.maxWait * 100) : 0;
       $(cfg.eWaitBar).style.width = wPct + '%';
       $(cfg.eWaitLabel).textContent = `Wait: ${enemy.wait}` + (waitingForPlayer ? ' (paused)' : '');
@@ -1097,9 +1095,9 @@ function createCombatEngine(cfg) {
       enemy.wait = eAction.wait;
       enemy.maxWait = eAction.wait;
       enemy.def = eAction.def;
-      log(`${enemy.name} is preparing something... (Wait: ${eAction.wait})`, 'info');
+      log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
     }
-    log(`You ready ${item.name}`, 'info');
+    log(`You ready ${item.name} (Eff:${item.eff} Def:${item.def} W:${item.wait})`, 'info');
     buildItemGrid();
     updateUI();
     startTicking();
@@ -1146,7 +1144,7 @@ function createCombatEngine(cfg) {
     enemy.sealedActions = [];
     enemy.chosenAction = eAction;
     enemy.wait = eAction.wait; enemy.maxWait = eAction.wait; enemy.def = eAction.def;
-    log(`${enemy.name} is preparing something... (Wait: ${eAction.wait})`, 'info');
+    log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
   }
 
   function resolveAction(who) {
