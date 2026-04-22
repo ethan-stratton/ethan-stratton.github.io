@@ -123,7 +123,7 @@
   /* Middle: sprite stage */
   .combat-stage {
     display: flex; justify-content: center; align-items: flex-end;
-    gap: 100px; padding: 16px 24px 12px;
+    gap: 180px; padding: 16px 24px 12px;
     min-height: 100px; position: relative;
     background: rgba(8, 6, 14, 0.5);
     border-top: 1px solid #1a1520; border-bottom: 1px solid #1a1520;
@@ -174,19 +174,29 @@
 
   .textbox-items {
     display: grid; grid-template-columns: 1fr 1fr;
-    gap: 2px 16px;
+    gap: 2px 12px;
   }
   .textbox-item {
-    font-family: 'Cinzel', serif; font-size: 0.8rem;
-    color: #c8c0b8; padding: 4px 8px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.72rem;
+    color: #c8c0b8; padding: 5px 8px; cursor: pointer;
     border-radius: 3px; transition: all 0.15s;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px; user-select: none;
   }
   .textbox-item:hover { color: #e8e0d8; background: rgba(184, 156, 255, 0.15); }
   .textbox-item.selected { color: #e8e0d8; background: rgba(184, 156, 255, 0.2); }
   .textbox-item.sealed { color: #585050; cursor: not-allowed; }
   .textbox-item.sealed:hover { background: none; color: #585050; }
-  .textbox-item:disabled, .textbox-item[disabled] { color: #383030; cursor: not-allowed; }
+  .textbox-item.drag-over { border-top: 2px solid #b89cff; }
+  .textbox-item .item-label {
+    font-family: 'Cinzel', serif; font-size: 0.78rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .textbox-item .item-inline-stats {
+    font-size: 0.6rem; color: #686060;
+    white-space: nowrap; flex-shrink: 0;
+  }
 
   .textbox-stats {
     font-family: 'JetBrains Mono', monospace;
@@ -1554,19 +1564,40 @@ function createCombatEngine(cfg) {
     const statsEl = cfg.itemStatsEl ? $(cfg.itemStatsEl) : null;
     if (statsEl) statsEl.innerHTML = '&nbsp;';
     const items = cfg.getItems();
-    items.forEach((item) => {
+    // Maintain custom order per engine
+    if (!eng._itemOrder || eng._itemOrder.length !== items.length) {
+      eng._itemOrder = items.map((_, i) => i);
+    }
+    const order = eng._itemOrder;
+
+    order.forEach((idx, pos) => {
+      const item = items[idx];
+      if (!item) return;
       const div = document.createElement('div');
       const isSealed = player.sealedActions.includes(item.name);
       div.className = 'textbox-item' + (isSealed ? ' sealed' : '');
-      if (!waitingForPlayer || gameOver || isSealed) {
-        div.style.pointerEvents = isSealed ? 'none' : '';
-        if (!waitingForPlayer || gameOver) div.style.color = '#383030';
+      if (!waitingForPlayer || gameOver) {
+        if (!isSealed) div.style.color = '#383030';
       }
-      div.textContent = isSealed ? `🔒 ${item.name}` : item.name;
-      // Hover: show stats
+      div.draggable = true;
+      div.dataset.pos = pos;
+
+      // Build inline stats
+      const eff = item.eff + player.effBuff;
+      let specials = '';
+      if (item.type === 'pierce') specials = ' ⟁';
+      if (item.type === 'heal') specials = ' ♥';
+      if (item.stun) specials = ' ◉';
+      if (item.absorb) specials = ' ◎';
+      if (item.seal) specials = ' ⊘';
+      if (item.buff) specials = ' ↑';
+
+      const nameText = isSealed ? `🔒 ${item.name}` : item.name;
+      div.innerHTML = `<span class="item-label">${nameText}</span><span class="item-inline-stats"><span class="stat-eff">${eff}</span>/<span class="stat-def">${item.def}</span>/<span class="stat-wait">${item.wait}</span>${specials}</span>`;
+
+      // Hover: show full details in stats bar
       div.onmouseenter = () => {
         if (!statsEl) return;
-        const eff = item.eff + player.effBuff;
         let html = `<span class="stat-eff">Eff ${eff}${player.effBuff ? ' (+'+player.effBuff+')' : ''}</span> · <span class="stat-def">Def ${item.def}</span> · <span class="stat-wait">Wait ${item.wait}</span>`;
         if (item.type === 'pierce') html += ` · <span class="stat-special">pierces</span>`;
         if (item.type === 'heal') html += ` · <span class="stat-special">heals</span>`;
@@ -1578,10 +1609,27 @@ function createCombatEngine(cfg) {
         statsEl.innerHTML = html;
       };
       div.onmouseleave = () => { if (statsEl) statsEl.innerHTML = '&nbsp;'; };
+
+      // Click to pick
       div.onclick = () => {
         if (isSealed || !waitingForPlayer || gameOver) return;
         choosePlayerAction(item);
       };
+
+      // Drag & drop reorder
+      div.ondragstart = (e) => { e.dataTransfer.setData('text/plain', pos); e.dataTransfer.effectAllowed = 'move'; };
+      div.ondragover = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; div.classList.add('drag-over'); };
+      div.ondragleave = () => { div.classList.remove('drag-over'); };
+      div.ondrop = (e) => {
+        e.preventDefault(); div.classList.remove('drag-over');
+        const fromPos = parseInt(e.dataTransfer.getData('text/plain'));
+        const toPos = pos;
+        if (fromPos === toPos) return;
+        const moved = order.splice(fromPos, 1)[0];
+        order.splice(toPos, 0, moved);
+        buildItemGrid();
+      };
+
       grid.appendChild(div);
     });
   }
