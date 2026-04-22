@@ -352,7 +352,9 @@
     <p>
       <strong>Damage</strong> = attacker's <code>Effectiveness</code> − defender's <code>Defend</code>.
       If Defend ≥ Effect, the attack is fully blocked (0 damage).
-      Magic <strong>pierces defense</strong> entirely — Defend doesn't apply.
+      <strong>Piercing</strong> attacks (magic and the Trusty Dagger) ignore defense entirely.
+      The dagger's low damage but piercing property makes it the anti-shield tool —
+      use it when the enemy guards.
     </p>
     <p>
       <strong>Wait</strong> counts down simultaneously for both sides. The first to hit 0 acts,
@@ -488,48 +490,48 @@ const enemySprites = {
 
 // ── Items (Helen's inventory) ──
 const ITEMS = [
-  { name: 'Iron Sword', eff: 12, def: 6, wait: 8, desc: 'Balanced blade', type: 'melee' },
-  { name: 'Dagger', eff: 5, def: 3, wait: 3, desc: 'Quick and light', type: 'melee' },
-  { name: 'Heavy Axe', eff: 22, def: 4, wait: 14, desc: 'Devastating but slow', type: 'melee' },
-  { name: 'Short Bow', eff: 8, def: 1, wait: 4, desc: 'Fast, low defense', type: 'ranged' },
-  { name: 'Iron Shield', eff: 0, def: 14, wait: 6, desc: 'Pure defense', type: 'shield' },
-  { name: 'Thunder', eff: 18, def: 0, wait: 12, desc: 'Pierces defense!', type: 'magic' },
-  { name: 'Heal', eff: 15, def: 2, wait: 10, desc: 'Restore HP', type: 'heal' },
-  { name: 'Metronome', eff: 0, def: 0, wait: 1, desc: 'Wait and watch', type: 'tool' },
+  { name: 'Longbow', eff: 10, def: 2, wait: 5, desc: 'Fast and reliable', type: 'ranged' },
+  { name: 'Longsword', eff: 15, def: 7, wait: 10, desc: 'Balanced offense & defense', type: 'melee' },
+  { name: 'Broadsword', eff: 22, def: 16, wait: 14, desc: 'Heavy but well-guarded', type: 'melee' },
+  { name: 'Trusty Dagger', eff: 2, def: 0, wait: 6, desc: 'Pierces defense!', type: 'magic' },
+  { name: 'Wooden Shield', eff: 0, def: 18, wait: 8, desc: 'Pure defense wall', type: 'shield' },
+  { name: 'Thunder', eff: 35, def: 0, wait: 20, desc: 'Devastating. Pierces defense!', type: 'magic' },
+  { name: 'Heal', eff: 30, def: 0, wait: 15, desc: 'Restore HP, no defense while casting', type: 'heal' },
+  { name: 'Metronome', eff: 0, def: 0, wait: 1, desc: 'Wait 1 tick and observe', type: 'tool' },
 ];
 
 // ── Enemies ──
 const ENEMIES = [
   {
-    name: 'Slime', hp: 40, sprite: 'Slime',
+    name: 'Slime', hp: 30, sprite: 'Slime',
     actions: [
-      { name: 'Tackle', eff: 6, def: 2, wait: 5 },
-      { name: 'Bounce', eff: 3, def: 4, wait: 3 },
+      { name: 'Tackle', eff: 8, def: 2, wait: 6 },
+      { name: 'Bounce', eff: 4, def: 5, wait: 4 },
     ],
     ai: (enemy, player) => enemy.actions[Math.random() < 0.6 ? 0 : 1],
     desc: 'Simple and predictable.'
   },
   {
-    name: 'Lizardman', hp: 65, sprite: 'Lizardman',
+    name: 'Lizardman', hp: 55, sprite: 'Lizardman',
     actions: [
-      { name: 'Slash', eff: 10, def: 3, wait: 6 },
-      { name: 'Guard Stance', eff: 4, def: 12, wait: 8 },
-      { name: 'Quick Jab', eff: 5, def: 5, wait: 3 },
+      { name: 'Slash', eff: 14, def: 4, wait: 8 },
+      { name: 'Guard Stance', eff: 5, def: 20, wait: 10 },
+      { name: 'Quick Jab', eff: 7, def: 6, wait: 4 },
     ],
     ai: (enemy, player) => {
-      // If player chose high-wait action, guard up
-      if (player.chosenAction && player.chosenAction.wait >= 8)
+      // If player chose high-wait action, guard up to tank it
+      if (player.chosenAction && player.chosenAction.wait >= 10)
         return enemy.actions[1]; // guard
       return enemy.actions[Math.random() < 0.5 ? 0 : 2];
     },
     desc: 'Guards when you wind up.'
   },
   {
-    name: 'Skeleton', hp: 55, sprite: 'Skeleton',
+    name: 'Skeleton', hp: 50, sprite: 'Skeleton',
     actions: [
-      { name: 'Bone Slash', eff: 9, def: 2, wait: 5 },
-      { name: 'Bone Throw', eff: 7, def: 0, wait: 3 },
-      { name: 'Reassemble', eff: 10, def: 6, wait: 10, type: 'heal' },
+      { name: 'Bone Slash', eff: 12, def: 3, wait: 7 },
+      { name: 'Bone Throw', eff: 9, def: 0, wait: 4 },
+      { name: 'Reassemble', eff: 15, def: 8, wait: 12, type: 'heal' },
     ],
     ai: (enemy, player) => {
       if (enemy.hp < enemy.maxHp * 0.35 && Math.random() < 0.5)
@@ -539,20 +541,19 @@ const ENEMIES = [
     desc: 'Heals when wounded.'
   },
   {
-    name: 'Dark Knight', hp: 90, sprite: 'DarkKnight',
+    name: 'Dark Knight', hp: 80, sprite: 'DarkKnight',
     actions: [
-      { name: 'Dark Blade', eff: 16, def: 5, wait: 8 },
-      { name: 'Quick Slash', eff: 8, def: 4, wait: 4 },
-      { name: 'Black Shield', eff: 0, def: 16, wait: 7 },
-      { name: 'Counter', eff: 12, def: 8, wait: 6 },
+      { name: 'Dark Blade', eff: 20, def: 8, wait: 10 },
+      { name: 'Quick Slash', eff: 10, def: 5, wait: 5 },
+      { name: 'Black Shield', eff: 0, def: 22, wait: 8 },
+      { name: 'Counter', eff: 15, def: 10, wait: 7 },
     ],
     ai: (enemy, player) => {
       // Punishes slow spells with quick attacks
-      if (player.chosenAction && player.chosenAction.type === 'magic')
-        return enemy.actions[1]; // quick slash
-      if (player.chosenAction && player.chosenAction.wait >= 10)
+      if (player.chosenAction && player.chosenAction.type === 'magic' && player.chosenAction.wait >= 15)
+        return enemy.actions[1]; // quick slash — rush down while defenseless
+      if (player.chosenAction && player.chosenAction.wait >= 12)
         return enemy.actions[1]; // rush down slow actions
-      // Mix of heavy and defensive
       let r = Math.random();
       if (r < 0.35) return enemy.actions[0];
       if (r < 0.6) return enemy.actions[3];
@@ -561,23 +562,23 @@ const ENEMIES = [
     desc: 'Counters magic and slow attacks.'
   },
   {
-    name: 'Dragon', hp: 140, sprite: 'Dragon',
+    name: 'Dragon', hp: 120, sprite: 'Dragon',
     actions: [
-      { name: 'Claw', eff: 14, def: 6, wait: 6 },
-      { name: 'Fire Breath', eff: 25, def: 0, wait: 14, type: 'magic' },
-      { name: 'Tail Sweep', eff: 10, def: 8, wait: 5 },
-      { name: 'Roar', eff: 0, def: 10, wait: 3 },
+      { name: 'Claw', eff: 18, def: 8, wait: 8 },
+      { name: 'Fire Breath', eff: 30, def: 0, wait: 16, type: 'magic' },
+      { name: 'Tail Sweep', eff: 12, def: 10, wait: 6 },
+      { name: 'Roar', eff: 0, def: 14, wait: 4 },
     ],
     ai: (enemy, player) => {
-      // Fire breath when player shields
+      // Fire breath when player shields (pierces!)
       if (player.chosenAction && player.chosenAction.type === 'shield')
-        return enemy.actions[1]; // fire breath pierces!
+        return enemy.actions[1]; // fire breath
       if (enemy.hp < enemy.maxHp * 0.3)
         return enemy.actions[Math.random() < 0.5 ? 1 : 0]; // aggressive when low
       let r = Math.random();
-      if (r < 0.35) return enemy.actions[0];
-      if (r < 0.55) return enemy.actions[2];
-      if (r < 0.75) return enemy.actions[3];
+      if (r < 0.3) return enemy.actions[0];
+      if (r < 0.5) return enemy.actions[2];
+      if (r < 0.7) return enemy.actions[3];
       return enemy.actions[1];
     },
     desc: 'Breathes fire when you turtle.'
@@ -585,7 +586,7 @@ const ENEMIES = [
 ];
 
 // ── State ──
-let player = { hp: 60, maxHp: 60, wait: 0, maxWait: 0, chosenAction: null, def: 0 };
+let player = { hp: 50, maxHp: 50, wait: 0, maxWait: 0, chosenAction: null, def: 0 };
 let enemy = { hp: 0, maxHp: 0, wait: 0, maxWait: 0, chosenAction: null, def: 0, actions: [], ai: null, name: '' };
 let tickSpeed = 200;
 let tickTimer = null;
