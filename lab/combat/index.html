@@ -1081,6 +1081,8 @@ function createCombatEngine(cfg) {
     player.wait = item.wait;
     player.maxWait = item.wait;
     player.def = item.def;
+    // Clear sealed actions now that player has picked
+    player.sealedActions = [];
 
     if (!enemy.chosenAction) {
       const eAction = currentEnemyData.ai(enemy, player);
@@ -1133,6 +1135,8 @@ function createCombatEngine(cfg) {
       const available = currentEnemyData.actions.filter(a => !enemy.sealedActions.includes(a.name));
       eAction = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : eAction;
     }
+    // Clear sealed actions now that enemy has picked
+    enemy.sealedActions = [];
     enemy.chosenAction = eAction;
     enemy.wait = eAction.wait; enemy.maxWait = eAction.wait; enemy.def = eAction.def;
     log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
@@ -1155,9 +1159,13 @@ function createCombatEngine(cfg) {
         showDmgPopup(cfg.playerFigId, '+' + act.buff.amount + ' EFF', '#b89cff');
       } else if (act.seal) {
         if (enemy.chosenAction && !enemy.sealedActions.includes(enemy.chosenAction.name)) {
-          enemy.sealedActions.push(enemy.chosenAction.name);
-          log(`Sealed ${enemy.name}'s ${enemy.chosenAction.name}! It can't use it again.`, 'info');
+          const sealedName = enemy.chosenAction.name;
+          enemy.sealedActions.push(sealedName);
+          log(`Sealed ${enemy.name}'s ${sealedName}! Action cancelled — forced to pick again.`, 'info');
           showDmgPopup(cfg.enemyFigId, 'SEALED', '#b89cff');
+          // Cancel the enemy's current action and force a new pick
+          enemy.chosenAction = null; enemy.wait = 0; enemy.maxWait = 0; enemy.def = 0;
+          pickEnemyAction();
         } else { log(`Seal Rune fizzles — nothing to seal.`, 'info'); }
       } else {
         let dmg = act.type === 'pierce' ? eff : Math.max(0, eff - enemy.def);
@@ -1180,7 +1188,7 @@ function createCombatEngine(cfg) {
           showDmgPopup(cfg.enemyFigId, 'STUN +' + act.stun, '#caba6a');
         }
       }
-      player.sealedActions = [];
+      // sealedActions cleared after player picks next action (in choosePlayerAction)
       if (enemy.hp <= 0) { victory(); return; }
     } else {
       const act = enemy.chosenAction; if (!act) return;
@@ -1216,7 +1224,7 @@ function createCombatEngine(cfg) {
           showDmgPopup(cfg.playerFigId, 'STUN +' + act.stun, '#caba6a');
         }
       }
-      enemy.sealedActions = [];
+      // sealedActions cleared after enemy picks next action (in pickEnemyAction)
       if (player.hp <= 0) { defeat(); return; }
     }
   }
