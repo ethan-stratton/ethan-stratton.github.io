@@ -739,6 +739,213 @@
       and no way to heal without resetting your damage engine.
     </p>
   </div>
+
+  <!-- ═══════════ GDD — INTERFACE SHIFTS ═══════════ -->
+  <div class="how" style="margin-top: 16px; border-color: #2a3a4a;">
+    <h3>Design Document — Transformation Interface Shifts</h3>
+    <p>
+      Each transformation doesn't just change your stats — it changes <strong>what you see</strong>.
+      The interface itself shifts to reflect your new nature. Information is power in this system,
+      so changing what information you have access to changes how you play fundamentally.
+    </p>
+
+    <h4>🧛 Vampire — Dark Sight</h4>
+    <p>
+      The screen darkens. Enemy sprites gain a faint red pulse showing their "heartbeat" —
+      a visual tell that speeds up when they're low HP. You can <em>feel</em> when they're close to death
+      without reading numbers. The blood meter glows brighter as it fills, lighting the screen.
+      At 30 Blood, the whole arena has a crimson cast. You're not reading stats anymore — you're hunting.
+    </p>
+
+    <h4>🐺 Werewolf — Instinct</h4>
+    <p>
+      Eff/Def/Wait numbers are <strong>hidden</strong>. Actions show only names and a vague
+      feel: "Heavy," "Fast," "Desperate." You're playing on instinct. The enemy's wait bar
+      still ticks, but you don't see the number — just the bar shrinking. Fights are faster,
+      wilder, less calculated. This is the opposite of Chronomancer.
+    </p>
+
+    <h4>💀 Lich — Death's Eyes</h4>
+    <p>
+      All living enemies appear as skeletons — sprites shift to bone. The world looks
+      decayed, colors desaturated. Enemy HP is shown as an <strong>exact number</strong>
+      (not a bar), but YOUR HP bar has no number — just a bar that might be lying to you
+      (it drifts slightly, ±3 HP visual noise). You see death clearly. Your own mortality is uncertain.
+    </p>
+
+    <h4>🔮 Chronomancer — Foresight</h4>
+    <p>
+      You see the enemy's <strong>current AND next queued action</strong>. Two moves ahead.
+      The second action is shown faintly, ghosted — it might change if the enemy's AI
+      reacts to what you do. But it gives you a plan. The tradeoff: your +3 Wait penalty
+      means you're always reacting from behind. You see the future but can't keep up with it.
+    </p>
+
+    <h4>🧟 Revenant — Afterimage</h4>
+    <p>
+      After resurrection, the screen flickers. Your sprite glitches — stuttering frames,
+      brief static. The combat log occasionally shows corrupted text. You're not fully here anymore.
+      The doubled Wait values aren't just a penalty — they feel like lag. Like the game itself
+      is struggling to keep you alive.
+    </p>
+
+    <h4>⚡ Berserker — Tunnel Vision</h4>
+    <p>
+      As your combo streak grows, the edges of the screen darken (vignette tightens).
+      At 3+ streak, only the enemy and your action choices are fully visible.
+      The combat log fades. Your own HP bar shrinks. You're losing awareness of everything
+      except the next hit. Breaking the streak with Shield or Heal snaps the view back to normal —
+      the sudden clarity feels like waking up.
+    </p>
+  </div>
+
+  <!-- ═══════════ GDD — ACTION COMBOS ═══════════ -->
+  <div class="how" style="margin-top: 16px; border-color: #3a2a2a;">
+    <h3>Design Document — Action Combos</h3>
+    <p>
+      Using specific actions in sequence triggers <strong>combo effects</strong> — bonus damage,
+      status effects, or defensive reactions. These are NOT listed in the UI. Players discover them
+      through experimentation, accident, and word of mouth. The game acknowledges a combo with
+      a brief flash and a unique log message.
+    </p>
+    <p>
+      <strong>Design principle:</strong> Combos reward planning but don't obsolete single actions.
+      A combo should be ~30-50% stronger than using the actions separately, not 5×.
+      And every combo has a <strong>risk window</strong> — the setup action usually leaves you exposed.
+    </p>
+
+    <h4>Weapon Combos</h4>
+    <ul>
+      <li><strong>Stun → any attack:</strong> "Shattered Guard" — bonus +5 Eff (enemy is staggered, defense disrupted)</li>
+      <li><strong>Seal → pierce attack:</strong> "Exploit" — bonus +8 Eff (sealed their defense, now pierce through the gap)</li>
+      <li><strong>Longbow → Longbow → Longbow:</strong> "Volley" — third arrow hits for 2× Eff (sustained pressure rewarded)</li>
+      <li><strong>Any weapon 3× in a row:</strong> "Mastery" — third use gets +4 Eff (you're in a rhythm)</li>
+      <li><strong>Trusty Dagger → Longsword:</strong> "Riposte" — Longsword gains pierce (dagger finds the gap, sword follows through)</li>
+    </ul>
+
+    <h4>Defensive Combos</h4>
+    <ul>
+      <li><strong>Shield → Broadsword:</strong> "Shield Bash" — Broadsword Eff += damage blocked last turn (hit them with what they gave you)</li>
+      <li><strong>Heal → Shield:</strong> "Fortify" — Shield Def +6 this turn (catching your breath behind steel)</li>
+      <li><strong>Shield → Shield:</strong> "Brace" — second Shield Def +10 (digging in, but you're doing zero damage)</li>
+    </ul>
+
+    <h4>Magic Combos</h4>
+    <ul>
+      <li><strong>Invigorate → Thunder:</strong> "Overcharge" — Thunder gains +10 Eff AND stuns 3 (channeled lightning)</li>
+      <li><strong>Invigorate → Invigorate:</strong> "Surge" — second buff gives +8 instead of +5 (momentum)</li>
+      <li><strong>Drain Touch → Seal Rune:</strong> "Soul Bind" — seal duration lasts 2 cycles instead of 1 (you've tasted their essence)</li>
+    </ul>
+
+    <h4>Transformation Synergies</h4>
+    <p>
+      Each transformation unlocks <strong>unique combo paths</strong> that don't exist in base form.
+      These are the deepest secrets — requiring both the right transformation AND the right action sequence.
+    </p>
+    <ul>
+      <li><strong>Vampire + Drain Touch → any attack:</strong> "Blood Frenzy" — next attack Eff scales with current Blood meter (10 Blood = +10 Eff)</li>
+      <li><strong>Werewolf + Claw → Bite:</strong> "Savage" — Bite Eff doubled if Claw hit this cycle (pounce then devour)</li>
+      <li><strong>Lich + Thunder → Thunder:</strong> "Chain Lightning" — second Thunder costs 0 Def, hits for 1.5× (death accelerates)</li>
+      <li><strong>Berserker + 5-streak → Broadsword:</strong> "Deathblow" — Eff tripled but streak resets AND you take 10 self-damage (all-in finisher)</li>
+      <li><strong>Chronomancer + Seal (on predicted action):</strong> "Paradox" — if you seal the action Chronomancer revealed as "next," seal lasts 3 cycles (you broke their timeline)</li>
+      <li><strong>Revenant + any action at 1 HP:</strong> "Defiance" — Eff doubled (fighting with nothing left to lose)</li>
+    </ul>
+  </div>
+
+  <!-- ═══════════ GDD — WEAPON IDENTITY & ENCHANTMENTS ═══════════ -->
+  <div class="how" style="margin-top: 16px; border-color: #2a3a2a;">
+    <h3>Design Document — Weapon Identity & Enchantments</h3>
+    <p>
+      Weapons aren't disposable tools — they grow, remember, and develop personality.
+      Two players' Longswords should feel different after 20 fights.
+    </p>
+
+    <h4>Weapon Experience</h4>
+    <p>
+      Each weapon tracks usage. Every N uses, it <strong>evolves</strong> — not just +Eff,
+      but new capabilities. Evolution paths are partially random (enchantments) and partially
+      earned (combo discoveries).
+    </p>
+    <ul>
+      <li><strong>Longsword Lv.1→2:</strong> "Keen Edge" — gains a 20% chance to pierce on any hit</li>
+      <li><strong>Longsword Lv.2→3:</strong> "Blade Mastery" — Wait reduced by 1 permanently</li>
+      <li><strong>Longbow Lv.1→2:</strong> "Steady Aim" — Def +2 while waiting (you've learned to hold position)</li>
+      <li><strong>Longbow Lv.2→3:</strong> "Double Nock" — 30% chance to fire twice (second hit at half Eff)</li>
+      <li><strong>Wooden Shield Lv.2→3:</strong> "Ironbound" — becomes Iron Shield, Def +4, enables Shield Bash combo</li>
+    </ul>
+
+    <h4>Random Enchantments</h4>
+    <p>
+      At evolution milestones, weapons gain a <strong>random enchantment</strong> from a pool.
+      These are permanent and unique to your copy. Enchantments are named with mystical language —
+      the weapon is becoming something with a history.
+    </p>
+    <ul>
+      <li><strong>...of the Comet:</strong> +3 Eff on first use each fight (opening strike)</li>
+      <li><strong>...of Echoes:</strong> 15% chance to repeat the action at half stats (ghostly afterimage)</li>
+      <li><strong>...of Stillwater:</strong> +3 Def permanently (the weapon has a calming presence)</li>
+      <li><strong>...of the Pyre:</strong> hits have 20% chance to add burn (2 damage per tick for 3 ticks)</li>
+      <li><strong>...of Famine:</strong> absorb 2 HP on any hit regardless of weapon type</li>
+      <li><strong>...of Thorns:</strong> attacker takes 3 damage when they hit you while this weapon is active</li>
+      <li><strong>...of Whispers:</strong> reveals enemy's next action for 1 turn after this weapon fires</li>
+      <li><strong>...of the Void:</strong> pierce, but Def becomes 0 for this action</li>
+    </ul>
+    <p>
+      <strong>The mystical feeling:</strong> Finding "Longsword of the Pyre" should feel like
+      finding a named weapon in Dark Souls, not rolling a stat. The name tells a story.
+      Why does this sword burn? Who used it before you? The game doesn't answer. Your imagination does.
+    </p>
+
+    <h4>Awakening (Beet-style)</h4>
+    <p>
+      At the highest weapon mastery, a weapon can <strong>Awaken</strong> — a one-time permanent
+      transformation that changes its identity. Like Beet's Saiga manifesting from spiritual energy,
+      an Awakened weapon reflects the player's journey with it.
+    </p>
+    <p>
+      Awakening depends on <strong>what you did with the weapon</strong> — kill count, combo count,
+      damage taken while it was active, enemies sealed with it. Different histories = different Awakenings.
+    </p>
+    <ul>
+      <li><strong>Longsword (high kill count):</strong> Awakens into "Oathblade" — Eff scales with consecutive victories (run momentum)</li>
+      <li><strong>Longsword (high damage taken):</strong> Awakens into "Scar" — Eff increases as your HP drops (wounded fury)</li>
+      <li><strong>Shield (many blocks):</strong> Awakens into "Aegis" — auto-blocks the first hit each fight at half Def (it remembers its purpose)</li>
+      <li><strong>Drain Touch (high absorb total):</strong> Awakens into "Leech King" — absorb always heals at least 5, even on 0-damage blocked hits</li>
+      <li><strong>Thunder (used with Invigorate):</strong> Awakens into "Judgment" — pierce + stun 2 baseline. The nuke.</li>
+    </ul>
+    <p>
+      <strong>The Beet connection:</strong> Beet's weapons aren't things he found. They're extensions of his will.
+      The Saiga don't work for anyone else. An Awakened weapon in Wait Combat shouldn't feel like loot —
+      it should feel like something that grew out of the player's choices. "This is MY Oathblade.
+      It exists because of how I played." That's the attachment.
+    </p>
+  </div>
+
+  <!-- ═══════════ GDD — CLASH SYSTEM ═══════════ -->
+  <div class="how" style="margin-top: 16px; border-color: #4a3a2a;">
+    <h3>Design Document — The Clash</h3>
+    <p>
+      When both combatants' Wait timers hit <strong>0 on the same tick</strong>, a <strong>Clash</strong>
+      occurs. Both actions resolve simultaneously, but with bonus effects:
+    </p>
+    <ul>
+      <li><strong>Both attacking:</strong> Both deal +50% Eff. A mutual kill is possible. High risk, high drama.</li>
+      <li><strong>Attack vs Shield:</strong> Attacker breaks through — damage ignores half of Def. Shields aren't safe at zero.</li>
+      <li><strong>Attack vs Heal:</strong> Heal resolves first, then damage hits. The heal saves you — barely.</li>
+      <li><strong>Both shielding:</strong> Nothing happens. A wasted turn for both. The game punishes passivity.</li>
+    </ul>
+    <p>
+      <strong>The design:</strong> Clashes are uncommon — you'd have to deliberately time your Wait
+      to match the enemy's countdown. But when they happen, they're memorable. A Clash kill
+      should feel like a finishing blow in a fighting game. Screen flash. Bigger damage popup.
+      The log says something different: "CLASH — Longsword strikes true!" not just "hits for 22."
+    </p>
+    <p>
+      <strong>Strategic depth:</strong> Players who master Wait counting can engineer Clashes intentionally.
+      See the enemy at Wait 6? Pick an action with Wait 6. You're betting you can win the simultaneous
+      exchange. That's the "finisher" energy — not random, but earned through reading the fight.
+    </p>
+  </div>
 </div>
 
 <script>
