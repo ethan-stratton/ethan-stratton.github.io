@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Liquid Noise — strattao</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400&family=JetBrains+Mono:wght@300;400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    color: #c8c0b8;
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  canvas#starfield {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .content {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  .back {
+    display: inline-block;
+    font-size: 0.8rem;
+    color: #706860;
+    text-decoration: none;
+    margin-bottom: 24px;
+    letter-spacing: 0.04em;
+    transition: color 0.3s;
+  }
+  .back:hover { color: #b89cff; }
+
+  h1 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 2rem;
+    color: #e8e0d8;
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 30px rgba(180, 140, 255, 0.3);
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+    color: #706860;
+    margin-bottom: 32px;
+    line-height: 1.6;
+  }
+
+  .demo-area {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+  }
+
+  .canvas-wrap {
+    flex: 1;
+    min-width: 0;
+  }
+
+  canvas#liquid {
+    width: 100%;
+    aspect-ratio: 16/9;
+    border-radius: 8px;
+    border: 1px solid rgba(184, 156, 255, 0.12);
+    display: block;
+  }
+
+  .layer-toggles {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .layer-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    padding: 4px 12px;
+    border: 1px solid rgba(184, 156, 255, 0.2);
+    border-radius: 4px;
+    background: rgba(184, 156, 255, 0.06);
+    color: #a898c8;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.04em;
+  }
+  .layer-btn:hover { border-color: rgba(184, 156, 255, 0.5); }
+  .layer-btn.active {
+    background: rgba(184, 156, 255, 0.15);
+    border-color: rgba(184, 156, 255, 0.5);
+    color: #dcc8ff;
+  }
+
+  .controls {
+    width: 280px;
+    flex-shrink: 0;
+  }
+
+  .preset-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 24px;
+  }
+
+  .preset-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 5px 10px;
+    border: 1px solid rgba(184, 156, 255, 0.15);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #a898c8;
+    cursor: pointer;
+    transition: all 0.25s;
+  }
+  .preset-btn:hover {
+    border-color: rgba(184, 156, 255, 0.5);
+    background: rgba(184, 156, 255, 0.08);
+  }
+  .preset-btn.active {
+    background: rgba(184, 156, 255, 0.15);
+    border-color: rgba(184, 156, 255, 0.5);
+    color: #dcc8ff;
+  }
+
+  .ctrl-section {
+    margin-bottom: 20px;
+  }
+
+  .ctrl-section h3 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 0.8rem;
+    color: #a898c8;
+    letter-spacing: 0.06em;
+    margin-bottom: 10px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .ctrl-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: #706860;
+    width: 60px;
+    flex-shrink: 0;
+    letter-spacing: 0.04em;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 3px;
+    background: rgba(184, 156, 255, 0.12);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #b89cff;
+    border: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #b89cff;
+    border: none;
+    cursor: pointer;
+  }
+
+  .ctrl-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    color: #585050;
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  input[type="color"] {
+    width: 24px;
+    height: 24px;
+    border: 1px solid rgba(184, 156, 255, 0.2);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 1px; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 2px; }
+
+  .explanation {
+    margin-top: 40px;
+    padding-top: 32px;
+    border-top: 1px solid rgba(184, 156, 255, 0.06);
+  }
+
+  .explanation h2 {
+    font-family: 'Cinzel', serif;
+    font-weight: 400;
+    font-size: 1.1rem;
+    color: #e0d8f0;
+    letter-spacing: 0.04em;
+    margin-bottom: 16px;
+  }
+
+  .explanation p {
+    font-size: 0.88rem;
+    line-height: 1.75;
+    color: #a8a098;
+    margin-bottom: 14px;
+  }
+
+  .explanation code {
+    background: rgba(184, 156, 255, 0.08);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82em;
+  }
+
+  footer {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    color: #403838;
+    font-size: 0.75rem;
+    padding: 40px 0;
+    letter-spacing: 0.04em;
+    border-top: 1px solid rgba(184, 156, 255, 0.06);
+  }
+
+  @media (max-width: 768px) {
+    .demo-area { flex-direction: column; }
+    .controls { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+
+<div class="content">
+  <a href="/" class="back">← back</a>
+  <h1>Liquid Noise</h1>
+  <p class="subtitle">Scrolling noise layers — the technique behind Iron &amp; Ether's lava and water. Adjust everything.</p>
+
+  <div class="demo-area">
+    <div class="canvas-wrap">
+      <canvas id="liquid" width="960" height="540"></canvas>
+      <div class="layer-toggles">
+        <button class="layer-btn active" data-layer="0">Base</button>
+        <button class="layer-btn active" data-layer="1">Layer 1</button>
+        <button class="layer-btn active" data-layer="2">Layer 2</button>
+        <button class="layer-btn active" data-layer="3">Layer 3</button>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="preset-row">
+        <button class="preset-btn active" data-preset="lava">Lava</button>
+        <button class="preset-btn" data-preset="water">Water</button>
+        <button class="preset-btn" data-preset="acid">Acid</button>
+        <button class="preset-btn" data-preset="blood">Blood</button>
+        <button class="preset-btn" data-preset="void">Void</button>
+        <button class="preset-btn" data-preset="mercury">Mercury</button>
+      </div>
+
+      <div class="ctrl-section">
+        <h3>Base</h3>
+        <div class="ctrl-row">
+          <span class="ctrl-label">color</span>
+          <input type="color" id="baseColor" value="#b43c0f">
+        </div>
+      </div>
+
+      <div class="ctrl-section">
+        <h3>Layer 1 — Broad Flow</h3>
+        <div class="ctrl-row">
+          <span class="ctrl-label">color</span>
+          <input type="color" id="l1Color" value="#c8460f">
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">alpha</span>
+          <input type="range" id="l1Alpha" min="0" max="100" value="90">
+          <span class="ctrl-val" id="l1AlphaVal">0.90</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">scale</span>
+          <input type="range" id="l1Scale" min="50" max="800" value="500">
+          <span class="ctrl-val" id="l1ScaleVal">5.0</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">speedX</span>
+          <input type="range" id="l1SpeedX" min="-100" max="100" value="-30">
+          <span class="ctrl-val" id="l1SpeedXVal">-3.0</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">speedY</span>
+          <input type="range" id="l1SpeedY" min="-100" max="100" value="-20">
+          <span class="ctrl-val" id="l1SpeedYVal">-2.0</span>
+        </div>
+      </div>
+
+      <div class="ctrl-section">
+        <h3>Layer 2 — Counter Drift</h3>
+        <div class="ctrl-row">
+          <span class="ctrl-label">color</span>
+          <input type="color" id="l2Color" value="#ff8c1e">
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">alpha</span>
+          <input type="range" id="l2Alpha" min="0" max="100" value="60">
+          <span class="ctrl-val" id="l2AlphaVal">0.60</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">scale</span>
+          <input type="range" id="l2Scale" min="50" max="800" value="300">
+          <span class="ctrl-val" id="l2ScaleVal">3.0</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">speedX</span>
+          <input type="range" id="l2SpeedX" min="-100" max="100" value="20">
+          <span class="ctrl-val" id="l2SpeedXVal">2.0</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">speedY</span>
+          <input type="range" id="l2SpeedY" min="-100" max="100" value="-15">
+          <span class="ctrl-val" id="l2SpeedYVal">-1.5</span>
+        </div>
+      </div>
+
+      <div class="ctrl-section">
+        <h3>Layer 3 — Surface Shimmer</h3>
+        <div class="ctrl-row">
+          <span class="ctrl-label">color</span>
+          <input type="color" id="l3Color" value="#ffc83c">
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">alpha</span>
+          <input type="range" id="l3Alpha" min="0" max="100" value="35">
+          <span class="ctrl-val" id="l3AlphaVal">0.35</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">scale</span>
+          <input type="range" id="l3Scale" min="50" max="800" value="200">
+          <span class="ctrl-val" id="l3ScaleVal">2.0</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">speedX</span>
+          <input type="range" id="l3SpeedX" min="-100" max="100" value="15">
+          <span class="ctrl-val" id="l3SpeedXVal">1.5</span>
+        </div>
+        <div class="ctrl-row">
+          <span class="ctrl-label">speedY</span>
+          <input type="range" id="l3SpeedY" min="-100" max="100" value="25">
+          <span class="ctrl-val" id="l3SpeedYVal">2.5</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="explanation">
+    <h2>How It Works</h2>
+    <p>The entire effect is three noise textures scrolling at different speeds and scales, blended on top of a flat base color. That's it. No shaders, no simulation, no fluid dynamics.</p>
+    <p><strong>Layer 1</strong> is large-scale and slow — it creates the broad molten flow, the sense that something massive is moving underneath. <strong>Layer 2</strong> drifts in the opposite direction at a smaller scale — these are the magma veins and counter-currents that break up the uniformity. <strong>Layer 3</strong> is small and fast on a diagonal — surface shimmer that hides the tiling seams and adds life.</p>
+    <p>The key insight: <strong>layers moving in different directions at different scales make the tiling invisible.</strong> Each noise texture tiles perfectly on its own, but the brain can't track three overlapping patterns simultaneously. The result reads as organic, churning liquid.</p>
+    <p>Toggle individual layers on/off to see how they contribute. Change colors to make water, acid, blood, or void. The technique is the same regardless of the palette — what changes is the mood.</p>
+    <p>This is the exact approach used in <a href="/" style="color:#b89cff;">Iron &amp; Ether</a>'s lava moat and water pools. The game generates two Perlin noise textures at startup, then scrolls them with <code>SamplerState.LinearWrap</code> for seamless tiling. Total cost: three texture draws per liquid surface.</p>
+  </div>
+</div>
+
+<footer>built by hand</footer>
+
+<script>
+// ── Starfield (shared across site) ──
+(function() {
+  const canvas = document.getElementById('starfield');
+  const ctx = canvas.getContext('2d');
+  let w, h, stars;
+  const STAR_COUNT = 200;
+  function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+  function createStars() {
+    stars = [];
+    for (let i = 0; i < STAR_COUNT; i++) {
+      stars.push({
+        x: Math.random() * w, y: Math.random() * h,
+        size: 0.4 + Math.random() * 1.6,
+        speed: 0.1 + Math.random() * 0.4,
+        alpha: 0.2 + Math.random() * 0.5,
+        twinkleSpeed: 0.005 + Math.random() * 0.02,
+        twinkleOffset: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+  let time = 0;
+  function draw() {
+    ctx.clearRect(0, 0, w, h); time++;
+    for (const s of stars) {
+      s.y -= s.speed;
+      if (s.y < -4) { s.y = h + 4; s.x = Math.random() * w; }
+      const twinkle = 0.5 + 0.5 * Math.sin(time * s.twinkleSpeed + s.twinkleOffset);
+      const a = s.alpha * (0.4 + 0.6 * twinkle);
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(260, 20%, 88%, ${a})`; ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize', () => { resize(); createStars(); });
+  resize(); createStars(); draw();
+})();
+
+// ── Perlin Noise Generator ──
+function createNoise(w, h, seed) {
+  // Simple 2D value noise with interpolation
+  const gridSize = 16;
+  const grid = [];
+  const s = seed || 0;
+  function hash(x, y) {
+    let n = x * 374761393 + y * 668265263 + s;
+    n = (n ^ (n >> 13)) * 1274126177;
+    n = n ^ (n >> 16);
+    return (n & 0x7fffffff) / 0x7fffffff;
+  }
+  for (let gy = 0; gy <= Math.ceil(h / gridSize) + 1; gy++) {
+    grid[gy] = [];
+    for (let gx = 0; gx <= Math.ceil(w / gridSize) + 1; gx++) {
+      grid[gy][gx] = hash(gx, gy);
+    }
+  }
+  
+  const data = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const gx = x / gridSize;
+      const gy = y / gridSize;
+      const ix = Math.floor(gx);
+      const iy = Math.floor(gy);
+      const fx = gx - ix;
+      const fy = gy - iy;
+      // Smoothstep
+      const sx = fx * fx * (3 - 2 * fx);
+      const sy = fy * fy * (3 - 2 * fy);
+      const a = grid[iy][ix];
+      const b = grid[iy][ix + 1];
+      const c = grid[iy + 1][ix];
+      const d = grid[iy + 1][ix + 1];
+      const v = a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+      data[y * w + x] = v;
+    }
+  }
+  return data;
+}
+
+function noiseToImageData(noiseData, w, h) {
+  const imgData = new ImageData(w, h);
+  for (let i = 0; i < w * h; i++) {
+    const v = Math.floor(noiseData[i] * 255);
+    imgData.data[i * 4] = v;
+    imgData.data[i * 4 + 1] = v;
+    imgData.data[i * 4 + 2] = v;
+    imgData.data[i * 4 + 3] = 255;
+  }
+  return imgData;
+}
+
+// ── Main Demo ──
+(function() {
+  const canvas = document.getElementById('liquid');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // Generate two tileable noise textures at different frequencies
+  const NTEX = 128;
+  const noise1Data = createNoise(NTEX, NTEX, 42);
+  const noise2Data = createNoise(NTEX, NTEX, 137);
+
+  // Create offscreen canvases for noise textures
+  function makeNoiseCanvas(data) {
+    const c = document.createElement('canvas');
+    c.width = NTEX; c.height = NTEX;
+    const cx = c.getContext('2d');
+    cx.putImageData(noiseToImageData(data, NTEX, NTEX), 0, 0);
+    return c;
+  }
+  const noiseTex1 = makeNoiseCanvas(noise1Data);
+  const noiseTex2 = makeNoiseCanvas(noise2Data);
+
+  // State
+  const layerVisible = [true, true, true, true]; // base, l1, l2, l3
+
+  const presets = {
+    lava: {
+      base: '#b43c0f',
+      l1: { color: '#c8460f', alpha: 0.9, scale: 5, sx: -3, sy: -2 },
+      l2: { color: '#ff8c1e', alpha: 0.6, scale: 3, sx: 2, sy: -1.5 },
+      l3: { color: '#ffc83c', alpha: 0.35, scale: 2, sx: 1.5, sy: 2.5 },
+    },
+    water: {
+      base: '#0f2346',
+      l1: { color: '#3282b4', alpha: 0.6, scale: 4, sx: -1.4, sy: -0.9 },
+      l2: { color: '#286eaa', alpha: 0.5, scale: 3, sx: -1.1, sy: 1.2 },
+      l3: { color: '#5ab4e0', alpha: 0.3, scale: 2, sx: 0.8, sy: -0.6 },
+    },
+    acid: {
+      base: '#0a2a0a',
+      l1: { color: '#1e8c1e', alpha: 0.8, scale: 4.5, sx: -1.5, sy: -1 },
+      l2: { color: '#3cdc3c', alpha: 0.5, scale: 2.5, sx: 1, sy: -2 },
+      l3: { color: '#a0ff50', alpha: 0.4, scale: 1.8, sx: 2, sy: 1.5 },
+    },
+    blood: {
+      base: '#2a0808',
+      l1: { color: '#6e1010', alpha: 0.85, scale: 5.5, sx: -0.8, sy: -0.5 },
+      l2: { color: '#a02020', alpha: 0.5, scale: 3, sx: 0.6, sy: -1 },
+      l3: { color: '#c83030', alpha: 0.3, scale: 2, sx: 1.2, sy: 0.8 },
+    },
+    void: {
+      base: '#06050f',
+      l1: { color: '#1a1040', alpha: 0.8, scale: 6, sx: -0.5, sy: -0.3 },
+      l2: { color: '#3020a0', alpha: 0.45, scale: 3.5, sx: 0.4, sy: -0.8 },
+      l3: { color: '#7040ff', alpha: 0.25, scale: 2, sx: 1, sy: 1.2 },
+    },
+    mercury: {
+      base: '#2a2a30',
+      l1: { color: '#8888a0', alpha: 0.7, scale: 5, sx: -1, sy: -0.6 },
+      l2: { color: '#b0b0c8', alpha: 0.5, scale: 3, sx: 0.8, sy: -1.2 },
+      l3: { color: '#e0e0f0', alpha: 0.3, scale: 2, sx: 1.5, sy: 1 },
+    },
+  };
+
+  function hexToRgb(hex) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return [r, g, b];
+  }
+
+  function getLayerParams(n) {
+    return {
+      color: document.getElementById(`l${n}Color`).value,
+      alpha: parseInt(document.getElementById(`l${n}Alpha`).value) / 100,
+      scale: parseInt(document.getElementById(`l${n}Scale`).value) / 100,
+      sx: parseInt(document.getElementById(`l${n}SpeedX`).value) / 10,
+      sy: parseInt(document.getElementById(`l${n}SpeedY`).value) / 10,
+    };
+  }
+
+  function setLayerParams(n, p) {
+    document.getElementById(`l${n}Color`).value = p.color;
+    document.getElementById(`l${n}Alpha`).value = Math.round(p.alpha * 100);
+    document.getElementById(`l${n}Scale`).value = Math.round(p.scale * 100);
+    document.getElementById(`l${n}SpeedX`).value = Math.round(p.sx * 10);
+    document.getElementById(`l${n}SpeedY`).value = Math.round(p.sy * 10);
+    updateLabels();
+  }
+
+  function updateLabels() {
+    for (let n = 1; n <= 3; n++) {
+      document.getElementById(`l${n}AlphaVal`).textContent = (parseInt(document.getElementById(`l${n}Alpha`).value) / 100).toFixed(2);
+      document.getElementById(`l${n}ScaleVal`).textContent = (parseInt(document.getElementById(`l${n}Scale`).value) / 100).toFixed(1);
+      document.getElementById(`l${n}SpeedXVal`).textContent = (parseInt(document.getElementById(`l${n}SpeedX`).value) / 10).toFixed(1);
+      document.getElementById(`l${n}SpeedYVal`).textContent = (parseInt(document.getElementById(`l${n}SpeedY`).value) / 10).toFixed(1);
+    }
+  }
+
+  function applyPreset(name) {
+    const p = presets[name];
+    document.getElementById('baseColor').value = p.base;
+    setLayerParams(1, p.l1);
+    setLayerParams(2, p.l2);
+    setLayerParams(3, p.l3);
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === name));
+  }
+
+  // Create tinted noise canvas for a layer
+  function tintNoise(noiseCvs, rgb, alpha) {
+    const c = document.createElement('canvas');
+    c.width = NTEX; c.height = NTEX;
+    const cx = c.getContext('2d');
+    // Draw noise as luminance
+    cx.drawImage(noiseCvs, 0, 0);
+    // Multiply with color
+    cx.globalCompositeOperation = 'multiply';
+    cx.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+    cx.fillRect(0, 0, NTEX, NTEX);
+    // Apply alpha via a destination-in with the original noise as alpha mask
+    cx.globalCompositeOperation = 'destination-in';
+    cx.drawImage(noiseCvs, 0, 0);
+    return c;
+  }
+
+  let time = 0;
+
+  function draw() {
+    time += 1 / 60;
+    ctx.clearRect(0, 0, W, H);
+
+    // Base color
+    if (layerVisible[0]) {
+      ctx.fillStyle = document.getElementById('baseColor').value;
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // Draw noise layers
+    const layers = [
+      { n: 1, tex: noiseTex1 },
+      { n: 2, tex: noiseTex2 },
+      { n: 3, tex: noiseTex1 },
+    ];
+
+    for (const l of layers) {
+      if (!layerVisible[l.n]) continue;
+      const p = getLayerParams(l.n);
+      const rgb = hexToRgb(p.color);
+      const texSize = Math.round(NTEX * p.scale);
+      if (texSize < 1) continue;
+
+      // Tint the noise
+      const tinted = tintNoise(l.tex, rgb, p.alpha);
+
+      ctx.globalAlpha = p.alpha;
+      ctx.globalCompositeOperation = 'lighter'; // additive blending for glow
+
+      // Calculate scroll offset (wrapping)
+      const offX = ((time * p.sx * 10) % texSize + texSize) % texSize;
+      const offY = ((time * p.sy * 10) % texSize + texSize) % texSize;
+
+      // Tile across the canvas
+      for (let y = -offY; y < H; y += texSize) {
+        for (let x = -offX; x < W; x += texSize) {
+          ctx.drawImage(tinted, x, y, texSize, texSize);
+        }
+      }
+
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  // Event listeners
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+  });
+
+  document.querySelectorAll('.layer-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.layer);
+      layerVisible[idx] = !layerVisible[idx];
+      btn.classList.toggle('active', layerVisible[idx]);
+    });
+  });
+
+  // Update value labels on slider input
+  document.querySelectorAll('input[type="range"]').forEach(input => {
+    input.addEventListener('input', () => {
+      updateLabels();
+      // Clear active preset
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    });
+  });
+  document.querySelectorAll('input[type="color"]').forEach(input => {
+    input.addEventListener('input', () => {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    });
+  });
+
+  updateLabels();
+  draw();
+})();
+</script>
+
+</body>
+</html>
