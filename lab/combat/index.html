@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wait Combat — strattao</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400&family=JetBrains+Mono:wght@300;400&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    color: #c8c0b8;
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  canvas#starfield {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0; pointer-events: none;
+  }
+
+  .content {
+    position: relative; z-index: 1;
+    max-width: 900px; margin: 0 auto;
+    padding: 60px 24px 80px;
+  }
+
+  header { margin-bottom: 32px; }
+  header h1 {
+    font-family: 'Cinzel', serif; font-weight: 400;
+    font-size: 2rem; color: #e8e0d8;
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 30px rgba(180, 140, 255, 0.3);
+  }
+  header .sub { font-size: 0.8rem; color: #585050; margin-top: 8px; }
+  header .sub a { color: #b89cff; text-decoration: none; }
+
+  .desc {
+    font-size: 0.85rem; color: #908880; line-height: 1.6;
+    margin-bottom: 32px; max-width: 700px;
+  }
+  .desc em { color: #c8b8a0; font-style: normal; }
+
+  /* ── Arena ── */
+  .arena {
+    display: flex; gap: 24px; align-items: flex-start;
+    margin-bottom: 24px; flex-wrap: wrap;
+  }
+
+  .combatant {
+    flex: 1; min-width: 250px;
+    background: rgba(20, 18, 25, 0.85);
+    border: 1px solid #2a2530;
+    border-radius: 8px; padding: 20px;
+  }
+  .combatant.player { border-color: #3a4a3a; }
+  .combatant.enemy { border-color: #4a2a2a; }
+
+  .combatant h2 {
+    font-family: 'Cinzel', serif; font-weight: 400;
+    font-size: 1.1rem; color: #e8e0d8; margin-bottom: 12px;
+  }
+
+  .hp-bar-wrap {
+    width: 100%; height: 18px;
+    background: #1a1520; border-radius: 4px;
+    overflow: hidden; margin-bottom: 8px;
+    position: relative;
+  }
+  .hp-bar {
+    height: 100%; border-radius: 4px;
+    transition: width 0.4s ease;
+  }
+  .hp-bar.player-bar { background: linear-gradient(90deg, #3a6a3a, #5a9a5a); }
+  .hp-bar.enemy-bar { background: linear-gradient(90deg, #6a3a3a, #9a5a5a); }
+  .hp-text {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+    color: #e8e0d8; text-shadow: 0 1px 2px #000;
+  }
+
+  .wait-bar-wrap {
+    width: 100%; height: 10px;
+    background: #1a1520; border-radius: 3px;
+    overflow: hidden; margin-bottom: 4px;
+  }
+  .wait-bar {
+    height: 100%; border-radius: 3px;
+    transition: width 0.15s linear;
+  }
+  .wait-bar.player-wait { background: linear-gradient(90deg, #4a6a8a, #6a9aca); }
+  .wait-bar.enemy-wait { background: linear-gradient(90deg, #8a6a4a, #ca9a6a); }
+  .wait-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem; color: #686060; margin-bottom: 12px;
+  }
+
+  .action-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem; color: #a898b0; margin-bottom: 4px;
+    min-height: 1.2em;
+  }
+
+  /* ── Items ── */
+  .items { margin-bottom: 24px; }
+  .items h3 {
+    font-family: 'Cinzel', serif; font-weight: 400;
+    font-size: 0.9rem; color: #c8c0b8; margin-bottom: 10px;
+  }
+
+  .item-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+  }
+
+  .item-btn {
+    background: rgba(30, 28, 35, 0.9);
+    border: 1px solid #2a2530; border-radius: 6px;
+    padding: 10px 12px; cursor: pointer;
+    transition: all 0.2s; text-align: left;
+  }
+  .item-btn:hover { border-color: #b89cff; background: rgba(40, 35, 50, 0.9); }
+  .item-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .item-btn .item-name {
+    font-family: 'Cinzel', serif; font-size: 0.85rem;
+    color: #e8e0d8; margin-bottom: 4px;
+  }
+  .item-btn .item-stats {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+    color: #908880;
+  }
+  .item-btn .item-desc {
+    font-size: 0.65rem; color: #686060; margin-top: 4px;
+    font-style: italic;
+  }
+  .stat-eff { color: #ca6a6a; }
+  .stat-def { color: #6a8aca; }
+  .stat-wait { color: #caba6a; }
+  .stat-special { color: #b89cff; }
+
+  /* ── Log ── */
+  .log-wrap {
+    background: rgba(15, 13, 20, 0.9);
+    border: 1px solid #2a2530; border-radius: 8px;
+    padding: 16px; max-height: 240px; overflow-y: auto;
+    margin-bottom: 24px;
+  }
+  .log-wrap p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; line-height: 1.6;
+    color: #908880; margin: 0;
+  }
+  .log-wrap p.dmg { color: #ca6a6a; }
+  .log-wrap p.heal { color: #6aca6a; }
+  .log-wrap p.block { color: #6a8aca; }
+  .log-wrap p.info { color: #caba6a; }
+  .log-wrap p.victory { color: #b89cff; font-weight: 400; }
+  .log-wrap p.defeat { color: #ca4a4a; font-weight: 400; }
+
+  /* ── Controls ── */
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+  .ctrl-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; padding: 8px 16px;
+    background: rgba(30, 28, 35, 0.9); border: 1px solid #3a3540;
+    border-radius: 4px; color: #c8c0b8; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .ctrl-btn:hover { border-color: #b89cff; color: #e8e0d8; }
+  .ctrl-btn.active { border-color: #b89cff; background: rgba(60, 50, 80, 0.5); }
+
+  /* ── Speed selector ── */
+  .speed-sel { display: flex; gap: 6px; align-items: center; margin-bottom: 16px; }
+  .speed-sel label { font-size: 0.7rem; color: #686060; }
+  .speed-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem; padding: 4px 10px;
+    background: rgba(30, 28, 35, 0.9); border: 1px solid #2a2530;
+    border-radius: 3px; color: #908880; cursor: pointer;
+  }
+  .speed-btn.active { border-color: #b89cff; color: #e8e0d8; }
+
+  /* ── Enemy select ── */
+  .enemy-select { margin-bottom: 24px; }
+  .enemy-select h3 {
+    font-family: 'Cinzel', serif; font-weight: 400;
+    font-size: 0.9rem; color: #c8c0b8; margin-bottom: 10px;
+  }
+  .enemy-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+  }
+  .enemy-btn {
+    background: rgba(30, 28, 35, 0.9);
+    border: 1px solid #2a2530; border-radius: 6px;
+    padding: 10px; cursor: pointer; transition: all 0.2s;
+    text-align: center;
+  }
+  .enemy-btn:hover { border-color: #ca6a6a; }
+  .enemy-btn.active { border-color: #ca6a6a; background: rgba(50, 30, 30, 0.5); }
+  .enemy-btn .ename { font-family: 'Cinzel', serif; font-size: 0.8rem; color: #e8e0d8; }
+  .enemy-btn .ehp { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: #686060; margin-top: 4px; }
+
+  /* ── How it works ── */
+  .how {
+    background: rgba(20, 18, 25, 0.7);
+    border: 1px solid #2a2530; border-radius: 8px;
+    padding: 20px; margin-top: 32px;
+  }
+  .how h3 {
+    font-family: 'Cinzel', serif; font-weight: 400;
+    font-size: 0.9rem; color: #e8e0d8; margin-bottom: 12px;
+  }
+  .how p {
+    font-size: 0.8rem; color: #908880; line-height: 1.7; margin-bottom: 10px;
+  }
+  .how strong { color: #c8b8a0; font-weight: 400; }
+  .how code {
+    font-family: 'JetBrains Mono', monospace;
+    background: rgba(0,0,0,0.3); padding: 1px 5px;
+    border-radius: 3px; font-size: 0.75rem; color: #b89cff;
+  }
+
+  /* ── Pixel sprites ── */
+  .sprite-area {
+    display: flex; justify-content: center; align-items: flex-end;
+    gap: 120px; margin-bottom: 24px; min-height: 100px;
+  }
+  .sprite-fig { text-align: center; position: relative; }
+  .sprite-fig canvas { image-rendering: pixelated; }
+  .sprite-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem; color: #686060; margin-top: 4px;
+  }
+  .dmg-popup {
+    position: absolute; font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem; font-weight: bold; pointer-events: none;
+    animation: popUp 0.8s ease-out forwards;
+  }
+  @keyframes popUp {
+    0% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-40px); }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-4px); }
+    40% { transform: translateX(4px); }
+    60% { transform: translateX(-3px); }
+    80% { transform: translateX(2px); }
+  }
+  .shake { animation: shake 0.3s ease; }
+</style>
+</head>
+<body>
+<canvas id="starfield"></canvas>
+
+<div class="content">
+  <header>
+    <h1>Wait Combat</h1>
+    <div class="sub"><a href="/">← strattao</a> · <a href="/lab/liquid/">liquid</a> · <a href="/lab/terrain/">terrain</a> · inspired by Helen's Mysterious Castle</div>
+  </header>
+
+  <p class="desc">
+    Every action has three stats: <em>Effectiveness</em> (damage or healing),
+    <em>Defend</em> (flat damage reduction while waiting), and <em>Wait</em> (ticks until the action fires).
+    You defend with whatever you chose <em>while</em> you're waiting. Powerful attacks leave you exposed.
+    Fast attacks keep you safe but deal less. Read the enemy's timer and choose wisely.
+  </p>
+
+  <!-- Enemy picker -->
+  <div class="enemy-select">
+    <h3>Choose your opponent</h3>
+    <div class="enemy-grid" id="enemyGrid"></div>
+  </div>
+
+  <!-- Sprite area -->
+  <div class="sprite-area">
+    <div class="sprite-fig" id="playerFig">
+      <canvas id="playerSprite" width="48" height="48"></canvas>
+      <div class="sprite-label">Helen</div>
+    </div>
+    <div class="sprite-fig" id="enemyFig">
+      <canvas id="enemySprite" width="48" height="48"></canvas>
+      <div class="sprite-label" id="enemySpriteLabel">Slime</div>
+    </div>
+  </div>
+
+  <!-- Arena -->
+  <div class="arena">
+    <div class="combatant player">
+      <h2>Helen</h2>
+      <div class="hp-bar-wrap">
+        <div class="hp-bar player-bar" id="playerHpBar"></div>
+        <div class="hp-text" id="playerHpText"></div>
+      </div>
+      <div class="action-name" id="playerAction">&nbsp;</div>
+      <div class="wait-bar-wrap">
+        <div class="wait-bar player-wait" id="playerWaitBar"></div>
+      </div>
+      <div class="wait-label" id="playerWaitLabel">Wait: —</div>
+    </div>
+    <div class="combatant enemy">
+      <h2 id="enemyName">Slime</h2>
+      <div class="hp-bar-wrap">
+        <div class="hp-bar enemy-bar" id="enemyHpBar"></div>
+        <div class="hp-text" id="enemyHpText"></div>
+      </div>
+      <div class="action-name" id="enemyAction">&nbsp;</div>
+      <div class="wait-bar-wrap">
+        <div class="wait-bar enemy-wait" id="enemyWaitBar"></div>
+      </div>
+      <div class="wait-label" id="enemyWaitLabel">Wait: —</div>
+    </div>
+  </div>
+
+  <!-- Speed -->
+  <div class="speed-sel">
+    <label>Speed:</label>
+    <button class="speed-btn" data-speed="400">Slow</button>
+    <button class="speed-btn active" data-speed="200">Normal</button>
+    <button class="speed-btn" data-speed="80">Fast</button>
+  </div>
+
+  <!-- Items -->
+  <div class="items">
+    <h3>Choose your action</h3>
+    <div class="item-grid" id="itemGrid"></div>
+  </div>
+
+  <!-- Log -->
+  <div class="log-wrap" id="log"></div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="ctrl-btn" id="restartBtn">Restart Fight</button>
+    <button class="ctrl-btn" id="resetBtn">New Game (Full HP)</button>
+  </div>
+
+  <!-- How it works -->
+  <div class="how">
+    <h3>How it works</h3>
+    <p>
+      Based on <strong>Helen's Mysterious Castle</strong> (2014), a brilliant RPGMaker game
+      that proved three numbers are enough for deep combat.
+    </p>
+    <p>
+      <strong>Damage</strong> = attacker's <code>Effectiveness</code> − defender's <code>Defend</code>.
+      If Defend ≥ Effect, the attack is fully blocked (0 damage).
+      Magic <strong>pierces defense</strong> entirely — Defend doesn't apply.
+    </p>
+    <p>
+      <strong>Wait</strong> counts down simultaneously for both sides. The first to hit 0 acts,
+      then picks a new action. If both hit 0 on the same tick, <strong>you go first</strong>.
+      A <strong>Metronome</strong> (Wait: 1) lets you peek at the enemy's choice before committing.
+    </p>
+    <p>
+      <strong>The tension:</strong> A heavy sword hits hard but its high Wait means you eat
+      multiple fast attacks while charging. A dagger is safe but tickles armored enemies.
+      A shield blocks everything but deals no damage. A spell ignores armor but leaves you
+      at 0 Defend. Every pick is a tradeoff.
+    </p>
+    <p>
+      Enemies have <strong>AI patterns</strong> — some react to your choices. The Lizardman
+      raises its guard when it sees you winding up an attack. The Dark Knight punishes
+      slow spells with fast counters.
+    </p>
+  </div>
+</div>
+
+<script>
+(function() {
+
+// ── Starfield ──
+const sf = document.getElementById('starfield');
+const sctx = sf.getContext('2d');
+let stars = [];
+function initStars() {
+  sf.width = window.innerWidth; sf.height = window.innerHeight;
+  stars = [];
+  for (let i = 0; i < 120; i++)
+    stars.push({ x: Math.random()*sf.width, y: Math.random()*sf.height, r: Math.random()*1.2+0.3, a: Math.random()*0.6+0.2, s: Math.random()*0.003+0.001 });
+}
+function drawStars(t) {
+  sctx.clearRect(0,0,sf.width,sf.height);
+  for (const s of stars) {
+    let a = s.a + Math.sin(t*s.s*1000)*0.3;
+    sctx.fillStyle = `rgba(200,190,220,${Math.max(0,a)})`;
+    sctx.beginPath(); sctx.arc(s.x,s.y,s.r,0,Math.PI*2); sctx.fill();
+  }
+  requestAnimationFrame(drawStars);
+}
+initStars(); requestAnimationFrame(drawStars);
+window.addEventListener('resize', initStars);
+
+// ── Pixel Sprites ──
+function drawPixelHelen(ctx) {
+  ctx.clearRect(0,0,48,48);
+  const s = 3; // scale
+  const px = (x,y,c) => { ctx.fillStyle = c; ctx.fillRect(x*s,y*s,s,s); };
+  // Hair (blue)
+  for (let x=5;x<=10;x++) px(x,2,'#4466aa');
+  for (let x=4;x<=11;x++) px(x,3,'#4466aa');
+  for (let x=4;x<=11;x++) px(x,4,'#4466aa');
+  // Face
+  for (let x=5;x<=10;x++) px(x,5,'#f0c8a0');
+  for (let x=5;x<=10;x++) px(x,6,'#f0c8a0');
+  for (let x=5;x<=10;x++) px(x,7,'#f0c8a0');
+  // Eyes
+  px(6,6,'#223'); px(9,6,'#223');
+  // Mouth
+  px(7,7,'#c08060'); px(8,7,'#c08060');
+  // Body (green tunic)
+  for (let x=5;x<=10;x++) for (let y=8;y<=11;y++) px(x,y,'#4a8a4a');
+  // Belt
+  for (let x=5;x<=10;x++) px(x,10,'#8a7040');
+  // Arms
+  for (let y=8;y<=10;y++) { px(4,y,'#f0c8a0'); px(11,y,'#f0c8a0'); }
+  // Legs
+  for (let y=12;y<=14;y++) { px(6,y,'#3a5a3a'); px(7,y,'#3a5a3a'); px(8,y,'#3a5a3a'); px(9,y,'#3a5a3a'); }
+  // Boots
+  px(6,14,'#5a4030'); px(7,14,'#5a4030'); px(8,14,'#5a4030'); px(9,14,'#5a4030');
+  // Sword (right hand)
+  px(12,7,'#c0c0c0'); px(12,6,'#c0c0c0'); px(12,5,'#c0c0c0'); px(12,4,'#d0d0d0');
+  px(12,8,'#8a7040'); // hilt
+}
+
+const enemySprites = {
+  Slime: (ctx) => {
+    ctx.clearRect(0,0,48,48);
+    const s=3, px=(x,y,c)=>{ctx.fillStyle=c;ctx.fillRect(x*s,y*s,s,s);};
+    for(let x=5;x<=10;x++)for(let y=8;y<=13;y++) px(x,y,'#4a8a4a');
+    for(let x=6;x<=9;x++)px(x,7,'#5a9a5a');
+    for(let x=6;x<=9;x++)px(x,14,'#3a7a3a');
+    px(6,10,'#222');px(9,10,'#222');
+    px(7,12,'#3a6a3a');px(8,12,'#3a6a3a');
+  },
+  Lizardman: (ctx) => {
+    ctx.clearRect(0,0,48,48);
+    const s=3, px=(x,y,c)=>{ctx.fillStyle=c;ctx.fillRect(x*s,y*s,s,s);};
+    for(let x=6;x<=9;x++)for(let y=3;y<=6;y++) px(x,y,'#6a8a40');
+    px(7,5,'#c02020');px(8,5,'#c02020');
+    for(let x=5;x<=10;x++)for(let y=7;y<=11;y++) px(x,y,'#5a7a30');
+    for(let y=7;y<=9;y++){px(4,y,'#6a8a40');px(11,y,'#6a8a40');}
+    px(11,8,'#aaa');px(11,7,'#aaa'); // shield
+    for(let y=12;y<=14;y++){px(6,y,'#4a6a20');px(7,y,'#4a6a20');px(8,y,'#4a6a20');px(9,y,'#4a6a20');}
+    px(10,3,'#6a8a40'); // horn
+  },
+  Skeleton: (ctx) => {
+    ctx.clearRect(0,0,48,48);
+    const s=3, px=(x,y,c)=>{ctx.fillStyle=c;ctx.fillRect(x*s,y*s,s,s);};
+    for(let x=6;x<=9;x++)for(let y=3;y<=6;y++) px(x,y,'#e8e0d0');
+    px(7,5,'#222');px(8,5,'#222');px(7,6,'#333');
+    for(let x=6;x<=9;x++)for(let y=7;y<=11;y++) px(x,y,'#d0c8b8');
+    for(let y=7;y<=10;y++){px(5,y,'#d0c8b8');px(10,y,'#d0c8b8');}
+    px(10,7,'#888');px(10,6,'#888');px(10,5,'#888'); // sword
+    for(let y=12;y<=14;y++){px(6,y,'#c0b8a8');px(9,y,'#c0b8a8');}
+  },
+  DarkKnight: (ctx) => {
+    ctx.clearRect(0,0,48,48);
+    const s=3, px=(x,y,c)=>{ctx.fillStyle=c;ctx.fillRect(x*s,y*s,s,s);};
+    for(let x=5;x<=10;x++)for(let y=2;y<=5;y++) px(x,y,'#3a3040');
+    px(7,4,'#c04040');px(8,4,'#c04040'); // eyes
+    for(let x=5;x<=10;x++)for(let y=6;y<=11;y++) px(x,y,'#2a2030');
+    for(let y=6;y<=10;y++){px(4,y,'#3a3040');px(11,y,'#3a3040');}
+    px(3,6,'#8080a0');px(3,7,'#8080a0');px(3,8,'#8080a0');px(3,5,'#a0a0c0'); // big sword
+    for(let y=12;y<=14;y++){px(6,y,'#2a2030');px(7,y,'#2a2030');px(8,y,'#2a2030');px(9,y,'#2a2030');}
+  },
+  Dragon: (ctx) => {
+    ctx.clearRect(0,0,48,48);
+    const s=3, px=(x,y,c)=>{ctx.fillStyle=c;ctx.fillRect(x*s,y*s,s,s);};
+    for(let x=4;x<=11;x++)for(let y=4;y<=7;y++) px(x,y,'#8a3030');
+    px(5,1,'#aa4040');px(10,1,'#aa4040');px(5,2,'#993030');px(10,2,'#993030'); // horns
+    for(let x=5;x<=10;x++)for(let y=2;y<=4;y++) px(x,y,'#8a3030');
+    px(6,5,'#ff8800');px(9,5,'#ff8800'); // eyes
+    for(let x=4;x<=11;x++)for(let y=8;y<=12;y++) px(x,y,'#7a2525');
+    // Wings
+    px(2,5,'#9a4040');px(3,4,'#9a4040');px(3,5,'#9a4040');
+    px(12,5,'#9a4040');px(13,4,'#9a4040');px(13,5,'#9a4040');
+    for(let y=13;y<=14;y++){px(5,y,'#6a2020');px(6,y,'#6a2020');px(9,y,'#6a2020');px(10,y,'#6a2020');}
+  }
+};
+
+// ── Items (Helen's inventory) ──
+const ITEMS = [
+  { name: 'Iron Sword', eff: 12, def: 6, wait: 8, desc: 'Balanced blade', type: 'melee' },
+  { name: 'Dagger', eff: 5, def: 3, wait: 3, desc: 'Quick and light', type: 'melee' },
+  { name: 'Heavy Axe', eff: 22, def: 4, wait: 14, desc: 'Devastating but slow', type: 'melee' },
+  { name: 'Short Bow', eff: 8, def: 1, wait: 4, desc: 'Fast, low defense', type: 'ranged' },
+  { name: 'Iron Shield', eff: 0, def: 14, wait: 6, desc: 'Pure defense', type: 'shield' },
+  { name: 'Thunder', eff: 18, def: 0, wait: 12, desc: 'Pierces defense!', type: 'magic' },
+  { name: 'Heal', eff: 15, def: 2, wait: 10, desc: 'Restore HP', type: 'heal' },
+  { name: 'Metronome', eff: 0, def: 0, wait: 1, desc: 'Wait and watch', type: 'tool' },
+];
+
+// ── Enemies ──
+const ENEMIES = [
+  {
+    name: 'Slime', hp: 40, sprite: 'Slime',
+    actions: [
+      { name: 'Tackle', eff: 6, def: 2, wait: 5 },
+      { name: 'Bounce', eff: 3, def: 4, wait: 3 },
+    ],
+    ai: (enemy, player) => enemy.actions[Math.random() < 0.6 ? 0 : 1],
+    desc: 'Simple and predictable.'
+  },
+  {
+    name: 'Lizardman', hp: 65, sprite: 'Lizardman',
+    actions: [
+      { name: 'Slash', eff: 10, def: 3, wait: 6 },
+      { name: 'Guard Stance', eff: 4, def: 12, wait: 8 },
+      { name: 'Quick Jab', eff: 5, def: 5, wait: 3 },
+    ],
+    ai: (enemy, player) => {
+      // If player chose high-wait action, guard up
+      if (player.chosenAction && player.chosenAction.wait >= 8)
+        return enemy.actions[1]; // guard
+      return enemy.actions[Math.random() < 0.5 ? 0 : 2];
+    },
+    desc: 'Guards when you wind up.'
+  },
+  {
+    name: 'Skeleton', hp: 55, sprite: 'Skeleton',
+    actions: [
+      { name: 'Bone Slash', eff: 9, def: 2, wait: 5 },
+      { name: 'Bone Throw', eff: 7, def: 0, wait: 3 },
+      { name: 'Reassemble', eff: 10, def: 6, wait: 10, type: 'heal' },
+    ],
+    ai: (enemy, player) => {
+      if (enemy.hp < enemy.maxHp * 0.35 && Math.random() < 0.5)
+        return enemy.actions[2]; // heal
+      return enemy.actions[Math.random() < 0.5 ? 0 : 1];
+    },
+    desc: 'Heals when wounded.'
+  },
+  {
+    name: 'Dark Knight', hp: 90, sprite: 'DarkKnight',
+    actions: [
+      { name: 'Dark Blade', eff: 16, def: 5, wait: 8 },
+      { name: 'Quick Slash', eff: 8, def: 4, wait: 4 },
+      { name: 'Black Shield', eff: 0, def: 16, wait: 7 },
+      { name: 'Counter', eff: 12, def: 8, wait: 6 },
+    ],
+    ai: (enemy, player) => {
+      // Punishes slow spells with quick attacks
+      if (player.chosenAction && player.chosenAction.type === 'magic')
+        return enemy.actions[1]; // quick slash
+      if (player.chosenAction && player.chosenAction.wait >= 10)
+        return enemy.actions[1]; // rush down slow actions
+      // Mix of heavy and defensive
+      let r = Math.random();
+      if (r < 0.35) return enemy.actions[0];
+      if (r < 0.6) return enemy.actions[3];
+      return enemy.actions[2];
+    },
+    desc: 'Counters magic and slow attacks.'
+  },
+  {
+    name: 'Dragon', hp: 140, sprite: 'Dragon',
+    actions: [
+      { name: 'Claw', eff: 14, def: 6, wait: 6 },
+      { name: 'Fire Breath', eff: 25, def: 0, wait: 14, type: 'magic' },
+      { name: 'Tail Sweep', eff: 10, def: 8, wait: 5 },
+      { name: 'Roar', eff: 0, def: 10, wait: 3 },
+    ],
+    ai: (enemy, player) => {
+      // Fire breath when player shields
+      if (player.chosenAction && player.chosenAction.type === 'shield')
+        return enemy.actions[1]; // fire breath pierces!
+      if (enemy.hp < enemy.maxHp * 0.3)
+        return enemy.actions[Math.random() < 0.5 ? 1 : 0]; // aggressive when low
+      let r = Math.random();
+      if (r < 0.35) return enemy.actions[0];
+      if (r < 0.55) return enemy.actions[2];
+      if (r < 0.75) return enemy.actions[3];
+      return enemy.actions[1];
+    },
+    desc: 'Breathes fire when you turtle.'
+  },
+];
+
+// ── State ──
+let player = { hp: 60, maxHp: 60, wait: 0, maxWait: 0, chosenAction: null, def: 0 };
+let enemy = { hp: 0, maxHp: 0, wait: 0, maxWait: 0, chosenAction: null, def: 0, actions: [], ai: null, name: '' };
+let tickSpeed = 200;
+let tickTimer = null;
+let gameOver = false;
+let currentEnemyIdx = 0;
+let waitingForPlayer = true;
+
+// ── DOM refs ──
+const $pHpBar = document.getElementById('playerHpBar');
+const $pHpText = document.getElementById('playerHpText');
+const $pWaitBar = document.getElementById('playerWaitBar');
+const $pWaitLabel = document.getElementById('playerWaitLabel');
+const $pAction = document.getElementById('playerAction');
+const $eHpBar = document.getElementById('enemyHpBar');
+const $eHpText = document.getElementById('enemyHpText');
+const $eWaitBar = document.getElementById('enemyWaitBar');
+const $eWaitLabel = document.getElementById('enemyWaitLabel');
+const $eAction = document.getElementById('enemyAction');
+const $eName = document.getElementById('enemyName');
+const $log = document.getElementById('log');
+const $itemGrid = document.getElementById('itemGrid');
+const $enemyGrid = document.getElementById('enemyGrid');
+
+// ── Draw sprites ──
+const pCtx = document.getElementById('playerSprite').getContext('2d');
+const eCtx = document.getElementById('enemySprite').getContext('2d');
+drawPixelHelen(pCtx);
+
+// ── UI builders ──
+function buildEnemyGrid() {
+  $enemyGrid.innerHTML = '';
+  ENEMIES.forEach((en, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'enemy-btn' + (i === currentEnemyIdx ? ' active' : '');
+    btn.innerHTML = `<div class="ename">${en.name}</div><div class="ehp">HP ${en.hp}</div>`;
+    btn.onclick = () => { currentEnemyIdx = i; startFight(); };
+    $enemyGrid.appendChild(btn);
+  });
+}
+
+function buildItemGrid() {
+  $itemGrid.innerHTML = '';
+  ITEMS.forEach((item, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'item-btn';
+    btn.disabled = !waitingForPlayer || gameOver;
+    let statsHtml = `<span class="stat-eff">Eff ${item.eff}</span> · <span class="stat-def">Def ${item.def}</span> · <span class="stat-wait">Wait ${item.wait}</span>`;
+    if (item.type === 'magic') statsHtml += ` · <span class="stat-special">pierces def</span>`;
+    if (item.type === 'heal') statsHtml += ` · <span class="stat-special">heals</span>`;
+    btn.innerHTML = `<div class="item-name">${item.name}</div><div class="item-stats">${statsHtml}</div><div class="item-desc">${item.desc}</div>`;
+    btn.onclick = () => choosePlayerAction(item);
+    $itemGrid.appendChild(btn);
+  });
+}
+
+function updateUI() {
+  const pPct = Math.max(0, player.hp / player.maxHp * 100);
+  const ePct = Math.max(0, enemy.hp / enemy.maxHp * 100);
+  $pHpBar.style.width = pPct + '%';
+  $pHpText.textContent = `${Math.max(0,player.hp)} / ${player.maxHp}`;
+  $eHpBar.style.width = ePct + '%';
+  $eHpText.textContent = `${Math.max(0,enemy.hp)} / ${enemy.maxHp}`;
+
+  if (player.chosenAction) {
+    $pAction.textContent = player.chosenAction.name;
+    const wPct = player.maxWait > 0 ? (player.wait / player.maxWait * 100) : 0;
+    $pWaitBar.style.width = wPct + '%';
+    $pWaitLabel.textContent = `Wait: ${player.wait}`;
+  } else {
+    $pAction.textContent = waitingForPlayer ? '⟵ choose an action' : '';
+    $pWaitBar.style.width = '0%';
+    $pWaitLabel.textContent = 'Wait: —';
+  }
+
+  if (enemy.chosenAction) {
+    $eAction.textContent = enemy.chosenAction.name;
+    const wPct = enemy.maxWait > 0 ? (enemy.wait / enemy.maxWait * 100) : 0;
+    $eWaitBar.style.width = wPct + '%';
+    $eWaitLabel.textContent = `Wait: ${enemy.wait}`;
+  } else {
+    $eAction.textContent = 'choosing...';
+    $eWaitBar.style.width = '0%';
+    $eWaitLabel.textContent = 'Wait: —';
+  }
+}
+
+function log(text, cls='') {
+  const p = document.createElement('p');
+  if (cls) p.className = cls;
+  p.textContent = text;
+  $log.appendChild(p);
+  $log.scrollTop = $log.scrollHeight;
+}
+
+function showDmgPopup(figId, text, color) {
+  const fig = document.getElementById(figId);
+  const popup = document.createElement('div');
+  popup.className = 'dmg-popup';
+  popup.style.color = color;
+  popup.style.left = '50%';
+  popup.style.top = '0';
+  popup.style.transform = 'translateX(-50%)';
+  popup.textContent = text;
+  fig.appendChild(popup);
+  fig.querySelector('canvas').classList.add('shake');
+  setTimeout(() => {
+    popup.remove();
+    fig.querySelector('canvas').classList.remove('shake');
+  }, 800);
+}
+
+// ── Combat logic ──
+function choosePlayerAction(item) {
+  if (!waitingForPlayer || gameOver) return;
+  waitingForPlayer = false;
+  player.chosenAction = item;
+  player.wait = item.wait;
+  player.maxWait = item.wait;
+  player.def = item.def;
+
+  // Enemy picks simultaneously
+  const enData = ENEMIES[currentEnemyIdx];
+  const eAction = enData.ai(enData, player);
+  enemy.chosenAction = eAction;
+  enemy.wait = eAction.wait;
+  enemy.maxWait = eAction.wait;
+  enemy.def = eAction.def;
+
+  log(`You ready ${item.name} (Eff:${item.eff} Def:${item.def} W:${item.wait})`, 'info');
+  log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
+
+  buildItemGrid();
+  updateUI();
+  startTicking();
+}
+
+function startTicking() {
+  if (tickTimer) clearInterval(tickTimer);
+  tickTimer = setInterval(tick, tickSpeed);
+}
+
+function stopTicking() {
+  if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+}
+
+function tick() {
+  if (gameOver || waitingForPlayer) { stopTicking(); return; }
+
+  // Decrement both
+  if (player.wait > 0) player.wait--;
+  if (enemy.wait > 0) enemy.wait--;
+  updateUI();
+
+  // Check who fires (ties = player first)
+  if (player.wait <= 0 && enemy.wait <= 0) {
+    stopTicking();
+    resolveAction('player');
+    if (!gameOver) resolveAction('enemy');
+    if (!gameOver) { waitingForPlayer = true; player.chosenAction = null; enemy.chosenAction = null; buildItemGrid(); updateUI(); }
+  } else if (player.wait <= 0) {
+    stopTicking();
+    resolveAction('player');
+    if (!gameOver) { waitingForPlayer = true; player.chosenAction = null; buildItemGrid(); updateUI(); startTicking(); }
+  } else if (enemy.wait <= 0) {
+    stopTicking();
+    resolveAction('enemy');
+    if (!gameOver) {
+      // Enemy picks next action immediately
+      const enData = ENEMIES[currentEnemyIdx];
+      const eAction = enData.ai(enData, player);
+      enemy.chosenAction = eAction;
+      enemy.wait = eAction.wait;
+      enemy.maxWait = eAction.wait;
+      enemy.def = eAction.def;
+      log(`${enemy.name} readies ${eAction.name}`, 'info');
+      updateUI();
+      startTicking();
+    }
+  }
+}
+
+function resolveAction(who) {
+  if (who === 'player') {
+    const act = player.chosenAction;
+    if (!act) return;
+    if (act.type === 'heal') {
+      const healed = Math.min(act.eff, player.maxHp - player.hp);
+      player.hp += healed;
+      log(`You heal ${healed} HP!`, 'heal');
+      showDmgPopup('playerFig', '+' + healed, '#6aca6a');
+    } else if (act.type === 'tool') {
+      log(`You wait and observe...`, 'info');
+    } else {
+      let dmg;
+      if (act.type === 'magic') {
+        dmg = act.eff; // pierces defense
+        if (dmg > 0) {
+          enemy.hp -= dmg;
+          log(`${act.name} pierces for ${dmg} damage!`, 'dmg');
+          showDmgPopup('enemyFig', '-' + dmg, '#ca6a6a');
+        }
+      } else {
+        dmg = Math.max(0, act.eff - enemy.def);
+        if (dmg > 0) {
+          enemy.hp -= dmg;
+          log(`${act.name} hits for ${dmg} damage!` + (enemy.def > 0 ? ` (${enemy.def} blocked)` : ''), 'dmg');
+          showDmgPopup('enemyFig', '-' + dmg, '#ca6a6a');
+        } else {
+          log(`${act.name} is fully blocked! (Def ${enemy.def} ≥ Eff ${act.eff})`, 'block');
+          showDmgPopup('enemyFig', 'BLOCK', '#6a8aca');
+        }
+      }
+    }
+    if (enemy.hp <= 0) { victory(); return; }
+  } else {
+    const act = enemy.chosenAction;
+    if (!act) return;
+    if (act.type === 'heal') {
+      const healed = Math.min(act.eff, enemy.maxHp - enemy.hp);
+      enemy.hp += healed;
+      log(`${enemy.name} heals ${healed} HP!`, 'heal');
+      showDmgPopup('enemyFig', '+' + healed, '#6aca6a');
+    } else {
+      let dmg;
+      if (act.type === 'magic') {
+        dmg = act.eff;
+        if (dmg > 0) {
+          player.hp -= dmg;
+          log(`${act.name} pierces for ${dmg} damage!`, 'dmg');
+          showDmgPopup('playerFig', '-' + dmg, '#ca6a6a');
+        }
+      } else {
+        dmg = Math.max(0, act.eff - player.def);
+        if (dmg > 0) {
+          player.hp -= dmg;
+          log(`${enemy.name}'s ${act.name} hits for ${dmg}!` + (player.def > 0 ? ` (${player.def} blocked)` : ''), 'dmg');
+          showDmgPopup('playerFig', '-' + dmg, '#ca6a6a');
+        } else {
+          log(`${enemy.name}'s ${act.name} blocked! (Your Def ${player.def} ≥ Eff ${act.eff})`, 'block');
+          showDmgPopup('playerFig', 'BLOCK', '#6a8aca');
+        }
+      }
+    }
+    if (player.hp <= 0) { defeat(); return; }
+  }
+}
+
+function victory() {
+  gameOver = true;
+  stopTicking();
+  log(`━━━ ${enemy.name} defeated! ━━━`, 'victory');
+  buildItemGrid();
+  updateUI();
+}
+
+function defeat() {
+  gameOver = true;
+  stopTicking();
+  log(`━━━ You fell in battle... ━━━`, 'defeat');
+  buildItemGrid();
+  updateUI();
+}
+
+function startFight() {
+  stopTicking();
+  const en = ENEMIES[currentEnemyIdx];
+  enemy.hp = en.hp; enemy.maxHp = en.hp;
+  enemy.wait = 0; enemy.maxWait = 0;
+  enemy.chosenAction = null; enemy.def = 0;
+  enemy.actions = en.actions; enemy.ai = en.ai; enemy.name = en.name;
+  player.wait = 0; player.maxWait = 0;
+  player.chosenAction = null; player.def = 0;
+  waitingForPlayer = true;
+  gameOver = false;
+  $eName.textContent = en.name;
+  document.getElementById('enemySpriteLabel').textContent = en.name;
+  $log.innerHTML = '';
+  log(`A ${en.name} appears! ${en.desc || ''}`, 'info');
+
+  // Draw enemy sprite
+  if (enemySprites[en.sprite]) enemySprites[en.sprite](eCtx);
+  
+  buildEnemyGrid();
+  buildItemGrid();
+  updateUI();
+}
+
+// ── Speed buttons ──
+document.querySelectorAll('.speed-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    tickSpeed = parseInt(btn.dataset.speed);
+    if (tickTimer) { stopTicking(); startTicking(); }
+  };
+});
+
+// ── Control buttons ──
+document.getElementById('restartBtn').onclick = () => startFight();
+document.getElementById('resetBtn').onclick = () => {
+  player.hp = player.maxHp;
+  startFight();
+};
+
+// ── Init ──
+buildEnemyGrid();
+startFight();
+
+})();
+</script>
+</body>
+</html>

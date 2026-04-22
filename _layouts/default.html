@@ -318,6 +318,10 @@
         <canvas class="tile-canvas" data-tile="terrain"></canvas>
         <div class="tile-label">Alien Terrain</div>
       </a>
+      <a href="/lab/combat/" class="sidebar-tile" title="Wait Combat — Helen's Mysterious Castle Combat Demo">
+        <canvas class="tile-canvas" data-tile="combat"></canvas>
+        <div class="tile-label">Wait Combat</div>
+      </a>
       <div class="sidebar-tile" title="Iron & Ether — In Development">
         <canvas class="tile-canvas" data-tile="ironether"></canvas>
         <div class="tile-label">Iron & Ether</div>
@@ -614,6 +618,35 @@
           imgData.data[i+3] = 255;
         }
         ctx.putImageData(imgData, 0, 0);
+      } else if (type === 'combat') {
+        // Two figures facing off with wait bars
+        ctx.fillStyle = '#0a0a10'; ctx.fillRect(0, 0, w, h);
+        // Player (green)
+        const px = 30, py = 55, ps = 4;
+        ctx.fillStyle = '#4a8a4a';
+        ctx.fillRect(px-ps, py-ps*4, ps*2, ps*4);
+        ctx.fillStyle = '#f0c8a0'; ctx.fillRect(px-ps, py-ps*5, ps*2, ps);
+        // Sword
+        ctx.fillStyle = '#c0c0c0'; ctx.fillRect(px+ps+1, py-ps*3, 2, ps*2);
+        // Enemy (red)
+        const ex = w-30, ey = 55;
+        ctx.fillStyle = '#8a3030';
+        ctx.fillRect(ex-ps, ey-ps*4, ps*2, ps*4);
+        ctx.fillStyle = '#8a3030'; ctx.fillRect(ex-ps, ey-ps*5, ps*2, ps);
+        ctx.fillStyle = '#ff6600'; ctx.fillRect(ex-ps+1, ey-ps*5+1, 1, 1); ctx.fillRect(ex+ps-2, ey-ps*5+1, 1, 1);
+        // Wait bars
+        const bw = 24, bh = 3, by = 70;
+        ctx.fillStyle = '#1a1520';
+        ctx.fillRect(px-bw/2, by, bw, bh); ctx.fillRect(ex-bw/2, by, bw, bh);
+        const pWait = (Math.sin(time*1.5)+1)/2;
+        const eWait = (Math.cos(time*1.2)+1)/2;
+        ctx.fillStyle = '#4a6a8a'; ctx.fillRect(px-bw/2, by, bw*pWait, bh);
+        ctx.fillStyle = '#8a6a4a'; ctx.fillRect(ex-bw/2, by, bw*eWait, bh);
+        // Clash spark
+        if (Math.sin(time*3) > 0.8) {
+          ctx.fillStyle = '#fff'; ctx.fillRect(w/2-1, 50, 2, 2);
+          ctx.fillStyle = 'rgba(255,200,100,0.5)'; ctx.fillRect(w/2-3, 48, 6, 6);
+        }
       } else if (type === 'ironether') {
         ctx.fillStyle = '#0a0810'; ctx.fillRect(0, 0, w, h);
         ctx.strokeStyle = `rgba(255,140,60,${0.3+0.15*Math.sin(time*1.5)})`;
