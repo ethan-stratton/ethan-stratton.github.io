@@ -46,6 +46,18 @@
   }
   .desc em { color: #c8b8a0; font-style: normal; }
 
+  /* ── Mode Tabs ── */
+  .mode-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+  .mode-tab {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem; padding: 10px 24px;
+    background: rgba(30, 28, 35, 0.9); border: 1px solid #3a3540;
+    border-radius: 4px; color: #908880; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .mode-tab:hover { border-color: #b89cff; color: #c8c0b8; }
+  .mode-tab.active { border-color: #b89cff; background: rgba(60, 50, 80, 0.5); color: #e8e0d8; }
+
   /* ── Arena ── */
   .arena {
     display: flex; gap: 24px; align-items: flex-start;
@@ -174,6 +186,8 @@
   }
   .ctrl-btn:hover { border-color: #b89cff; color: #e8e0d8; }
   .ctrl-btn.active { border-color: #b89cff; background: rgba(60, 50, 80, 0.5); }
+  .ctrl-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .ctrl-btn:disabled:hover { border-color: #3a3540; color: #c8c0b8; }
 
   /* ── Speed selector ── */
   .speed-sel { display: flex; gap: 6px; align-items: center; margin-bottom: 16px; }
@@ -207,7 +221,7 @@
   .enemy-btn .ename { font-family: 'Cinzel', serif; font-size: 0.8rem; color: #e8e0d8; }
   .enemy-btn .ehp { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: #686060; margin-top: 4px; }
 
-  /* ── How it works ── */
+  /* ── How it works / GDD ── */
   .how {
     background: rgba(20, 18, 25, 0.7);
     border: 1px solid #2a2530; border-radius: 8px;
@@ -217,9 +231,18 @@
     font-family: 'Cinzel', serif; font-weight: 400;
     font-size: 0.9rem; color: #e8e0d8; margin-bottom: 12px;
   }
+  .how h4 {
+    font-family: 'Cinzel', serif; font-weight: 400;
+    font-size: 0.85rem; color: #c8b8a0; margin: 16px 0 8px;
+  }
   .how p {
     font-size: 0.8rem; color: #908880; line-height: 1.7; margin-bottom: 10px;
   }
+  .how ul {
+    font-size: 0.8rem; color: #908880; line-height: 1.7;
+    margin: 0 0 10px 20px;
+  }
+  .how li { margin-bottom: 4px; }
   .how strong { color: #c8b8a0; font-weight: 400; }
   .how code {
     font-family: 'JetBrains Mono', monospace;
@@ -255,6 +278,109 @@
     80% { transform: translateX(2px); }
   }
   .shake { animation: shake 0.3s ease; }
+
+  /* ── Run Mode: Orb Map ── */
+  .run-container { display: none; margin-bottom: 24px; }
+  .run-container.active { display: block; }
+  .sandbox-container.active { display: block; }
+  .sandbox-container { display: none; }
+
+  .run-layout { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  .run-main { flex: 1; min-width: 300px; }
+
+  .orb-map {
+    width: 80px; display: flex; flex-direction: column; align-items: center;
+    padding: 16px 0; background: rgba(20, 18, 25, 0.7);
+    border: 1px solid #2a2530; border-radius: 8px;
+  }
+  .orb-node {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: 2px solid #3a3540; background: rgba(30, 28, 35, 0.9);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+    color: #686060; cursor: default; transition: all 0.3s;
+    position: relative;
+  }
+  .orb-node.current { border-color: #b89cff; color: #e8e0d8; box-shadow: 0 0 12px rgba(184,156,255,0.4); cursor: pointer; }
+  .orb-node.completed { border-color: #3a6a3a; background: rgba(40, 80, 40, 0.3); color: #5a9a5a; }
+  .orb-node.locked { opacity: 0.35; }
+  .orb-node.boss { border-color: #8a4a2a; }
+  .orb-node.boss.current { border-color: #ca8a4a; box-shadow: 0 0 12px rgba(202,138,74,0.4); }
+  .orb-connector { width: 2px; height: 20px; background: #2a2530; }
+  .orb-connector.completed { background: #3a6a3a; }
+
+  /* ── Loadout ── */
+  .loadout-screen { margin-bottom: 24px; }
+  .loadout-screen h3 {
+    font-family: 'Cinzel', serif; font-weight: 400;
+    font-size: 0.9rem; color: #c8c0b8; margin-bottom: 10px;
+  }
+  .loadout-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; color: #686060; margin-bottom: 12px;
+  }
+  .loadout-count .full { color: #ca6a6a; }
+  .loadout-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .preset-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem; padding: 6px 12px;
+    background: rgba(30, 28, 35, 0.9); border: 1px solid #2a2530;
+    border-radius: 4px; color: #908880; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .preset-btn:hover { border-color: #b89cff; color: #c8c0b8; }
+
+  .loadout-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 6px; margin-bottom: 16px;
+  }
+  .loadout-item {
+    background: rgba(30, 28, 35, 0.9);
+    border: 1px solid #2a2530; border-radius: 6px;
+    padding: 8px 10px; cursor: pointer; transition: all 0.2s;
+    text-align: left;
+  }
+  .loadout-item:hover { border-color: #585050; }
+  .loadout-item.equipped { border-color: #5a8a5a; background: rgba(40, 70, 40, 0.3); }
+  .loadout-item .li-name {
+    font-family: 'Cinzel', serif; font-size: 0.75rem; color: #e8e0d8;
+  }
+  .loadout-item .li-stats {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: #686060; margin-top: 2px;
+  }
+
+  /* ── Rest Screen ── */
+  .rest-screen {
+    background: rgba(20, 18, 25, 0.85);
+    border: 1px solid #3a4a3a; border-radius: 8px;
+    padding: 24px; margin-bottom: 24px; text-align: center;
+  }
+  .rest-screen h3 {
+    font-family: 'Cinzel', serif; font-weight: 400;
+    font-size: 1.1rem; color: #5a9a5a; margin-bottom: 12px;
+  }
+  .rest-screen p {
+    font-size: 0.8rem; color: #908880; margin-bottom: 8px;
+  }
+  .rest-screen .rest-heal {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem; color: #6aca6a; margin-bottom: 16px;
+  }
+
+  /* ── Run Over ── */
+  .run-over {
+    background: rgba(20, 18, 25, 0.85);
+    border: 1px solid #4a2a2a; border-radius: 8px;
+    padding: 24px; margin-bottom: 24px; text-align: center;
+  }
+  .run-over h3 {
+    font-family: 'Cinzel', serif; font-weight: 400;
+    font-size: 1.1rem; color: #ca4a4a; margin-bottom: 12px;
+  }
+  .run-over.won h3 { color: #b89cff; }
+  .run-over p { font-size: 0.8rem; color: #908880; margin-bottom: 12px; }
+
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
@@ -273,76 +399,184 @@
     Fast attacks keep you safe but deal less. Read the enemy's timer and choose wisely.
   </p>
 
-  <!-- Enemy picker -->
-  <div class="enemy-select">
-    <h3>Choose your opponent</h3>
-    <div class="enemy-grid" id="enemyGrid"></div>
+  <!-- Mode Tabs -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="sandbox">Sandbox</button>
+    <button class="mode-tab" data-mode="run">Run Mode</button>
   </div>
 
-  <!-- Sprite area -->
-  <div class="sprite-area">
-    <div class="sprite-fig" id="playerFig">
-      <canvas id="playerSprite" width="48" height="48"></canvas>
-      <div class="sprite-label">Helen</div>
+  <!-- ═══════════ SANDBOX MODE ═══════════ -->
+  <div class="sandbox-container active" id="sandboxContainer">
+    <div class="enemy-select">
+      <h3>Choose your opponent</h3>
+      <div class="enemy-grid" id="enemyGrid"></div>
     </div>
-    <div class="sprite-fig" id="enemyFig">
-      <canvas id="enemySprite" width="48" height="48"></canvas>
-      <div class="sprite-label" id="enemySpriteLabel">Slime</div>
+
+    <div class="sprite-area">
+      <div class="sprite-fig" id="playerFig">
+        <canvas id="playerSprite" width="48" height="48"></canvas>
+        <div class="sprite-label">Helen</div>
+      </div>
+      <div class="sprite-fig" id="enemyFig">
+        <canvas id="enemySprite" width="48" height="48"></canvas>
+        <div class="sprite-label" id="enemySpriteLabel">Slime</div>
+      </div>
+    </div>
+
+    <div class="arena">
+      <div class="combatant player">
+        <h2>Helen</h2>
+        <div class="hp-bar-wrap">
+          <div class="hp-bar player-bar" id="playerHpBar"></div>
+          <div class="hp-text" id="playerHpText"></div>
+        </div>
+        <div class="action-name" id="playerAction">&nbsp;</div>
+        <div class="wait-bar-wrap">
+          <div class="wait-bar player-wait" id="playerWaitBar"></div>
+        </div>
+        <div class="wait-label" id="playerWaitLabel">Wait: —</div>
+      </div>
+      <div class="combatant enemy">
+        <h2 id="enemyName">Slime</h2>
+        <div class="hp-bar-wrap">
+          <div class="hp-bar enemy-bar" id="enemyHpBar"></div>
+          <div class="hp-text" id="enemyHpText"></div>
+        </div>
+        <div class="action-name" id="enemyAction">&nbsp;</div>
+        <div class="wait-bar-wrap">
+          <div class="wait-bar enemy-wait" id="enemyWaitBar"></div>
+        </div>
+        <div class="wait-label" id="enemyWaitLabel">Wait: —</div>
+      </div>
+    </div>
+
+    <div class="speed-sel">
+      <label>Speed:</label>
+      <button class="speed-btn" data-speed="400">Slow</button>
+      <button class="speed-btn active" data-speed="200">Normal</button>
+      <button class="speed-btn" data-speed="80">Fast</button>
+    </div>
+
+    <div class="items">
+      <h3>Choose your action</h3>
+      <div class="item-grid" id="itemGrid"></div>
+    </div>
+
+    <div class="log-wrap" id="log"></div>
+
+    <div class="controls">
+      <button class="ctrl-btn" id="restartBtn">Restart Fight</button>
+      <button class="ctrl-btn" id="resetBtn">New Game (Full HP)</button>
     </div>
   </div>
 
-  <!-- Arena -->
-  <div class="arena">
-    <div class="combatant player">
-      <h2>Helen</h2>
-      <div class="hp-bar-wrap">
-        <div class="hp-bar player-bar" id="playerHpBar"></div>
-        <div class="hp-text" id="playerHpText"></div>
+  <!-- ═══════════ RUN MODE ═══════════ -->
+  <div class="run-container" id="runContainer">
+
+    <!-- Loadout Screen (shown before run and at rest) -->
+    <div class="loadout-screen" id="runLoadout">
+      <h3>Equip your loadout <span style="font-family:'JetBrains Mono';font-size:0.7rem;color:#686060">(max 6)</span></h3>
+      <div class="loadout-presets">
+        <button class="preset-btn" data-preset="warrior">⚔️ Warrior</button>
+        <button class="preset-btn" data-preset="ranger">🏹 Ranger</button>
+        <button class="preset-btn" data-preset="vampire">🧛 Vampire</button>
+        <button class="preset-btn" data-preset="glasscannon">💥 Glass Cannon</button>
       </div>
-      <div class="action-name" id="playerAction">&nbsp;</div>
-      <div class="wait-bar-wrap">
-        <div class="wait-bar player-wait" id="playerWaitBar"></div>
+      <div class="loadout-count" id="loadoutCount">Equipped: 0 / 6</div>
+      <div class="loadout-grid" id="loadoutGrid"></div>
+      <div class="controls">
+        <button class="ctrl-btn" id="startRunBtn">Begin Run</button>
+        <button class="ctrl-btn" disabled title="Coming soon">🤝 Companion Fight</button>
       </div>
-      <div class="wait-label" id="playerWaitLabel">Wait: —</div>
     </div>
-    <div class="combatant enemy">
-      <h2 id="enemyName">Slime</h2>
-      <div class="hp-bar-wrap">
-        <div class="hp-bar enemy-bar" id="enemyHpBar"></div>
-        <div class="hp-text" id="enemyHpText"></div>
+
+    <!-- Run Layout: Orb Map + Combat -->
+    <div class="run-layout hidden" id="runLayout">
+      <div class="orb-map" id="orbMap"></div>
+      <div class="run-main">
+        <!-- Run sprites -->
+        <div class="sprite-area">
+          <div class="sprite-fig" id="runPlayerFig">
+            <canvas id="runPlayerSprite" width="48" height="48"></canvas>
+            <div class="sprite-label">Helen</div>
+          </div>
+          <div class="sprite-fig" id="runEnemyFig">
+            <canvas id="runEnemySprite" width="48" height="48"></canvas>
+            <div class="sprite-label" id="runEnemySpriteLabel">?</div>
+          </div>
+        </div>
+
+        <div class="arena">
+          <div class="combatant player">
+            <h2>Helen</h2>
+            <div class="hp-bar-wrap">
+              <div class="hp-bar player-bar" id="runPlayerHpBar"></div>
+              <div class="hp-text" id="runPlayerHpText"></div>
+            </div>
+            <div class="action-name" id="runPlayerAction">&nbsp;</div>
+            <div class="wait-bar-wrap">
+              <div class="wait-bar player-wait" id="runPlayerWaitBar"></div>
+            </div>
+            <div class="wait-label" id="runPlayerWaitLabel">Wait: —</div>
+          </div>
+          <div class="combatant enemy">
+            <h2 id="runEnemyName">?</h2>
+            <div class="hp-bar-wrap">
+              <div class="hp-bar enemy-bar" id="runEnemyHpBar"></div>
+              <div class="hp-text" id="runEnemyHpText"></div>
+            </div>
+            <div class="action-name" id="runEnemyAction">&nbsp;</div>
+            <div class="wait-bar-wrap">
+              <div class="wait-bar enemy-wait" id="runEnemyWaitBar"></div>
+            </div>
+            <div class="wait-label" id="runEnemyWaitLabel">Wait: —</div>
+          </div>
+        </div>
+
+        <div class="speed-sel">
+          <label>Speed:</label>
+          <button class="speed-btn run-speed" data-speed="400">Slow</button>
+          <button class="speed-btn run-speed active" data-speed="200">Normal</button>
+          <button class="speed-btn run-speed" data-speed="80">Fast</button>
+        </div>
+
+        <div class="items">
+          <h3>Choose your action</h3>
+          <div class="item-grid" id="runItemGrid"></div>
+        </div>
+
+        <div class="log-wrap" id="runLog"></div>
       </div>
-      <div class="action-name" id="enemyAction">&nbsp;</div>
-      <div class="wait-bar-wrap">
-        <div class="wait-bar enemy-wait" id="enemyWaitBar"></div>
+    </div>
+
+    <!-- Rest Screen -->
+    <div class="rest-screen hidden" id="restScreen">
+      <h3>Victory — Rest</h3>
+      <p id="restHpDisplay"></p>
+      <div class="rest-heal" id="restHealMsg"></div>
+      <div class="loadout-screen">
+        <h3>Adjust loadout <span style="font-family:'JetBrains Mono';font-size:0.7rem;color:#686060">(max 6)</span></h3>
+        <div class="loadout-presets">
+          <button class="preset-btn rest-preset" data-preset="warrior">⚔️ Warrior</button>
+          <button class="preset-btn rest-preset" data-preset="ranger">🏹 Ranger</button>
+          <button class="preset-btn rest-preset" data-preset="vampire">🧛 Vampire</button>
+          <button class="preset-btn rest-preset" data-preset="glasscannon">💥 Glass Cannon</button>
+        </div>
+        <div class="loadout-count" id="restLoadoutCount">Equipped: 0 / 6</div>
+        <div class="loadout-grid" id="restLoadoutGrid"></div>
       </div>
-      <div class="wait-label" id="enemyWaitLabel">Wait: —</div>
+      <button class="ctrl-btn" id="continueRunBtn">Continue to Node 2</button>
+    </div>
+
+    <!-- Run Over -->
+    <div class="run-over hidden" id="runOverScreen">
+      <h3 id="runOverTitle">Run Over</h3>
+      <p id="runOverMsg"></p>
+      <button class="ctrl-btn" id="newRunBtn">New Run</button>
     </div>
   </div>
 
-  <!-- Speed -->
-  <div class="speed-sel">
-    <label>Speed:</label>
-    <button class="speed-btn" data-speed="400">Slow</button>
-    <button class="speed-btn active" data-speed="200">Normal</button>
-    <button class="speed-btn" data-speed="80">Fast</button>
-  </div>
-
-  <!-- Items -->
-  <div class="items">
-    <h3>Choose your action</h3>
-    <div class="item-grid" id="itemGrid"></div>
-  </div>
-
-  <!-- Log -->
-  <div class="log-wrap" id="log"></div>
-
-  <!-- Controls -->
-  <div class="controls">
-    <button class="ctrl-btn" id="restartBtn">Restart Fight</button>
-    <button class="ctrl-btn" id="resetBtn">New Game (Full HP)</button>
-  </div>
-
-  <!-- How it works -->
+  <!-- ═══════════ HOW IT WORKS ═══════════ -->
   <div class="how">
     <h3>How it works</h3>
     <p>
@@ -382,6 +616,97 @@
       Read the enemy, count the ticks, adapt every turn.
     </p>
   </div>
+
+  <!-- ═══════════ GDD — TRANSFORMATIONS ═══════════ -->
+  <div class="how" style="margin-top: 16px; border-color: #3a2a40;">
+    <h3>Design Document — Transformations</h3>
+    <p>
+      Transformations change <strong>HOW</strong> you interact with the Eff / Def / Wait triangle — not just stat bonuses.
+      Each one redefines your relationship to the combat system. These are not implemented yet — this is the design spec.
+    </p>
+
+    <h4>🧛 Vampire</h4>
+    <p>
+      Your Def stat doesn't work normally. Instead you have a <strong>Blood</strong> meter (starts at 0, max 30).
+      Taking damage fills Blood (1:1 with damage taken). Spend Blood to supercharge your next action:
+    </p>
+    <ul>
+      <li><strong>10 Blood:</strong> Next attack gets 2× Eff</li>
+      <li><strong>20 Blood:</strong> Next attack gets 2× Eff AND heals you for damage dealt</li>
+      <li><strong>30 Blood:</strong> Next attack gets 3× Eff, heals, AND stuns</li>
+    </ul>
+    <p>
+      You <strong>WANT</strong> to get hit by small attacks. You <strong>FEAR</strong> big hits.
+      Metronome becomes your best friend — Wait 1 tick to scout if the incoming hit is worth eating.
+      Shield becomes a panic button, not a default.
+      Drain Touch synergy: already heals, now also fills Blood. The sustain loop.
+    </p>
+
+    <h4>🐺 Werewolf</h4>
+    <p>
+      You lose access to all weapons. Replaced with 3 innate actions:
+      <code>Claw</code> (Eff 12, Def 3, Wait 3),
+      <code>Bite</code> (Eff 18, Def 0, Wait 5, absorb),
+      <code>Howl</code> (Eff 0, Def 0, Wait 4, stun 4).
+    </p>
+    <p>
+      <strong>BUT:</strong> you act TWICE per cycle. After your action resolves, immediately pick again
+      before the enemy's next action. Raw tempo. The decision space shrinks but the pace doubles.
+    </p>
+    <p>
+      Weakness: no shield, no heal, no range. Pure aggression on a timer.
+    </p>
+
+    <h4>💀 Lich</h4>
+    <p>
+      All your attacks become <strong>pierce</strong>. Your Heal is replaced with
+      <code>Soul Harvest</code> (Eff 0, Wait 8 — kills any enemy below 15% HP instantly, otherwise fizzles).
+    </p>
+    <p>
+      <strong>BUT:</strong> your max HP ticks down by 1 every 3 ticks. You're on a clock.
+      Every fight is a DPS race against your own decay. Invigorate becomes critical —
+      buff fast, kill fast, or die to yourself. Long fights are death sentences.
+      Shield still works (you need it), but you can't heal. Drain Touch is your only sustain.
+    </p>
+
+    <h4>🧟 Revenant</h4>
+    <p>
+      You can't be killed — when HP hits 0, you <strong>resurrect at 15 HP</strong> (once per fight).
+    </p>
+    <p>
+      <strong>BUT:</strong> after resurrection, all your Wait values are doubled. You're slow, desperate, burning.
+      The strategic question: do you play safe to avoid triggering resurrection? Or do you
+      kamikaze early with high-risk plays, knowing you have a safety net, then survive the slow phase?
+    </p>
+    <p>
+      Invigorate before death carries over. Setup → die → resurrect → execute with buffed weapons.
+    </p>
+
+    <h4>🔮 Chronomancer</h4>
+    <p>
+      You can see the enemy's chosen action <strong>before</strong> picking yours (it's revealed immediately).
+    </p>
+    <p>
+      <strong>BUT:</strong> your Wait values are all +3. You're always slower.
+      Perfect information, imperfect tempo. You know they're charging Fire Breath —
+      but can you get your Shield up in time? Or do you Stun Mace to delay them further?
+      Metronome at Wait 4 instead of 1. Even scouting costs something.
+    </p>
+
+    <h4>⚡ Berserker</h4>
+    <p>
+      Each consecutive attack (non-shield, non-heal) adds <strong>+3 Eff</strong> to the NEXT attack (stacks).
+      Using Shield or Heal resets the streak to 0.
+    </p>
+    <p>
+      The snowball: Longbow (+0) → Longsword (+3) → Broadsword (+6) → Thunder (+9) = 44 pierce damage.
+    </p>
+    <p>
+      The tension: you can't afford to defend or heal without losing your streak.
+      Pure offense rewarded, but one bad read and you're eating damage with no defense
+      and no way to heal without resetting your damage engine.
+    </p>
+  </div>
 </div>
 
 <script>
@@ -412,33 +737,23 @@ window.addEventListener('resize', initStars);
 // ── Pixel Sprites ──
 function drawPixelHelen(ctx) {
   ctx.clearRect(0,0,48,48);
-  const s = 3; // scale
+  const s = 3;
   const px = (x,y,c) => { ctx.fillStyle = c; ctx.fillRect(x*s,y*s,s,s); };
-  // Hair (blue)
   for (let x=5;x<=10;x++) px(x,2,'#4466aa');
   for (let x=4;x<=11;x++) px(x,3,'#4466aa');
   for (let x=4;x<=11;x++) px(x,4,'#4466aa');
-  // Face
   for (let x=5;x<=10;x++) px(x,5,'#f0c8a0');
   for (let x=5;x<=10;x++) px(x,6,'#f0c8a0');
   for (let x=5;x<=10;x++) px(x,7,'#f0c8a0');
-  // Eyes
   px(6,6,'#223'); px(9,6,'#223');
-  // Mouth
   px(7,7,'#c08060'); px(8,7,'#c08060');
-  // Body (green tunic)
   for (let x=5;x<=10;x++) for (let y=8;y<=11;y++) px(x,y,'#4a8a4a');
-  // Belt
   for (let x=5;x<=10;x++) px(x,10,'#8a7040');
-  // Arms
   for (let y=8;y<=10;y++) { px(4,y,'#f0c8a0'); px(11,y,'#f0c8a0'); }
-  // Legs
   for (let y=12;y<=14;y++) { px(6,y,'#3a5a3a'); px(7,y,'#3a5a3a'); px(8,y,'#3a5a3a'); px(9,y,'#3a5a3a'); }
-  // Boots
   px(6,14,'#5a4030'); px(7,14,'#5a4030'); px(8,14,'#5a4030'); px(9,14,'#5a4030');
-  // Sword (right hand)
   px(12,7,'#c0c0c0'); px(12,6,'#c0c0c0'); px(12,5,'#c0c0c0'); px(12,4,'#d0d0d0');
-  px(12,8,'#8a7040'); // hilt
+  px(12,8,'#8a7040');
 }
 
 const enemySprites = {
@@ -458,9 +773,9 @@ const enemySprites = {
     px(7,5,'#c02020');px(8,5,'#c02020');
     for(let x=5;x<=10;x++)for(let y=7;y<=11;y++) px(x,y,'#5a7a30');
     for(let y=7;y<=9;y++){px(4,y,'#6a8a40');px(11,y,'#6a8a40');}
-    px(11,8,'#aaa');px(11,7,'#aaa'); // shield
+    px(11,8,'#aaa');px(11,7,'#aaa');
     for(let y=12;y<=14;y++){px(6,y,'#4a6a20');px(7,y,'#4a6a20');px(8,y,'#4a6a20');px(9,y,'#4a6a20');}
-    px(10,3,'#6a8a40'); // horn
+    px(10,3,'#6a8a40');
   },
   Skeleton: (ctx) => {
     ctx.clearRect(0,0,48,48);
@@ -469,35 +784,34 @@ const enemySprites = {
     px(7,5,'#222');px(8,5,'#222');px(7,6,'#333');
     for(let x=6;x<=9;x++)for(let y=7;y<=11;y++) px(x,y,'#d0c8b8');
     for(let y=7;y<=10;y++){px(5,y,'#d0c8b8');px(10,y,'#d0c8b8');}
-    px(10,7,'#888');px(10,6,'#888');px(10,5,'#888'); // sword
+    px(10,7,'#888');px(10,6,'#888');px(10,5,'#888');
     for(let y=12;y<=14;y++){px(6,y,'#c0b8a8');px(9,y,'#c0b8a8');}
   },
   DarkKnight: (ctx) => {
     ctx.clearRect(0,0,48,48);
     const s=3, px=(x,y,c)=>{ctx.fillStyle=c;ctx.fillRect(x*s,y*s,s,s);};
     for(let x=5;x<=10;x++)for(let y=2;y<=5;y++) px(x,y,'#3a3040');
-    px(7,4,'#c04040');px(8,4,'#c04040'); // eyes
+    px(7,4,'#c04040');px(8,4,'#c04040');
     for(let x=5;x<=10;x++)for(let y=6;y<=11;y++) px(x,y,'#2a2030');
     for(let y=6;y<=10;y++){px(4,y,'#3a3040');px(11,y,'#3a3040');}
-    px(3,6,'#8080a0');px(3,7,'#8080a0');px(3,8,'#8080a0');px(3,5,'#a0a0c0'); // big sword
+    px(3,6,'#8080a0');px(3,7,'#8080a0');px(3,8,'#8080a0');px(3,5,'#a0a0c0');
     for(let y=12;y<=14;y++){px(6,y,'#2a2030');px(7,y,'#2a2030');px(8,y,'#2a2030');px(9,y,'#2a2030');}
   },
   Dragon: (ctx) => {
     ctx.clearRect(0,0,48,48);
     const s=3, px=(x,y,c)=>{ctx.fillStyle=c;ctx.fillRect(x*s,y*s,s,s);};
     for(let x=4;x<=11;x++)for(let y=4;y<=7;y++) px(x,y,'#8a3030');
-    px(5,1,'#aa4040');px(10,1,'#aa4040');px(5,2,'#993030');px(10,2,'#993030'); // horns
+    px(5,1,'#aa4040');px(10,1,'#aa4040');px(5,2,'#993030');px(10,2,'#993030');
     for(let x=5;x<=10;x++)for(let y=2;y<=4;y++) px(x,y,'#8a3030');
-    px(6,5,'#ff8800');px(9,5,'#ff8800'); // eyes
+    px(6,5,'#ff8800');px(9,5,'#ff8800');
     for(let x=4;x<=11;x++)for(let y=8;y<=12;y++) px(x,y,'#7a2525');
-    // Wings
     px(2,5,'#9a4040');px(3,4,'#9a4040');px(3,5,'#9a4040');
     px(12,5,'#9a4040');px(13,4,'#9a4040');px(13,5,'#9a4040');
     for(let y=13;y<=14;y++){px(5,y,'#6a2020');px(6,y,'#6a2020');px(9,y,'#6a2020');px(10,y,'#6a2020');}
   }
 };
 
-// ── Items (Helen's inventory) ──
+// ── Items ──
 const ITEMS = [
   { name: 'Longbow', eff: 10, def: 2, wait: 5, desc: 'Fast and reliable', type: 'ranged' },
   { name: 'Longsword', eff: 15, def: 7, wait: 10, desc: 'Balanced offense & defense', type: 'melee' },
@@ -523,9 +837,8 @@ const ENEMIES = [
       { name: 'Sticky Spit', eff: 3, def: 1, wait: 5, stun: 3 },
     ],
     ai: (enemy, player) => {
-      // Stun when player is casting something slow
       if (player.chosenAction && player.chosenAction.wait >= 10)
-        return enemy.actions[2]; // sticky spit stun
+        return enemy.actions[2];
       return enemy.actions[Math.random() < 0.6 ? 0 : 1];
     },
     desc: 'Simple — but watch the stun spit.'
@@ -539,10 +852,8 @@ const ENEMIES = [
       { name: 'Tongue Lash', eff: 4, def: 0, wait: 5, seal: true },
     ],
     ai: (enemy, player) => {
-      // Seal the player's shield to force vulnerability
       if (player.chosenAction && player.chosenAction.type === 'shield' && Math.random() < 0.6)
-        return enemy.actions[3]; // tongue lash seal
-      // Guard up against heavy attacks
+        return enemy.actions[3];
       if (player.chosenAction && player.chosenAction.wait >= 10)
         return enemy.actions[1];
       return enemy.actions[Math.random() < 0.5 ? 0 : 2];
@@ -559,9 +870,8 @@ const ENEMIES = [
     ],
     ai: (enemy, player) => {
       if (enemy.hp < enemy.maxHp * 0.5) {
-        // When hurt: heal OR absorb
-        if (Math.random() < 0.35) return enemy.actions[2]; // heal
-        if (Math.random() < 0.4) return enemy.actions[3]; // absorb
+        if (Math.random() < 0.35) return enemy.actions[2];
+        if (Math.random() < 0.4) return enemy.actions[3];
       }
       return enemy.actions[Math.random() < 0.5 ? 0 : 1];
     },
@@ -577,13 +887,10 @@ const ENEMIES = [
       { name: 'Soul Drain', eff: 12, def: 3, wait: 9, absorb: true },
     ],
     ai: (enemy, player) => {
-      // Pierce when player is shielding
       if (player.chosenAction && player.chosenAction.type === 'shield')
-        return enemy.actions[3]; // void rend pierces
-      // Rush down slow actions
+        return enemy.actions[3];
       if (player.chosenAction && player.chosenAction.wait >= 12)
         return enemy.actions[1];
-      // Absorb when hurt
       if (enemy.hp < enemy.maxHp * 0.4 && Math.random() < 0.4)
         return enemy.actions[4];
       let r = Math.random();
@@ -603,13 +910,10 @@ const ENEMIES = [
       { name: 'Devour', eff: 20, def: 0, wait: 12, absorb: true },
     ],
     ai: (enemy, player) => {
-      // Fire breath when player shields
       if (player.chosenAction && player.chosenAction.type === 'shield')
         return enemy.actions[1];
-      // Roar stun when player is casting a long spell
       if (player.chosenAction && player.chosenAction.wait >= 14)
-        return enemy.actions[3]; // stun delays them even more
-      // Devour when hurt
+        return enemy.actions[3];
       if (enemy.hp < enemy.maxHp * 0.35)
         return enemy.actions[Math.random() < 0.5 ? 4 : 1];
       let r = Math.random();
@@ -622,417 +926,605 @@ const ENEMIES = [
   },
 ];
 
-// ── State ──
-let player = { hp: 50, maxHp: 50, wait: 0, maxWait: 0, chosenAction: null, def: 0, effBuff: 0, sealedActions: [] };
-let enemy = { hp: 0, maxHp: 0, wait: 0, maxWait: 0, chosenAction: null, def: 0, actions: [], ai: null, name: '', sealedActions: [] };
-let tickSpeed = 200;
-let tickTimer = null;
-let gameOver = false;
+// ── Presets ──
+const PRESETS = {
+  warrior: ['Longsword', 'Broadsword', 'Wooden Shield', 'Heal', 'Stun Mace', 'Metronome'],
+  ranger: ['Longbow', 'Trusty Dagger', 'Thunder', 'Seal Rune', 'Heal', 'Metronome'],
+  vampire: ['Drain Touch', 'Trusty Dagger', 'Longbow', 'Invigorate', 'Stun Mace', 'Metronome'],
+  glasscannon: ['Thunder', 'Invigorate', 'Longbow', 'Longsword', 'Metronome', 'Seal Rune'],
+};
+
+// ═══════════════════════════════════════
+// COMBAT ENGINE (shared by both modes)
+// ═══════════════════════════════════════
+
+function createCombatEngine(cfg) {
+  // cfg: { playerFigId, enemyFigId, playerSpriteId, enemySpriteId, enemySpriteLabelId,
+  //         pHpBar, pHpText, pWaitBar, pWaitLabel, pAction,
+  //         eHpBar, eHpText, eWaitBar, eWaitLabel, eAction, eName,
+  //         logEl, itemGridEl, getItems, onVictory, onDefeat }
+
+  const eng = {};
+  let player, enemy, tickSpeed = 200, tickTimer = null, gameOver = false;
+  let waitingForPlayer = true;
+  let currentEnemyData = null;
+
+  function initPlayer(hp, maxHp) {
+    player = { hp: hp||50, maxHp: maxHp||50, wait: 0, maxWait: 0, chosenAction: null, def: 0, effBuff: 0, sealedActions: [] };
+  }
+  eng.initPlayer = initPlayer;
+  eng.getPlayer = () => player;
+  eng.setTickSpeed = (s) => { tickSpeed = s; if (tickTimer) { stopTicking(); startTicking(); } };
+  eng.isGameOver = () => gameOver;
+
+  function $(id) { return document.getElementById(id); }
+
+  function updateUI() {
+    const pPct = Math.max(0, player.hp / player.maxHp * 100);
+    $(cfg.pHpBar).style.width = pPct + '%';
+    $(cfg.pHpText).textContent = `${Math.max(0,player.hp)} / ${player.maxHp}`;
+
+    const ePct = enemy ? Math.max(0, enemy.hp / enemy.maxHp * 100) : 0;
+    $(cfg.eHpBar).style.width = ePct + '%';
+    $(cfg.eHpText).textContent = enemy ? `${Math.max(0,enemy.hp)} / ${enemy.maxHp}` : '';
+
+    if (player.chosenAction) {
+      $(cfg.pAction).textContent = player.chosenAction.name;
+      const wPct = player.maxWait > 0 ? (player.wait / player.maxWait * 100) : 0;
+      $(cfg.pWaitBar).style.width = wPct + '%';
+      $(cfg.pWaitLabel).textContent = `Wait: ${player.wait}`;
+    } else {
+      $(cfg.pAction).textContent = waitingForPlayer ? '⟵ choose an action' : '';
+      $(cfg.pWaitBar).style.width = '0%';
+      $(cfg.pWaitLabel).textContent = 'Wait: —';
+    }
+
+    if (enemy && enemy.chosenAction) {
+      $(cfg.eAction).textContent = enemy.chosenAction.name;
+      const wPct = enemy.maxWait > 0 ? (enemy.wait / enemy.maxWait * 100) : 0;
+      $(cfg.eWaitBar).style.width = wPct + '%';
+      $(cfg.eWaitLabel).textContent = `Wait: ${enemy.wait}` + (waitingForPlayer ? ' (paused)' : '');
+    } else {
+      $(cfg.eAction).textContent = enemy ? 'choosing...' : '';
+      $(cfg.eWaitBar).style.width = '0%';
+      $(cfg.eWaitLabel).textContent = 'Wait: —';
+    }
+  }
+
+  function log(text, cls) {
+    const p = document.createElement('p');
+    if (cls) p.className = cls;
+    p.textContent = text;
+    $(cfg.logEl).appendChild(p);
+    $(cfg.logEl).scrollTop = $(cfg.logEl).scrollHeight;
+  }
+
+  function showDmgPopup(figId, text, color) {
+    const fig = $(figId);
+    if (!fig) return;
+    const popup = document.createElement('div');
+    popup.className = 'dmg-popup';
+    popup.style.color = color;
+    popup.style.left = '50%'; popup.style.top = '0';
+    popup.style.transform = 'translateX(-50%)';
+    popup.textContent = text;
+    fig.appendChild(popup);
+    const canvas = fig.querySelector('canvas');
+    if (canvas) canvas.classList.add('shake');
+    setTimeout(() => {
+      popup.remove();
+      if (canvas) canvas.classList.remove('shake');
+    }, 800);
+  }
+
+  function buildItemGrid() {
+    const grid = $(cfg.itemGridEl);
+    grid.innerHTML = '';
+    const items = cfg.getItems();
+    items.forEach((item) => {
+      const btn = document.createElement('button');
+      const isSealed = player.sealedActions.includes(item.name);
+      btn.className = 'item-btn';
+      btn.disabled = !waitingForPlayer || gameOver || isSealed;
+      let statsHtml = `<span class="stat-eff">Eff ${item.eff + player.effBuff}${player.effBuff ? ' (+'+player.effBuff+')' : ''}</span> · <span class="stat-def">Def ${item.def}</span> · <span class="stat-wait">Wait ${item.wait}</span>`;
+      if (item.type === 'pierce') statsHtml += ` · <span class="stat-special">pierces</span>`;
+      if (item.type === 'heal') statsHtml += ` · <span class="stat-special">heals</span>`;
+      if (item.stun) statsHtml += ` · <span class="stat-special">stun +${item.stun}</span>`;
+      if (item.absorb) statsHtml += ` · <span class="stat-special">absorb</span>`;
+      if (item.seal) statsHtml += ` · <span class="stat-special">seals</span>`;
+      if (item.buff) statsHtml += ` · <span class="stat-special">+${item.buff.amount} ${item.buff.stat}</span>`;
+      let desc = item.desc;
+      if (isSealed) desc = '🔒 SEALED — cannot use this turn';
+      btn.innerHTML = `<div class="item-name">${item.name}${isSealed ? ' 🔒' : ''}</div><div class="item-stats">${statsHtml}</div><div class="item-desc">${desc}</div>`;
+      btn.onclick = () => choosePlayerAction(item);
+      grid.appendChild(btn);
+    });
+  }
+  eng.buildItemGrid = buildItemGrid;
+
+  function choosePlayerAction(item) {
+    if (!waitingForPlayer || gameOver) return;
+    waitingForPlayer = false;
+    player.chosenAction = item;
+    player.wait = item.wait;
+    player.maxWait = item.wait;
+    player.def = item.def;
+
+    if (!enemy.chosenAction) {
+      const eAction = currentEnemyData.ai(enemy, player);
+      enemy.chosenAction = eAction;
+      enemy.wait = eAction.wait;
+      enemy.maxWait = eAction.wait;
+      enemy.def = eAction.def;
+      log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
+    }
+    log(`You ready ${item.name} (Eff:${item.eff} Def:${item.def} W:${item.wait})`, 'info');
+    buildItemGrid();
+    updateUI();
+    startTicking();
+  }
+
+  function startTicking() { if (tickTimer) clearInterval(tickTimer); tickTimer = setInterval(tick, tickSpeed); }
+  function stopTicking() { if (tickTimer) { clearInterval(tickTimer); tickTimer = null; } }
+
+  function tick() {
+    if (gameOver || waitingForPlayer) { stopTicking(); return; }
+    if (player.wait > 0) player.wait--;
+    if (enemy.wait > 0) enemy.wait--;
+    updateUI();
+
+    if (player.wait <= 0 && enemy.wait <= 0) {
+      stopTicking();
+      resolveAction('player'); if (gameOver) return;
+      resolveAction('enemy'); if (gameOver) return;
+      pickEnemyAction();
+      player.chosenAction = null; player.def = 0;
+      waitingForPlayer = true;
+      buildItemGrid(); updateUI();
+    } else if (player.wait <= 0) {
+      stopTicking();
+      resolveAction('player'); if (gameOver) return;
+      player.chosenAction = null; player.def = 0;
+      waitingForPlayer = true;
+      buildItemGrid(); updateUI();
+    } else if (enemy.wait <= 0) {
+      stopTicking();
+      resolveAction('enemy'); if (gameOver) return;
+      pickEnemyAction();
+      updateUI(); startTicking();
+    }
+  }
+
+  function pickEnemyAction() {
+    let eAction = currentEnemyData.ai(enemy, player);
+    if (enemy.sealedActions.includes(eAction.name)) {
+      const available = currentEnemyData.actions.filter(a => !enemy.sealedActions.includes(a.name));
+      eAction = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : eAction;
+    }
+    enemy.chosenAction = eAction;
+    enemy.wait = eAction.wait; enemy.maxWait = eAction.wait; enemy.def = eAction.def;
+    log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
+  }
+
+  function resolveAction(who) {
+    if (who === 'player') {
+      const act = player.chosenAction; if (!act) return;
+      const eff = act.eff + player.effBuff;
+      if (act.type === 'heal') {
+        const healed = Math.min(eff, player.maxHp - player.hp);
+        player.hp += healed;
+        log(`You heal ${healed} HP!`, 'heal');
+        showDmgPopup(cfg.playerFigId, '+' + healed, '#6aca6a');
+      } else if (act.type === 'tool') {
+        log(`You wait and observe...`, 'info');
+      } else if (act.type === 'buff') {
+        player.effBuff += act.buff.amount;
+        log(`Invigorate! All weapons gain +${act.buff.amount} Effect (total +${player.effBuff})`, 'info');
+        showDmgPopup(cfg.playerFigId, '+' + act.buff.amount + ' EFF', '#b89cff');
+      } else if (act.seal) {
+        if (enemy.chosenAction && !enemy.sealedActions.includes(enemy.chosenAction.name)) {
+          enemy.sealedActions.push(enemy.chosenAction.name);
+          log(`Sealed ${enemy.name}'s ${enemy.chosenAction.name}! It can't use it again.`, 'info');
+          showDmgPopup(cfg.enemyFigId, 'SEALED', '#b89cff');
+        } else { log(`Seal Rune fizzles — nothing to seal.`, 'info'); }
+      } else {
+        let dmg = act.type === 'pierce' ? eff : Math.max(0, eff - enemy.def);
+        if (dmg > 0) {
+          enemy.hp -= dmg;
+          let msg = act.type === 'pierce' ? `${act.name} pierces for ${dmg}!` : `${act.name} hits for ${dmg}!` + (enemy.def > 0 ? ` (${enemy.def} blocked)` : '');
+          log(msg, 'dmg');
+          showDmgPopup(cfg.enemyFigId, '-' + dmg, '#ca6a6a');
+          if (act.absorb) {
+            const absorbed = Math.min(dmg, player.maxHp - player.hp);
+            if (absorbed > 0) { player.hp += absorbed; log(`Absorbed ${absorbed} HP!`, 'heal'); showDmgPopup(cfg.playerFigId, '+' + absorbed, '#6aca6a'); }
+          }
+        } else {
+          log(`${act.name} is fully blocked! (Def ${enemy.def} ≥ Eff ${eff})`, 'block');
+          showDmgPopup(cfg.enemyFigId, 'BLOCK', '#6a8aca');
+        }
+        if (act.stun && enemy.chosenAction) {
+          enemy.wait += act.stun; enemy.maxWait = Math.max(enemy.maxWait, enemy.wait);
+          log(`Stunned! ${enemy.name}'s wait +${act.stun} (now ${enemy.wait})`, 'info');
+          showDmgPopup(cfg.enemyFigId, 'STUN +' + act.stun, '#caba6a');
+        }
+      }
+      player.sealedActions = [];
+      if (enemy.hp <= 0) { victory(); return; }
+    } else {
+      const act = enemy.chosenAction; if (!act) return;
+      if (act.type === 'heal') {
+        const healed = Math.min(act.eff, enemy.maxHp - enemy.hp);
+        enemy.hp += healed;
+        log(`${enemy.name} heals ${healed} HP!`, 'heal');
+        showDmgPopup(cfg.enemyFigId, '+' + healed, '#6aca6a');
+      } else if (act.seal) {
+        if (player.chosenAction && !player.sealedActions.includes(player.chosenAction.name)) {
+          player.sealedActions.push(player.chosenAction.name);
+          log(`${enemy.name} sealed your ${player.chosenAction.name}!`, 'info');
+          showDmgPopup(cfg.playerFigId, 'SEALED', '#b89cff');
+        } else { log(`${enemy.name}'s seal fizzles.`, 'info'); }
+      } else {
+        let dmg = act.type === 'pierce' ? act.eff : Math.max(0, act.eff - player.def);
+        if (dmg > 0) {
+          player.hp -= dmg;
+          let msg = act.type === 'pierce' ? `${act.name} pierces for ${dmg}!` : `${enemy.name}'s ${act.name} hits for ${dmg}!` + (player.def > 0 ? ` (${player.def} blocked)` : '');
+          log(msg, 'dmg');
+          showDmgPopup(cfg.playerFigId, '-' + dmg, '#ca6a6a');
+          if (act.absorb) {
+            const absorbed = Math.min(dmg, enemy.maxHp - enemy.hp);
+            if (absorbed > 0) { enemy.hp += absorbed; log(`${enemy.name} absorbed ${absorbed} HP!`, 'heal'); showDmgPopup(cfg.enemyFigId, '+' + absorbed, '#6aca6a'); }
+          }
+        } else {
+          log(`${enemy.name}'s ${act.name} blocked! (Your Def ${player.def} ≥ Eff ${act.eff})`, 'block');
+          showDmgPopup(cfg.playerFigId, 'BLOCK', '#6a8aca');
+        }
+        if (act.stun && player.chosenAction) {
+          player.wait += act.stun; player.maxWait = Math.max(player.maxWait, player.wait);
+          log(`Stunned! Your wait +${act.stun} (now ${player.wait})`, 'info');
+          showDmgPopup(cfg.playerFigId, 'STUN +' + act.stun, '#caba6a');
+        }
+      }
+      enemy.sealedActions = [];
+      if (player.hp <= 0) { defeat(); return; }
+    }
+  }
+
+  function victory() {
+    gameOver = true; stopTicking();
+    log(`━━━ ${enemy.name} defeated! ━━━`, 'victory');
+    buildItemGrid(); updateUI();
+    if (cfg.onVictory) cfg.onVictory();
+  }
+
+  function defeat() {
+    gameOver = true; stopTicking();
+    log(`━━━ You fell in battle... ━━━`, 'defeat');
+    buildItemGrid(); updateUI();
+    if (cfg.onDefeat) cfg.onDefeat();
+  }
+
+  eng.startFight = function(enemyIdx, hp, maxHp) {
+    stopTicking();
+    const en = ENEMIES[enemyIdx];
+    currentEnemyData = en;
+    enemy = { hp: en.hp, maxHp: en.hp, wait: 0, maxWait: 0, chosenAction: null, def: 0, actions: en.actions, ai: en.ai, name: en.name, sealedActions: [] };
+    initPlayer(hp || 50, maxHp || 50);
+    waitingForPlayer = true;
+    gameOver = false;
+    $(cfg.eName).textContent = en.name;
+    if (cfg.enemySpriteLabelId) $(cfg.enemySpriteLabelId).textContent = en.name;
+    $(cfg.logEl).innerHTML = '';
+    log(`A ${en.name} appears! ${en.desc || ''}`, 'info');
+
+    // Draw sprites
+    const eSpriteCanvas = $(cfg.enemySpriteId);
+    if (eSpriteCanvas && enemySprites[en.sprite]) enemySprites[en.sprite](eSpriteCanvas.getContext('2d'));
+    const pSpriteCanvas = $(cfg.playerSpriteId);
+    if (pSpriteCanvas) drawPixelHelen(pSpriteCanvas.getContext('2d'));
+
+    buildItemGrid(); updateUI();
+  };
+
+  eng.stop = function() { stopTicking(); };
+
+  return eng;
+}
+
+// ═══════════════════════════════════
+// SANDBOX MODE
+// ═══════════════════════════════════
+
 let currentEnemyIdx = 0;
-let waitingForPlayer = true;
 
-// ── DOM refs ──
-const $pHpBar = document.getElementById('playerHpBar');
-const $pHpText = document.getElementById('playerHpText');
-const $pWaitBar = document.getElementById('playerWaitBar');
-const $pWaitLabel = document.getElementById('playerWaitLabel');
-const $pAction = document.getElementById('playerAction');
-const $eHpBar = document.getElementById('enemyHpBar');
-const $eHpText = document.getElementById('enemyHpText');
-const $eWaitBar = document.getElementById('enemyWaitBar');
-const $eWaitLabel = document.getElementById('enemyWaitLabel');
-const $eAction = document.getElementById('enemyAction');
-const $eName = document.getElementById('enemyName');
-const $log = document.getElementById('log');
-const $itemGrid = document.getElementById('itemGrid');
-const $enemyGrid = document.getElementById('enemyGrid');
+const sandboxEngine = createCombatEngine({
+  playerFigId: 'playerFig', enemyFigId: 'enemyFig',
+  playerSpriteId: 'playerSprite', enemySpriteId: 'enemySprite',
+  enemySpriteLabelId: 'enemySpriteLabel',
+  pHpBar: 'playerHpBar', pHpText: 'playerHpText',
+  pWaitBar: 'playerWaitBar', pWaitLabel: 'playerWaitLabel', pAction: 'playerAction',
+  eHpBar: 'enemyHpBar', eHpText: 'enemyHpText',
+  eWaitBar: 'enemyWaitBar', eWaitLabel: 'enemyWaitLabel', eAction: 'enemyAction',
+  eName: 'enemyName', logEl: 'log', itemGridEl: 'itemGrid',
+  getItems: () => ITEMS,
+  onVictory: null, onDefeat: null,
+});
 
-// ── Draw sprites ──
-const pCtx = document.getElementById('playerSprite').getContext('2d');
-const eCtx = document.getElementById('enemySprite').getContext('2d');
-drawPixelHelen(pCtx);
-
-// ── UI builders ──
 function buildEnemyGrid() {
-  $enemyGrid.innerHTML = '';
+  const grid = document.getElementById('enemyGrid');
+  grid.innerHTML = '';
   ENEMIES.forEach((en, i) => {
     const btn = document.createElement('button');
     btn.className = 'enemy-btn' + (i === currentEnemyIdx ? ' active' : '');
     btn.innerHTML = `<div class="ename">${en.name}</div><div class="ehp">HP ${en.hp}</div>`;
-    btn.onclick = () => { currentEnemyIdx = i; startFight(); };
-    $enemyGrid.appendChild(btn);
+    btn.onclick = () => { currentEnemyIdx = i; sandboxEngine.startFight(i); buildEnemyGrid(); };
+    grid.appendChild(btn);
   });
 }
 
-function buildItemGrid() {
-  $itemGrid.innerHTML = '';
-  ITEMS.forEach((item, i) => {
-    const btn = document.createElement('button');
-    const isSealed = player.sealedActions.includes(item.name);
-    btn.className = 'item-btn';
-    btn.disabled = !waitingForPlayer || gameOver || isSealed;
-    let statsHtml = `<span class="stat-eff">Eff ${item.eff + player.effBuff}${player.effBuff ? ' (+'+player.effBuff+')' : ''}</span> · <span class="stat-def">Def ${item.def}</span> · <span class="stat-wait">Wait ${item.wait}</span>`;
-    if (item.type === 'pierce') statsHtml += ` · <span class="stat-special">pierces</span>`;
-    if (item.type === 'heal') statsHtml += ` · <span class="stat-special">heals</span>`;
-    if (item.stun) statsHtml += ` · <span class="stat-special">stun +${item.stun}</span>`;
-    if (item.absorb) statsHtml += ` · <span class="stat-special">absorb</span>`;
-    if (item.seal) statsHtml += ` · <span class="stat-special">seals</span>`;
-    if (item.buff) statsHtml += ` · <span class="stat-special">+${item.buff.amount} ${item.buff.stat}</span>`;
-    let desc = item.desc;
-    if (isSealed) desc = '🔒 SEALED — cannot use this turn';
-    btn.innerHTML = `<div class="item-name">${item.name}${isSealed ? ' 🔒' : ''}</div><div class="item-stats">${statsHtml}</div><div class="item-desc">${desc}</div>`;
-    btn.onclick = () => choosePlayerAction(item);
-    $itemGrid.appendChild(btn);
-  });
-}
-
-function updateUI() {
-  const pPct = Math.max(0, player.hp / player.maxHp * 100);
-  const ePct = Math.max(0, enemy.hp / enemy.maxHp * 100);
-  $pHpBar.style.width = pPct + '%';
-  $pHpText.textContent = `${Math.max(0,player.hp)} / ${player.maxHp}`;
-  $eHpBar.style.width = ePct + '%';
-  $eHpText.textContent = `${Math.max(0,enemy.hp)} / ${enemy.maxHp}`;
-
-  if (player.chosenAction) {
-    $pAction.textContent = player.chosenAction.name;
-    const wPct = player.maxWait > 0 ? (player.wait / player.maxWait * 100) : 0;
-    $pWaitBar.style.width = wPct + '%';
-    $pWaitLabel.textContent = `Wait: ${player.wait}`;
-  } else {
-    $pAction.textContent = waitingForPlayer ? '⟵ choose an action' : '';
-    $pWaitBar.style.width = '0%';
-    $pWaitLabel.textContent = 'Wait: —';
-  }
-
-  if (enemy.chosenAction) {
-    $eAction.textContent = enemy.chosenAction.name;
-    const wPct = enemy.maxWait > 0 ? (enemy.wait / enemy.maxWait * 100) : 0;
-    $eWaitBar.style.width = wPct + '%';
-    $eWaitLabel.textContent = `Wait: ${enemy.wait}` + (waitingForPlayer ? ' (paused)' : '');
-  } else {
-    $eAction.textContent = 'choosing...';
-    $eWaitBar.style.width = '0%';
-    $eWaitLabel.textContent = 'Wait: —';
-  }
-}
-
-function log(text, cls='') {
-  const p = document.createElement('p');
-  if (cls) p.className = cls;
-  p.textContent = text;
-  $log.appendChild(p);
-  $log.scrollTop = $log.scrollHeight;
-}
-
-function showDmgPopup(figId, text, color) {
-  const fig = document.getElementById(figId);
-  const popup = document.createElement('div');
-  popup.className = 'dmg-popup';
-  popup.style.color = color;
-  popup.style.left = '50%';
-  popup.style.top = '0';
-  popup.style.transform = 'translateX(-50%)';
-  popup.textContent = text;
-  fig.appendChild(popup);
-  fig.querySelector('canvas').classList.add('shake');
-  setTimeout(() => {
-    popup.remove();
-    fig.querySelector('canvas').classList.remove('shake');
-  }, 800);
-}
-
-// ── Combat logic ──
-function choosePlayerAction(item) {
-  if (!waitingForPlayer || gameOver) return;
-  waitingForPlayer = false;
-  player.chosenAction = item;
-  player.wait = item.wait;
-  player.maxWait = item.wait;
-  player.def = item.def;
-
-  // Enemy picks only if it doesn't already have a pending action
-  if (!enemy.chosenAction) {
-    const enData = ENEMIES[currentEnemyIdx];
-    const eAction = enData.ai(enData, player);
-    enemy.chosenAction = eAction;
-    enemy.wait = eAction.wait;
-    enemy.maxWait = eAction.wait;
-    enemy.def = eAction.def;
-    log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
-  }
-
-  log(`You ready ${item.name} (Eff:${item.eff} Def:${item.def} W:${item.wait})`, 'info');
-
-  buildItemGrid();
-  updateUI();
-  startTicking();
-}
-
-function startTicking() {
-  if (tickTimer) clearInterval(tickTimer);
-  tickTimer = setInterval(tick, tickSpeed);
-}
-
-function stopTicking() {
-  if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
-}
-
-function tick() {
-  if (gameOver || waitingForPlayer) { stopTicking(); return; }
-
-  // Decrement both
-  if (player.wait > 0) player.wait--;
-  if (enemy.wait > 0) enemy.wait--;
-  updateUI();
-
-  // Both hit zero — player goes first (Helen's rule), then enemy
-  if (player.wait <= 0 && enemy.wait <= 0) {
-    stopTicking();
-    // Player fires
-    let pAct = player.chosenAction;
-    resolveAction('player');
-    if (gameOver) return;
-    // Enemy fires
-    resolveAction('enemy');
-    if (gameOver) return;
-    // Both need new actions — enemy picks, player chooses
-    pickEnemyAction();
-    player.chosenAction = null;
-    player.def = 0;
-    waitingForPlayer = true;
-    buildItemGrid();
-    updateUI();
-  } else if (player.wait <= 0) {
-    stopTicking();
-    resolveAction('player');
-    if (gameOver) return;
-    // Player needs new action, enemy keeps ticking
-    player.chosenAction = null;
-    player.def = 0;
-    waitingForPlayer = true;
-    buildItemGrid();
-    updateUI();
-    // DON'T restart ticking — wait for player to pick, enemy wait is paused
-    // (In Helen's, time only advances when both sides have chosen)
-  } else if (enemy.wait <= 0) {
-    stopTicking();
-    resolveAction('enemy');
-    if (gameOver) return;
-    // Enemy picks next action immediately, player keeps their action
-    pickEnemyAction();
-    updateUI();
-    startTicking();
-  }
-}
-
-function pickEnemyAction() {
-  const enData = ENEMIES[currentEnemyIdx];
-  let eAction = enData.ai(enData, player);
-  // If the chosen action is sealed, pick a random unsealed one
-  if (enemy.sealedActions.includes(eAction.name)) {
-    const available = enData.actions.filter(a => !enemy.sealedActions.includes(a.name));
-    eAction = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : eAction;
-  }
-  enemy.chosenAction = eAction;
-  enemy.wait = eAction.wait;
-  enemy.maxWait = eAction.wait;
-  enemy.def = eAction.def;
-  log(`${enemy.name} readies ${eAction.name} (Eff:${eAction.eff} Def:${eAction.def} W:${eAction.wait})`, 'info');
-}
-
-function resolveAction(who) {
-  if (who === 'player') {
-    const act = player.chosenAction;
-    if (!act) return;
-    const eff = act.eff + player.effBuff;
-
-    if (act.type === 'heal') {
-      const healed = Math.min(eff, player.maxHp - player.hp);
-      player.hp += healed;
-      log(`You heal ${healed} HP!`, 'heal');
-      showDmgPopup('playerFig', '+' + healed, '#6aca6a');
-    } else if (act.type === 'tool') {
-      log(`You wait and observe...`, 'info');
-    } else if (act.type === 'buff') {
-      player.effBuff += act.buff.amount;
-      log(`Invigorate! All weapons gain +${act.buff.amount} Effect (total +${player.effBuff})`, 'info');
-      showDmgPopup('playerFig', '+' + act.buff.amount + ' EFF', '#b89cff');
-    } else if (act.seal) {
-      // Seal enemy's current action
-      if (enemy.chosenAction && !enemy.sealedActions.includes(enemy.chosenAction.name)) {
-        enemy.sealedActions.push(enemy.chosenAction.name);
-        log(`Sealed ${enemy.name}'s ${enemy.chosenAction.name}! It can't use it again.`, 'info');
-        showDmgPopup('enemyFig', 'SEALED', '#b89cff');
-      } else {
-        log(`Seal Rune fizzles — nothing to seal.`, 'info');
-      }
-    } else {
-      // Damage action
-      let dmg;
-      if (act.type === 'pierce') {
-        dmg = eff;
-      } else {
-        dmg = Math.max(0, eff - enemy.def);
-      }
-
-      if (dmg > 0) {
-        enemy.hp -= dmg;
-        let msg = act.type === 'pierce' ? `${act.name} pierces for ${dmg}!` : `${act.name} hits for ${dmg}!` + (enemy.def > 0 ? ` (${enemy.def} blocked)` : '');
-        log(msg, 'dmg');
-        showDmgPopup('enemyFig', '-' + dmg, '#ca6a6a');
-
-        // Absorb: heal player for damage dealt
-        if (act.absorb) {
-          const absorbed = Math.min(dmg, player.maxHp - player.hp);
-          if (absorbed > 0) {
-            player.hp += absorbed;
-            log(`Absorbed ${absorbed} HP!`, 'heal');
-            showDmgPopup('playerFig', '+' + absorbed, '#6aca6a');
-          }
-        }
-      } else {
-        log(`${act.name} is fully blocked! (Def ${enemy.def} ≥ Eff ${eff})`, 'block');
-        showDmgPopup('enemyFig', 'BLOCK', '#6a8aca');
-      }
-
-      // Stun: add wait to enemy
-      if (act.stun && enemy.chosenAction) {
-        enemy.wait += act.stun;
-        enemy.maxWait = Math.max(enemy.maxWait, enemy.wait);
-        log(`Stunned! ${enemy.name}'s wait +${act.stun} (now ${enemy.wait})`, 'info');
-        showDmgPopup('enemyFig', 'STUN +' + act.stun, '#caba6a');
-      }
-    }
-
-    // Clear sealed actions after player acts (seals last one turn)
-    player.sealedActions = [];
-
-    if (enemy.hp <= 0) { victory(); return; }
-  } else {
-    const act = enemy.chosenAction;
-    if (!act) return;
-
-    if (act.type === 'heal') {
-      const healed = Math.min(act.eff, enemy.maxHp - enemy.hp);
-      enemy.hp += healed;
-      log(`${enemy.name} heals ${healed} HP!`, 'heal');
-      showDmgPopup('enemyFig', '+' + healed, '#6aca6a');
-    } else if (act.seal) {
-      // Enemy seals player's current action
-      if (player.chosenAction && !player.sealedActions.includes(player.chosenAction.name)) {
-        player.sealedActions.push(player.chosenAction.name);
-        log(`${enemy.name} sealed your ${player.chosenAction.name}!`, 'info');
-        showDmgPopup('playerFig', 'SEALED', '#b89cff');
-      } else {
-        log(`${enemy.name}'s seal fizzles.`, 'info');
-      }
-    } else {
-      let dmg;
-      if (act.type === 'pierce') {
-        dmg = act.eff;
-      } else {
-        dmg = Math.max(0, act.eff - player.def);
-      }
-
-      if (dmg > 0) {
-        player.hp -= dmg;
-        let msg = act.type === 'pierce' ? `${act.name} pierces for ${dmg}!` : `${enemy.name}'s ${act.name} hits for ${dmg}!` + (player.def > 0 ? ` (${player.def} blocked)` : '');
-        log(msg, 'dmg');
-        showDmgPopup('playerFig', '-' + dmg, '#ca6a6a');
-
-        // Enemy absorb
-        if (act.absorb) {
-          const absorbed = Math.min(dmg, enemy.maxHp - enemy.hp);
-          if (absorbed > 0) {
-            enemy.hp += absorbed;
-            log(`${enemy.name} absorbed ${absorbed} HP!`, 'heal');
-            showDmgPopup('enemyFig', '+' + absorbed, '#6aca6a');
-          }
-        }
-      } else {
-        log(`${enemy.name}'s ${act.name} blocked! (Your Def ${player.def} ≥ Eff ${act.eff})`, 'block');
-        showDmgPopup('playerFig', 'BLOCK', '#6a8aca');
-      }
-
-      // Enemy stun on player
-      if (act.stun && player.chosenAction) {
-        player.wait += act.stun;
-        player.maxWait = Math.max(player.maxWait, player.wait);
-        log(`Stunned! Your wait +${act.stun} (now ${player.wait})`, 'info');
-        showDmgPopup('playerFig', 'STUN +' + act.stun, '#caba6a');
-      }
-    }
-
-    // Clear enemy sealed actions after it acts
-    enemy.sealedActions = [];
-
-    if (player.hp <= 0) { defeat(); return; }
-  }
-}
-
-function victory() {
-  gameOver = true;
-  stopTicking();
-  log(`━━━ ${enemy.name} defeated! ━━━`, 'victory');
-  buildItemGrid();
-  updateUI();
-}
-
-function defeat() {
-  gameOver = true;
-  stopTicking();
-  log(`━━━ You fell in battle... ━━━`, 'defeat');
-  buildItemGrid();
-  updateUI();
-}
-
-function startFight() {
-  stopTicking();
-  const en = ENEMIES[currentEnemyIdx];
-  enemy.hp = en.hp; enemy.maxHp = en.hp;
-  enemy.wait = 0; enemy.maxWait = 0;
-  enemy.chosenAction = null; enemy.def = 0;
-  enemy.actions = en.actions; enemy.ai = en.ai; enemy.name = en.name;
-  enemy.sealedActions = [];
-  player.wait = 0; player.maxWait = 0;
-  player.chosenAction = null; player.def = 0;
-  player.effBuff = 0; player.sealedActions = [];
-  waitingForPlayer = true;
-  gameOver = false;
-  $eName.textContent = en.name;
-  document.getElementById('enemySpriteLabel').textContent = en.name;
-  $log.innerHTML = '';
-  log(`A ${en.name} appears! ${en.desc || ''}`, 'info');
-
-  // Draw enemy sprite
-  if (enemySprites[en.sprite]) enemySprites[en.sprite](eCtx);
-  
-  buildEnemyGrid();
-  buildItemGrid();
-  updateUI();
-}
-
-// ── Speed buttons ──
-document.querySelectorAll('.speed-btn').forEach(btn => {
+// Speed buttons (sandbox)
+document.querySelectorAll('.speed-sel:not(.run-speed-sel) .speed-btn:not(.run-speed)').forEach(btn => {
   btn.onclick = () => {
-    document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+    btn.parentElement.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    tickSpeed = parseInt(btn.dataset.speed);
-    if (tickTimer) { stopTicking(); startTicking(); }
+    sandboxEngine.setTickSpeed(parseInt(btn.dataset.speed));
   };
 });
 
-// ── Control buttons ──
-document.getElementById('restartBtn').onclick = () => startFight();
-document.getElementById('resetBtn').onclick = () => {
-  player.hp = player.maxHp;
-  startFight();
+document.getElementById('restartBtn').onclick = () => sandboxEngine.startFight(currentEnemyIdx);
+document.getElementById('resetBtn').onclick = () => sandboxEngine.startFight(currentEnemyIdx);
+
+// ═══════════════════════════════════
+// RUN MODE
+// ═══════════════════════════════════
+
+let runState = {
+  active: false,
+  node: 0, // 0-indexed, 0-6
+  hp: 50,
+  maxHp: 50,
+  loadout: [], // item names
+  enemies: [], // enemy indices for each node
+  phase: 'loadout', // loadout | combat | rest | over
 };
+
+// Generate run enemies: nodes 0-5 random, node 6 = Dragon (idx 4)
+function generateRunEnemies() {
+  const pool1 = [0, 1, 2]; // Slime, Lizardman, Skeleton
+  const poolMid = [0, 1, 2, 3]; // + Dark Knight
+  const enemies = [];
+  enemies.push(pool1[Math.floor(Math.random() * pool1.length)]); // node 0
+  for (let i = 1; i < 6; i++) {
+    enemies.push(poolMid[Math.floor(Math.random() * poolMid.length)]);
+  }
+  enemies.push(4); // node 6 = Dragon
+  return enemies;
+}
+
+let runEngine = null;
+
+function initRunEngine() {
+  runEngine = createCombatEngine({
+    playerFigId: 'runPlayerFig', enemyFigId: 'runEnemyFig',
+    playerSpriteId: 'runPlayerSprite', enemySpriteId: 'runEnemySprite',
+    enemySpriteLabelId: 'runEnemySpriteLabel',
+    pHpBar: 'runPlayerHpBar', pHpText: 'runPlayerHpText',
+    pWaitBar: 'runPlayerWaitBar', pWaitLabel: 'runPlayerWaitLabel', pAction: 'runPlayerAction',
+    eHpBar: 'runEnemyHpBar', eHpText: 'runEnemyHpText',
+    eWaitBar: 'runEnemyWaitBar', eWaitLabel: 'runEnemyWaitLabel', eAction: 'runEnemyAction',
+    eName: 'runEnemyName', logEl: 'runLog', itemGridEl: 'runItemGrid',
+    getItems: () => ITEMS.filter(it => runState.loadout.includes(it.name)),
+    onVictory: () => {
+      runState.hp = runEngine.getPlayer().hp;
+      if (runState.node >= 6) {
+        // Won the whole run!
+        runState.phase = 'over';
+        showRunOver(true);
+      } else {
+        runState.phase = 'rest';
+        showRestScreen();
+      }
+    },
+    onDefeat: () => {
+      runState.phase = 'over';
+      showRunOver(false);
+    },
+  });
+}
+
+function buildOrbMap() {
+  const map = document.getElementById('orbMap');
+  map.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    if (i > 0) {
+      const conn = document.createElement('div');
+      conn.className = 'orb-connector' + (i <= runState.node ? ' completed' : '');
+      map.appendChild(conn);
+    }
+    const orb = document.createElement('div');
+    let cls = 'orb-node';
+    if (i === 6) cls += ' boss';
+    if (i < runState.node) cls += ' completed';
+    else if (i === runState.node) cls += ' current';
+    else cls += ' locked';
+    orb.className = cls;
+    orb.textContent = i === 6 ? '🐉' : (i < runState.node ? '✓' : (i + 1));
+    map.appendChild(orb);
+  }
+}
+
+function buildLoadoutGrid(gridId, countId) {
+  const grid = document.getElementById(gridId);
+  grid.innerHTML = '';
+  ITEMS.forEach(item => {
+    const div = document.createElement('div');
+    const equipped = runState.loadout.includes(item.name);
+    div.className = 'loadout-item' + (equipped ? ' equipped' : '');
+    div.innerHTML = `<div class="li-name">${equipped ? '✓ ' : ''}${item.name}</div><div class="li-stats">E${item.eff} D${item.def} W${item.wait}${item.type==='pierce'?' pierce':''}${item.type==='heal'?' heal':''}${item.stun?' stun':''}${item.absorb?' absorb':''}${item.seal?' seal':''}${item.buff?' buff':''}</div>`;
+    div.onclick = () => {
+      if (equipped) {
+        runState.loadout = runState.loadout.filter(n => n !== item.name);
+      } else if (runState.loadout.length < 6) {
+        runState.loadout.push(item.name);
+      }
+      buildLoadoutGrid(gridId, countId);
+    };
+    grid.appendChild(div);
+  });
+  const countEl = document.getElementById(countId);
+  const n = runState.loadout.length;
+  countEl.innerHTML = `Equipped: <span class="${n>=6?'full':''}">${n}</span> / 6`;
+}
+
+function applyPreset(presetName) {
+  const p = PRESETS[presetName];
+  if (p) runState.loadout = [...p];
+}
+
+// Preset buttons (loadout screen)
+document.querySelectorAll('.preset-btn:not(.rest-preset)').forEach(btn => {
+  btn.onclick = () => {
+    applyPreset(btn.dataset.preset);
+    buildLoadoutGrid('loadoutGrid', 'loadoutCount');
+  };
+});
+document.querySelectorAll('.rest-preset').forEach(btn => {
+  btn.onclick = () => {
+    applyPreset(btn.dataset.preset);
+    buildLoadoutGrid('restLoadoutGrid', 'restLoadoutCount');
+  };
+});
+
+// Start Run
+document.getElementById('startRunBtn').onclick = () => {
+  if (runState.loadout.length === 0) return;
+  runState.active = true;
+  runState.node = 0;
+  runState.hp = 50; runState.maxHp = 50;
+  runState.enemies = generateRunEnemies();
+  runState.phase = 'combat';
+  initRunEngine();
+  showRunCombat();
+  runEngine.startFight(runState.enemies[0], runState.hp, runState.maxHp);
+};
+
+function showRunLoadout() {
+  document.getElementById('runLoadout').classList.remove('hidden');
+  document.getElementById('runLayout').classList.add('hidden');
+  document.getElementById('restScreen').classList.add('hidden');
+  document.getElementById('runOverScreen').classList.add('hidden');
+  buildLoadoutGrid('loadoutGrid', 'loadoutCount');
+}
+
+function showRunCombat() {
+  document.getElementById('runLoadout').classList.add('hidden');
+  document.getElementById('runLayout').classList.remove('hidden');
+  document.getElementById('restScreen').classList.add('hidden');
+  document.getElementById('runOverScreen').classList.add('hidden');
+  buildOrbMap();
+}
+
+function showRestScreen() {
+  document.getElementById('runLoadout').classList.add('hidden');
+  document.getElementById('runLayout').classList.add('hidden');
+  document.getElementById('restScreen').classList.remove('hidden');
+  document.getElementById('runOverScreen').classList.add('hidden');
+
+  // Heal 10 HP
+  const healAmt = Math.min(10, runState.maxHp - runState.hp);
+  runState.hp += healAmt;
+
+  document.getElementById('restHpDisplay').textContent = `HP: ${runState.hp} / ${runState.maxHp}`;
+  document.getElementById('restHealMsg').textContent = healAmt > 0 ? `Restored ${healAmt} HP at the campfire.` : 'Already at full health.';
+  document.getElementById('continueRunBtn').textContent = `Continue to Node ${runState.node + 2}`;
+
+  buildLoadoutGrid('restLoadoutGrid', 'restLoadoutCount');
+}
+
+function showRunOver(won) {
+  document.getElementById('runLoadout').classList.add('hidden');
+  document.getElementById('runLayout').classList.add('hidden');
+  document.getElementById('restScreen').classList.add('hidden');
+  document.getElementById('runOverScreen').classList.remove('hidden');
+
+  const screen = document.getElementById('runOverScreen');
+  screen.className = 'run-over' + (won ? ' won' : '');
+  document.getElementById('runOverTitle').textContent = won ? '🏆 Run Complete!' : '💀 Run Over';
+  document.getElementById('runOverMsg').textContent = won
+    ? `You defeated the Dragon and survived all 7 encounters!`
+    : `Fell at node ${runState.node + 1} of 7. Better luck next run.`;
+}
+
+// Continue from rest
+document.getElementById('continueRunBtn').onclick = () => {
+  if (runState.loadout.length === 0) return;
+  runState.node++;
+  runState.phase = 'combat';
+  initRunEngine();
+  showRunCombat();
+  runEngine.startFight(runState.enemies[runState.node], runState.hp, runState.maxHp);
+};
+
+// New Run
+document.getElementById('newRunBtn').onclick = () => {
+  runState.loadout = runState.loadout.length ? runState.loadout : [];
+  runState.phase = 'loadout';
+  showRunLoadout();
+};
+
+// Run speed buttons
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('run-speed')) {
+    document.querySelectorAll('.run-speed').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    if (runEngine) runEngine.setTickSpeed(parseInt(e.target.dataset.speed));
+  }
+});
+
+// ═══════════════════════════════════
+// MODE SWITCHING
+// ═══════════════════════════════════
+
+let currentMode = 'sandbox';
+
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentMode = tab.dataset.mode;
+
+    if (currentMode === 'sandbox') {
+      document.getElementById('sandboxContainer').classList.add('active');
+      document.getElementById('runContainer').classList.remove('active');
+      if (runEngine) runEngine.stop();
+    } else {
+      document.getElementById('sandboxContainer').classList.remove('active');
+      document.getElementById('runContainer').classList.add('active');
+      sandboxEngine.stop();
+      if (runState.phase === 'loadout' || !runState.active) {
+        showRunLoadout();
+      } else if (runState.phase === 'rest') {
+        showRestScreen();
+      } else if (runState.phase === 'over') {
+        showRunOver(false);
+      }
+      // combat stays as-is
+    }
+  };
+});
+
+// ── Sandbox speed buttons (re-wire) ──
+document.querySelectorAll('.speed-btn:not(.run-speed)').forEach(btn => {
+  btn.onclick = () => {
+    btn.parentElement.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    sandboxEngine.setTickSpeed(parseInt(btn.dataset.speed));
+  };
+});
 
 // ── Init ──
 buildEnemyGrid();
-startFight();
+sandboxEngine.startFight(0);
+buildLoadoutGrid('loadoutGrid', 'loadoutCount');
 
 })();
 </script>
