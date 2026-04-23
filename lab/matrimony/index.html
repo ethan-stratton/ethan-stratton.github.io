@@ -67,10 +67,6 @@
 <h1>Matrimony Beyond Space and Time</h1>
 <canvas id="game" width="512" height="512"></canvas>
 <div class="info">Arrow keys to move · Space to interact</div>
-<div class="dialogue-box" id="dialogueBox">
-  <div class="speaker" id="dialogueSpeaker"></div>
-  <div id="dialogueText"></div>
-</div>
 
 <script>
 // ══════════════════════════════════
@@ -393,38 +389,30 @@ const ENEMY_DATA = {
 };
 
 function startCombat(entity, enemyStats) {
-  state.combatTransition = { type: 'in', startTime: performance.now(), duration: 600 };
-  // Set up combat state after transition
-  setTimeout(() => {
-    state.combat = {
-      enemy: entity,
-      enemyName: enemyStats.name || entity.type,
-      enemySprite: entity.type,
-      enemyHp: enemyStats.maxHp,
-      enemyMaxHp: enemyStats.maxHp,
-      enemyEff: enemyStats.eff,
-      enemyDef: enemyStats.def,
-      enemyWait: enemyStats.wait,
-      playerHp: 30,
-      playerMaxHp: 30,
-      playerEff: 10,
-      playerDef: 2,
-      playerWait: 0,
-      attackText: '',
-    };
-  }, 600);
+  state.combat = {
+    enemy: entity,
+    enemyName: enemyStats.name || entity.type,
+    enemySprite: entity.type,
+    enemyHp: enemyStats.maxHp,
+    enemyMaxHp: enemyStats.maxHp,
+    enemyEff: enemyStats.eff,
+    enemyDef: enemyStats.def,
+    enemyWait: enemyStats.wait,
+    playerHp: 30,
+    playerMaxHp: 30,
+    playerEff: 10,
+    playerDef: 2,
+    playerWait: 0,
+    attackText: '',
+  };
 }
 
 function exitCombat() {
-  state.combatTransition = { type: 'out', startTime: performance.now(), duration: 400 };
   const enemy = state.combat.enemy;
   if (state.combat.enemyHp <= 0) {
     state.defeatedEnemies[enemy.id] = true;
   }
-  setTimeout(() => {
-    state.combat = null;
-    state.combatTransition = null;
-  }, 400);
+  state.combat = null;
 }
 
 function drawCombat() {
@@ -432,14 +420,18 @@ function drawCombat() {
   const W = canvas.width;
   const H = canvas.height;
   
-  // Background
-  ctx.fillStyle = '#0c0c14';
-  ctx.fillRect(0, 0, W, H);
+  // Draw the overworld FIRST (it stays visible in top and bottom)
+  // (draw() was already called before this in the game loop)
   
   const FONT = '"Pixelify Sans", sans-serif';
   
   // ── TOP: Enemy info bar (~18% of screen height) ──
+  // Drawn over the overworld with a semi-transparent bg
   const topH = Math.round(H * 0.18);
+  
+  // Semi-transparent bar behind enemy info
+  ctx.fillStyle = 'rgba(12, 12, 20, 0.85)';
+  ctx.fillRect(0, 0, W, topH);
   
   // Enemy portrait box (left side)
   const portraitSize = Math.round(topH * 0.75);
@@ -450,6 +442,8 @@ function drawCombat() {
   ctx.strokeStyle = '#5a5060';
   ctx.lineWidth = 2;
   ctx.strokeRect(portraitX, portraitY, portraitSize, portraitSize);
+  ctx.fillStyle = '#0c0c14';
+  ctx.fillRect(portraitX + 1, portraitY + 1, portraitSize - 2, portraitSize - 2);
   
   // Draw enemy sprite in portrait
   const spr = sprites[c.enemySprite];
@@ -472,26 +466,23 @@ function drawCombat() {
   const barH = 10;
   const barY = infoY + 2;
   
-  // HP bar background
   ctx.fillStyle = '#2a1a1a';
   ctx.fillRect(infoX, barY, barW, barH);
-  // HP bar fill
   const hpRatio = c.enemyHp / c.enemyMaxHp;
   ctx.fillStyle = hpRatio > 0.5 ? '#3a8a3a' : hpRatio > 0.25 ? '#b89030' : '#a03030';
   ctx.fillRect(infoX, barY, Math.round(barW * hpRatio), barH);
-  // HP bar border
   ctx.strokeStyle = '#6a6070';
   ctx.lineWidth = 1;
   ctx.strokeRect(infoX, barY, barW, barH);
   
-  // Attack text area (to the right of HP bar)
-  const textX = infoX + barW + 16;
+  // Enemy name
   ctx.fillStyle = '#e8e0d0';
   ctx.font = '14px ' + FONT;
   ctx.textAlign = 'left';
   ctx.fillText(c.enemyName, infoX, barY + barH + 18);
   
-  // Attack text
+  // Attack text area (to the right of HP bar)
+  const textX = infoX + barW + 16;
   if (c.attackText) {
     ctx.fillStyle = '#d0c0a0';
     ctx.font = '13px ' + FONT;
@@ -502,20 +493,16 @@ function drawCombat() {
   const statY = portraitY + portraitSize + 6;
   ctx.fillStyle = '#a098a0';
   ctx.font = '12px ' + FONT;
-  ctx.fillText('Eff: ' + c.enemyEff, portraitX, statY + 12);
-  ctx.fillText('Def: ' + c.enemyDef, portraitX + 70, statY + 12);
-  ctx.fillText('Wait: ' + c.enemyWait, portraitX + 140, statY + 12);
+  ctx.fillText('Eff ' + c.enemyEff, portraitX, statY + 12);
+  ctx.fillText('Def ' + c.enemyDef, portraitX + 70, statY + 12);
+  ctx.fillText('Wait ' + c.enemyWait, portraitX + 140, statY + 12);
   
   // ── MIDDLE: Battle arena (~50% of screen, starts at ~20%) ──
-  const arenaY = Math.round(H * 0.20);
+  const arenaY = topH;
   const arenaH = Math.round(H * 0.50);
   
-  // Arena background (simple gradient floor)
-  const grad = ctx.createLinearGradient(0, arenaY, 0, arenaY + arenaH);
-  grad.addColorStop(0, '#1a1820');
-  grad.addColorStop(0.4, '#1e2418');
-  grad.addColorStop(1, '#222818');
-  ctx.fillStyle = grad;
+  // Darken only the arena area
+  ctx.fillStyle = 'rgba(10, 10, 18, 0.88)';
   ctx.fillRect(0, arenaY, W, arenaH);
   
   // Simple ground line
@@ -556,12 +543,17 @@ function drawCombat() {
     ctx.imageSmoothingEnabled = true;
   }
   
-  // ── BOTTOM: Player info bar ──
-  const botY = arenaY + arenaH + 8;
+  // ── BOTTOM: Player info (below arena, over visible overworld) ──
+  const botY = arenaY + arenaH;
+  const botH = H - botY;
   
-  // Player HP
-  const pBarX = portraitX;
-  const pBarY = botY + 4;
+  // Semi-transparent bar behind player info
+  ctx.fillStyle = 'rgba(12, 12, 20, 0.85)';
+  ctx.fillRect(0, botY, W, botH);
+  
+  // Player HP bar
+  const pBarX = 12;
+  const pBarY = botY + 10;
   ctx.fillStyle = '#1a1a2a';
   ctx.fillRect(pBarX, pBarY, barW, barH);
   const pHpRatio = c.playerHp / c.playerMaxHp;
@@ -570,17 +562,15 @@ function drawCombat() {
   ctx.strokeStyle = '#6a6070';
   ctx.strokeRect(pBarX, pBarY, barW, barH);
   
-  // Player HP text
   ctx.fillStyle = '#e8e0d0';
   ctx.font = '13px ' + FONT;
   ctx.fillText('HP ' + c.playerHp + '/' + c.playerMaxHp, pBarX, pBarY + barH + 16);
   
-  // Player stats
   ctx.fillStyle = '#a098a0';
   ctx.font = '12px ' + FONT;
-  ctx.fillText('Eff: ' + c.playerEff, pBarX + barW + 16, pBarY + 9);
-  ctx.fillText('Def: ' + c.playerDef, pBarX + barW + 86, pBarY + 9);
-  ctx.fillText('Wait: ' + c.playerWait, pBarX + barW + 156, pBarY + 9);
+  ctx.fillText('Eff ' + c.playerEff, pBarX + barW + 16, pBarY + 9);
+  ctx.fillText('Def ' + c.playerDef, pBarX + barW + 86, pBarY + 9);
+  ctx.fillText('Wait ' + c.playerWait, pBarX + barW + 156, pBarY + 9);
   
   // Temporary: ESC to exit
   ctx.fillStyle = '#484048';
@@ -591,37 +581,63 @@ function drawCombat() {
 }
 
 function drawCombatTransition() {
-  const t = state.combatTransition;
-  if (!t) return;
-  const elapsed = performance.now() - t.startTime;
-  const progress = Math.min(1, elapsed / t.duration);
-  
-  if (t.type === 'in') {
-    // Horizontal bars closing in from top and bottom
-    const barH = Math.round((canvas.height / 2) * progress);
-    ctx.fillStyle = '#0c0c14';
-    ctx.fillRect(0, 0, canvas.width, barH);
-    ctx.fillRect(0, canvas.height - barH, canvas.width, barH);
-  } else {
-    // Reverse — bars opening
-    const barH = Math.round((canvas.height / 2) * (1 - progress));
-    ctx.fillStyle = '#0c0c14';
-    ctx.fillRect(0, 0, canvas.width, barH);
-    ctx.fillRect(0, canvas.height - barH, canvas.width, barH);
-  }
+  // No screen wipe — combat overlays directly on the overworld
 }
 
 function showDialogue(speaker, text) {
   state.dialogue = { speaker, text };
-  const box = document.getElementById('dialogueBox');
-  document.getElementById('dialogueSpeaker').textContent = speaker;
-  document.getElementById('dialogueText').textContent = text;
-  box.style.display = 'block';
 }
 
 function closeDialogue() {
   state.dialogue = null;
-  document.getElementById('dialogueBox').style.display = 'none';
+}
+
+function drawDialogue() {
+  if (!state.dialogue) return;
+  const W = canvas.width;
+  const H = canvas.height;
+  const FONT = '"Pixelify Sans", sans-serif';
+  
+  // Box in bottom third of canvas
+  const boxH = Math.round(H * 0.22);
+  const boxY = H - boxH - 16;
+  const boxX = 16;
+  const boxW = W - 32;
+  
+  // Background
+  ctx.fillStyle = 'rgba(10, 8, 15, 0.92)';
+  ctx.fillRect(boxX, boxY, boxW, boxH);
+  ctx.strokeStyle = '#5a5060';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(boxX, boxY, boxW, boxH);
+  
+  // Speaker name
+  if (state.dialogue.speaker) {
+    ctx.fillStyle = '#b89cff';
+    ctx.font = '14px ' + FONT;
+    ctx.textAlign = 'left';
+    ctx.fillText(state.dialogue.speaker, boxX + 12, boxY + 22);
+  }
+  
+  // Text (word wrap)
+  ctx.fillStyle = '#c8b8a0';
+  ctx.font = '13px ' + FONT;
+  const textY = state.dialogue.speaker ? boxY + 42 : boxY + 22;
+  const maxW = boxW - 24;
+  const words = state.dialogue.text.split(' ');
+  let line = '';
+  let lineY = textY;
+  for (const word of words) {
+    const test = line + word + ' ';
+    if (ctx.measureText(test).width > maxW && line) {
+      ctx.fillText(line.trim(), boxX + 12, lineY);
+      line = word + ' ';
+      lineY += 18;
+    } else {
+      line = test;
+    }
+  }
+  ctx.fillText(line.trim(), boxX + 12, lineY);
 }
 
 // ══════════════════════════════════
@@ -693,7 +709,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.08', canvas.width - 8, 14);
+  ctx.fillText('v0.09', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
@@ -771,14 +787,15 @@ function drawEntity(ctx, entity, x, y) {
 let lastTime = 0;
 
 function gameLoop(time) {
-  if (state.combat) {
-    drawCombat();
-  } else {
+  if (!state.combat) {
     handleMovement(time);
-    draw();
   }
-  if (state.combatTransition) {
-    drawCombatTransition();
+  draw(); // Always draw overworld
+  if (state.combat) {
+    drawCombat(); // Overlay combat on top
+  }
+  if (state.dialogue) {
+    drawDialogue(); // Dialogue box on canvas
   }
   requestAnimationFrame(gameLoop);
 }
