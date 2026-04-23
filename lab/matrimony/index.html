@@ -352,6 +352,9 @@ function closeDialogue() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
+  // Don't render until tileset is loaded (prevents flash of IntGrid)
+  if (!tilesetLoaded) return;
+  
   const cam = getCameraOffset();
   const camX = cam.x;
   const camY = cam.y;
