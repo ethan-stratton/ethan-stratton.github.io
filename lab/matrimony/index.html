@@ -121,12 +121,12 @@ function loadSprite(name, src) {
 // 128x384 sheet, 32x32 frames, 4 cols × 12 rows
 // Row 0: Idle down (2f)
 // Row 1: Idle right (2f)
-// Row 2: Idle left (2f)
+// Row 2: Idle up (2f)
 // Row 3: Walk down (4f)
 // Row 4: Walk right (4f)
-// Row 5: Walk left (4f)
+// Row 5: Walk up (4f)
 // Row 6: ignore
-// Row 7: Hurt (2f) — loop once on damage
+// Row 7: Hurt (2f)
 // Row 8: ignore
 // Row 9: Death down (3f)
 // Row 10: Death right (3f)
@@ -137,10 +137,10 @@ const PLAYER_SHEET = {
   anims: {
     idle_down:  { row: 0, frames: 2 },
     idle_right: { row: 1, frames: 2 },
-    idle_left:  { row: 2, frames: 2 },
+    idle_up:    { row: 2, frames: 2 },
     walk_down:  { row: 3, frames: 4 },
     walk_right: { row: 4, frames: 4 },
-    walk_left:  { row: 5, frames: 4 },
+    walk_up:    { row: 5, frames: 4 },
     hurt:       { row: 7, frames: 2 },
     death_down: { row: 9, frames: 3 },
     death_right:{ row: 10, frames: 3 },
@@ -454,7 +454,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.06', canvas.width - 8, 14);
+  ctx.fillText('v0.07', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
@@ -484,10 +484,10 @@ function drawPlayer(ctx, x, y) {
     return;
   }
   
-  // Pick animation: walk if moving, idle if not
-  // Facing is 'left', 'right', or 'down' (no up sprites — use down as fallback)
+  // Left uses right's rows but flipped
   let dir = state.facing;
-  if (dir === 'up') dir = 'down'; // no up row, fallback
+  let flip = false;
+  if (dir === 'left') { dir = 'right'; flip = true; }
   
   const animName = (state.moving ? 'walk_' : 'idle_') + dir;
   const anim = PLAYER_SHEET.anims[animName];
@@ -497,16 +497,28 @@ function drawPlayer(ctx, x, y) {
   const srcX = frame * PLAYER_SHEET.frameW;
   const srcY = anim.row * PLAYER_SHEET.frameH;
   
-  // Draw 32×32 frame at 2× scale, centered on tile
   const drawSize = s * 2;
   const drawX = Math.round(x - s / 2);
   const drawY = Math.round(y - s / 2);
   
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(PLAYER_SHEET.img,
-    srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
-    drawX, drawY, drawSize, drawSize
-  );
+  
+  if (flip) {
+    ctx.save();
+    ctx.translate(drawX + drawSize, drawY);
+    ctx.scale(-1, 1);
+    ctx.drawImage(PLAYER_SHEET.img,
+      srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
+      0, 0, drawSize, drawSize
+    );
+    ctx.restore();
+  } else {
+    ctx.drawImage(PLAYER_SHEET.img,
+      srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
+      drawX, drawY, drawSize, drawSize
+    );
+  }
+  
   ctx.imageSmoothingEnabled = true;
 }
 
