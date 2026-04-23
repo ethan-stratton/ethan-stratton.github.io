@@ -712,20 +712,30 @@ function drawCombat() {
   ctx.strokeStyle = '#6a6070'; ctx.lineWidth = 1;
   ctx.strokeRect(infoX, barY, barW, barH);
   
-  // Enemy action + wait countdown — show when enemy has chosen an action
+  // Enemy action display — name right of HP bar, stats below
   if (c.enemyAction) {
+    const act = COMBAT_ACTIONS[c.enemyAction] || {};
+    // Action name to right of HP bar
     ctx.font = '12px ' + FONT;
     ctx.fillStyle = '#d0c0a0';
     ctx.textAlign = 'left';
-    ctx.fillText(c.enemyAction, infoX, barY + barH + 14);
-    // Gold WAIT label + white countdown
-    ctx.font = 'bold 12px ' + FONT;
-    ctx.fillStyle = '#d4a830';
-    const waitLabelX = infoX + ctx.measureText(c.enemyAction + '  ').width;
-    ctx.fillText('WAIT:', waitLabelX, barY + barH + 14);
-    ctx.font = '12px ' + FONT;
-    ctx.fillStyle = '#e8e0d0';
-    ctx.fillText(' ' + (c.enemyWaitCountdown >= 0 ? c.enemyWaitCountdown : ''), waitLabelX + ctx.measureText('WAIT:').width, barY + barH + 14);
+    ctx.fillText(c.enemyAction, infoX + barW + 8, barY + barH - 1);
+    // EFF DEF WAIT on line below HP bar
+    const statY = barY + barH + 13;
+    ctx.font = 'bold 11px ' + FONT;
+    let sx = infoX;
+    ctx.fillStyle = '#d4a830'; ctx.fillText('EFF:', sx, statY);
+    ctx.font = '11px ' + FONT; ctx.fillStyle = '#e8e0d0';
+    sx += ctx.measureText('EFF:').width + 2; ctx.fillText(act.eff || 0, sx, statY);
+    sx += ctx.measureText('' + (act.eff || 0)).width + 10;
+    ctx.font = 'bold 11px ' + FONT; ctx.fillStyle = '#d4a830'; ctx.fillText('DEF:', sx, statY);
+    ctx.font = '11px ' + FONT; ctx.fillStyle = '#e8e0d0';
+    sx += ctx.measureText('DEF:').width + 2; ctx.fillText(act.def || 0, sx, statY);
+    sx += ctx.measureText('' + (act.def || 0)).width + 10;
+    ctx.font = 'bold 11px ' + FONT; ctx.fillStyle = '#d4a830'; ctx.fillText('WAIT:', sx, statY);
+    ctx.font = '11px ' + FONT; ctx.fillStyle = '#e8e0d0';
+    sx += ctx.measureText('WAIT:').width + 2;
+    ctx.fillText(c.enemyWaitCountdown >= 0 ? c.enemyWaitCountdown : (act.wait || 0), sx, statY);
   }
   
   // ── ARENA ──
@@ -1010,8 +1020,8 @@ function drawCombat() {
     ctx.font = labelFont; ctx.fillStyle = goldColor;
     ctx.fillText('WAIT:', sx, statsY);
     ctx.font = numFont; ctx.fillStyle = whiteColor;
-    // Show countdown if waiting or just finished (at 0), otherwise show base value
-    const waitVal = (c.waiting || c.waitCountdown === 0) ? c.waitCountdown : (act.wait || 0);
+    // Show countdown if actively waiting, otherwise show base value
+    const waitVal = c.waiting ? c.waitCountdown : (act.wait || 0);
     ctx.fillText(' ' + waitVal, sx + ctx.measureText('WAIT:').width, statsY);
   }
   
@@ -1163,65 +1173,65 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.25', canvas.width - 8, 14);
+  ctx.fillText('v0.26', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle)
   if (state.showFontTest) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.fillRect(20, 20, canvas.width - 40, canvas.height - 40);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.fillRect(10, 10, canvas.width - 20, canvas.height - 20);
     ctx.strokeStyle = '#5a5060'; ctx.lineWidth = 1;
-    ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
+    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
     
-    const sampleText = 'Matrimony Beyond Space and Time';
-    const sampleStats = 'EFF: 12  DEF: 5  WAIT: 8  HP 30/30';
-    const sampleAction = 'Punch  Kick  Shortbow  Stand Still';
-    const fonts = [
-      { name: 'Pixelify Sans', family: '"Pixelify Sans", sans-serif' },
-      { name: 'RM2000', family: '"RM2000", monospace' },
-      { name: 'RM2000Alt', family: '"RM2000Alt", monospace' },
-      { name: 'RMG2000', family: '"RMG2000", monospace' },
-    ];
-    
-    let y = 50;
+    const sample = 'Punch  Kick  EFF: 12  DEF: 5  WAIT: 8  HP 30/30';
     ctx.textAlign = 'left';
-    for (const f of fonts) {
-      ctx.fillStyle = '#d4a830';
-      ctx.font = '11px "Pixelify Sans"';
-      ctx.fillText(f.name + ':', 30, y);
-      y += 4;
-      
-      ctx.fillStyle = '#e8e0d0';
-      ctx.font = '16px ' + f.family;
-      ctx.fillText(sampleText, 30, y + 16);
-      y += 22;
-      
-      ctx.font = '14px ' + f.family;
-      ctx.fillStyle = '#b0a898';
-      ctx.fillText(sampleStats, 30, y + 14);
-      y += 20;
-      
-      ctx.font = '15px ' + f.family;
-      ctx.fillStyle = '#ffe8c0';
-      ctx.fillText(sampleAction, 30, y + 14);
-      y += 28;
-      
-      // Gradient text demo
-      const gradText = '★ CRITICAL HIT ★';
-      ctx.font = 'bold 18px ' + f.family;
-      const gradW = ctx.measureText(gradText).width;
-      const grad = ctx.createLinearGradient(30, 0, 30 + gradW, 0);
-      grad.addColorStop(0, '#ff6060');
-      grad.addColorStop(0.3, '#ffcc00');
-      grad.addColorStop(0.6, '#60ff90');
-      grad.addColorStop(1, '#6090ff');
-      ctx.fillStyle = grad;
-      ctx.fillText(gradText, 30, y + 14);
-      y += 30;
+    let y = 30;
+    
+    // RM2000 at different sizes — pixel fonts need exact sizes to snap crisp
+    const rm2kSizes = [8, 10, 12, 14, 16, 18, 20, 24];
+    ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
+    ctx.fillText('RM2000 at different sizes (pixel fonts need exact multiples to be sharp):', 20, y); y += 14;
+    for (const sz of rm2kSizes) {
+      ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
+      ctx.fillText(sz + 'px:', 20, y + 10);
+      ctx.fillStyle = '#e8e0d0'; ctx.font = sz + 'px "RM2000"';
+      ctx.fillText(sample, 52, y + 10);
+      y += Math.max(sz + 4, 14);
     }
+    y += 6;
+    
+    // Other fonts for comparison
+    const others = [
+      { name: 'RM2000Alt 12px', font: '12px "RM2000Alt"' },
+      { name: 'RM2000Alt 16px', font: '16px "RM2000Alt"' },
+      { name: 'RMG2000 12px', font: '12px "RMG2000"' },
+      { name: 'RMG2000 16px', font: '16px "RMG2000"' },
+      { name: 'Pixelify 14px', font: '14px "Pixelify Sans"' },
+      { name: 'Pixelify 16px', font: '16px "Pixelify Sans"' },
+    ];
+    for (const o of others) {
+      ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
+      ctx.fillText(o.name + ':', 20, y + 10);
+      ctx.fillStyle = '#e8e0d0'; ctx.font = o.font;
+      ctx.fillText(sample, 100, y + 10);
+      y += 18;
+    }
+    y += 8;
+    
+    // Gradient demo with Pixelify Sans (Ethan's pick for special text)
+    const gradText = '★ CRITICAL HIT ★';
+    ctx.font = 'bold 20px "Pixelify Sans"';
+    const gradW = ctx.measureText(gradText).width;
+    const grad = ctx.createLinearGradient(20, 0, 20 + gradW, 0);
+    grad.addColorStop(0, '#ff6060');
+    grad.addColorStop(0.3, '#ffcc00');
+    grad.addColorStop(0.6, '#60ff90');
+    grad.addColorStop(1, '#6090ff');
+    ctx.fillStyle = grad;
+    ctx.fillText(gradText, 20, y + 10);
     
     ctx.fillStyle = 'rgba(140, 130, 140, 0.6)';
-    ctx.font = '11px "Pixelify Sans"';
-    ctx.fillText('Press F to close  |  Yes, gradient text works!', 30, canvas.height - 30);
+    ctx.font = '10px "Pixelify Sans"';
+    ctx.fillText('Press F to close', 20, canvas.height - 18);
   }
   ctx.textAlign = 'left';
 }
@@ -1334,8 +1344,10 @@ function gameLoop(time) {
       const t = time - a.startTime;
       if (t >= a.totalDuration) {
         c.playerAttackAnim = null;
-        // Reset WAIT values after attack animation completes
-        // Player can now pick a new action
+        // Reset — player's attack executed, clear waiting state, stats show base values
+        c.waiting = false;
+        c.waitCountdown = -1;
+        c.attackText = null;
       }
     }
     
