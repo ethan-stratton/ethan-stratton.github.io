@@ -130,7 +130,7 @@ const state = {
   entities: [],
   collision: [],  // 2D array: 0=walk, 1=wall
   mapW: 0, mapH: 0,
-  tiles: [],  // from LDtk tile layer
+  tiles: [],      // from LDtk tile layers (all of them, in draw order)
   facing: 'down',
   moving: false,
   moveTimer: 0,
@@ -160,11 +160,13 @@ async function loadLevel() {
     tilesetImg.src = 'LDtK_Matrimony/' + tsDef.relPath;
   }
 
+  // Collect tile layers in reverse order (LDtk stores top-first, we want background drawn first)
+  const tileLayers = [];
+  
   for (const layer of level.layerInstances) {
     if (layer.__identifier === 'IntGrid') {
       state.mapW = layer.__cWid;
       state.mapH = layer.__cHei;
-      // Convert flat array to 2D
       state.collision = [];
       for (let y = 0; y < state.mapH; y++) {
         const row = [];
@@ -174,8 +176,8 @@ async function loadLevel() {
         state.collision.push(row);
       }
     }
-    if (layer.__identifier === 'Tiles') {
-      state.tiles = layer.gridTiles || [];
+    if (layer.__type === 'Tiles' && layer.gridTiles && layer.gridTiles.length > 0) {
+      tileLayers.push(layer.gridTiles);
     }
     if (layer.__identifier === 'Entities') {
       state.entities = [];
@@ -196,6 +198,10 @@ async function loadLevel() {
       }
     }
   }
+  
+  // Reverse so background layers draw first
+  tileLayers.reverse();
+  state.tiles = tileLayers;
   
   updateCamera();
 }
@@ -378,19 +384,21 @@ function draw() {
     }
   }
   
-  // Draw tile layer (from LDtk)
+  // Draw tile layers (background first, foreground last)
   if (tilesetLoaded && tilesetImg) {
     ctx.imageSmoothingEnabled = false;
-    for (const tile of state.tiles) {
-      const gx = Math.floor(tile.px[0] / TILE);
-      const gy = Math.floor(tile.px[1] / TILE);
-      if (gx < startX || gx > endX || gy < startY || gy > endY) continue;
-      const sx = (gx - camX) * TILE * SCALE;
-      const sy = (gy - camY) * TILE * SCALE;
-      ctx.drawImage(tilesetImg,
-        tile.src[0], tile.src[1], TILE, TILE,
-        sx, sy, TILE * SCALE, TILE * SCALE
-      );
+    for (const tileLayer of state.tiles) {
+      for (const tile of tileLayer) {
+        const gx = Math.floor(tile.px[0] / TILE);
+        const gy = Math.floor(tile.px[1] / TILE);
+        if (gx < startX || gx > endX || gy < startY || gy > endY) continue;
+        const sx = (gx - camX) * TILE * SCALE;
+        const sy = (gy - camY) * TILE * SCALE;
+        ctx.drawImage(tilesetImg,
+          tile.src[0], tile.src[1], TILE, TILE,
+          sx, sy, TILE * SCALE, TILE * SCALE
+        );
+      }
     }
     ctx.imageSmoothingEnabled = true;
   }
