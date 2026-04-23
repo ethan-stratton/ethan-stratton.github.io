@@ -103,15 +103,18 @@ function playFootstep() {
   const osc = ac.createOscillator();
   const gain = ac.createGain();
   osc.type = 'square';
-  // Alternate between two pitches for L/R foot feel
-  osc.frequency.value = footstepAlt ? 180 : 150;
+  // Randomize pitch and volume for natural variation
+  const basePitch = footstepAlt ? 175 : 145;
+  osc.frequency.value = basePitch + (Math.random() - 0.5) * 40;
   footstepAlt = !footstepAlt;
-  gain.gain.setValueAtTime(0.06, ac.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.08);
+  const vol = 0.03 + Math.random() * 0.04;
+  const dur = 0.06 + Math.random() * 0.04;
+  gain.gain.setValueAtTime(vol, ac.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + dur);
   osc.connect(gain);
   gain.connect(ac.destination);
   osc.start(ac.currentTime);
-  osc.stop(ac.currentTime + 0.08);
+  osc.stop(ac.currentTime + dur);
 }
 canvas.style.width = (CANVAS_W * DISPLAY_SCALE) + 'px';
 canvas.style.height = (CANVAS_H * DISPLAY_SCALE) + 'px';
@@ -373,6 +376,15 @@ document.addEventListener('keydown', (e) => {
           c.lastWaitTick = performance.now();
           c.waiting = true;
           c.attackText = action;
+          // Enemy also picks an action and starts counting down simultaneously
+          if (!c.enemyWaiting) {
+            const enemyActions = ['Stand Still', 'Do Nothing'];
+            c.enemyAction = enemyActions[c.enemyActionIndex % 2];
+            c.enemyActionIndex++;
+            const enemyAct = COMBAT_ACTIONS[c.enemyAction] || {};
+            c.enemyWaitCountdown = enemyAct.wait || 0;
+            c.enemyWaiting = true;
+          }
         }
       }
     } else if (state.dialogue) {
@@ -439,7 +451,7 @@ function tryMove(dx, dy) {
   playFootstep();
 }
 
-const MOVE_DURATION = 200; // ms for grid movement
+const MOVE_DURATION = 250; // ms for grid movement
 let lastFrameTime = 0;
 
 function handleMovement(now) {
@@ -541,10 +553,15 @@ function startCombat(entity, enemyStats) {
     selectedEnemy: 0,
     actions: ['Punch', 'Kick', ...(state.inventory.includes('Shortbow') ? ['Shortbow'] : [])],
     selectedAction: 0,
-    waitCountdown: -1, // -1 = not counting, >=0 = ticking down
+    waitCountdown: -1, // player wait: -1 = not counting, >=0 = ticking down
     waitTickSpeed: 500, // ms per tick
     lastWaitTick: 0,
-    waiting: false, // true while wait is counting down
+    waiting: false, // true while player wait is counting down
+    // Enemy action state
+    enemyAction: null, // name of enemy's chosen action
+    enemyWaitCountdown: -1,
+    enemyWaiting: false,
+    enemyActionIndex: 0, // alternates between Stand Still and Do Nothing
   };
 }
 
@@ -560,6 +577,8 @@ function exitCombat() {
 const COMBAT_ACTIONS = {
   'Punch': { eff: 8, def: 0, wait: 2 },
   'Kick':  { eff: 12, def: 0, wait: 5 },
+  'Stand Still': { eff: 0, def: 0, wait: 10 },
+  'Do Nothing':  { eff: 0, def: 0, wait: 10 },
 };
 
 // Mouse state for combat menu
@@ -678,6 +697,22 @@ function drawCombat() {
   ctx.fillRect(infoX, barY, Math.round(barW * hpRatio), barH);
   ctx.strokeStyle = '#6a6070'; ctx.lineWidth = 1;
   ctx.strokeRect(infoX, barY, barW, barH);
+  
+  // Enemy action + wait countdown — show when enemy has chosen an action
+  if (c.enemyAction) {
+    ctx.font = '12px ' + FONT;
+    ctx.fillStyle = '#d0c0a0';
+    ctx.textAlign = 'left';
+    ctx.fillText(c.enemyAction, infoX, barY + barH + 14);
+    // Gold WAIT label + white countdown
+    ctx.font = 'bold 12px ' + FONT;
+    ctx.fillStyle = '#d4a830';
+    const waitLabelX = infoX + ctx.measureText(c.enemyAction + '  ').width;
+    ctx.fillText('WAIT:', waitLabelX, barY + barH + 14);
+    ctx.font = '12px ' + FONT;
+    ctx.fillStyle = '#e8e0d0';
+    ctx.fillText(' ' + (c.enemyWaitCountdown >= 0 ? c.enemyWaitCountdown : ''), waitLabelX + ctx.measureText('WAIT:').width, barY + barH + 14);
+  }
   
   // ── ARENA ──
   ctx.fillStyle = 'rgba(2, 2, 8, 0.97)';
@@ -900,8 +935,8 @@ function drawCombat() {
     ctx.font = labelFont; ctx.fillStyle = goldColor;
     ctx.fillText('WAIT:', sx, statsY);
     ctx.font = numFont; ctx.fillStyle = whiteColor;
-    // Show countdown if waiting, otherwise show base value
-    const waitVal = c.waiting ? c.waitCountdown : (act.wait || 0);
+    // Show countdown if waiting or just finished (at 0), otherwise show base value
+    const waitVal = (c.waiting || c.waitCountdown === 0) ? c.waitCountdown : (act.wait || 0);
     ctx.fillText(' ' + waitVal, sx + ctx.measureText('WAIT:').width, statsY);
   }
   
@@ -1053,7 +1088,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.22', canvas.width - 8, 14);
+  ctx.fillText('v0.23', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
@@ -1155,17 +1190,30 @@ function gameLoop(time) {
   if (!state.combat) {
     handleMovement(time);
   }
-  // Update combat wait countdown
-  if (state.combat && state.combat.waiting && state.combat.waitCountdown > 0) {
+  // Update combat wait countdowns — both player and enemy tick together
+  if (state.combat) {
     const c = state.combat;
-    if (time - c.lastWaitTick >= c.waitTickSpeed) {
-      c.waitCountdown--;
+    const bothActive = c.waiting || c.enemyWaiting;
+    if (bothActive && time - c.lastWaitTick >= c.waitTickSpeed) {
       c.lastWaitTick = time;
-      if (c.waitCountdown <= 0) {
-        // Wait done — attack executes, return to action select
+      // Tick player
+      if (c.waiting && c.waitCountdown > 0) {
+        c.waitCountdown--;
+      }
+      // Tick enemy
+      if (c.enemyWaiting && c.enemyWaitCountdown > 0) {
+        c.enemyWaitCountdown--;
+      }
+      // Check if player's wait hit zero — they can pick a new action
+      if (c.waiting && c.waitCountdown <= 0) {
         c.waiting = false;
-        c.waitCountdown = -1;
-        // TODO: apply damage here
+        // TODO: apply player's attack damage here
+      }
+      // Check if enemy's wait hit zero — enemy executes
+      if (c.enemyWaiting && c.enemyWaitCountdown <= 0) {
+        c.enemyWaiting = false;
+        // TODO: apply enemy's attack damage here
+        c.enemyAction = null;
       }
     }
   }
