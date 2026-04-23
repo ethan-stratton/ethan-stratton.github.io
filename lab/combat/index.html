@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wait Combat — strattao</title>
+<title>Matrimony Beyond Space and Time — strattao</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Inter:wght@300;400&family=JetBrains+Mono:wght@300;400&display=swap');
 
@@ -565,15 +565,30 @@
 
 <div class="content">
   <header>
-    <h1>Wait Combat</h1>
-    <div class="sub"><a href="/">← strattao</a> · <a href="/lab/liquid/">liquid</a> · <a href="/lab/terrain/">terrain</a> · inspired by Helen's Mysterious Castle</div>
+    <h1>Matrimony Beyond Space and Time</h1>
+    <div class="sub"><a href="/">← strattao</a> · combat prototype · inspired by Helen's Mysterious Castle</div>
   </header>
 
-  <p class="desc">
-    Every action has three stats: <em>Effectiveness</em> (damage or healing),
-    <em>Defend</em> (flat damage reduction while waiting), and <em>Wait</em> (ticks until the action fires).
-    You defend with whatever you chose <em>while</em> you're waiting. Powerful attacks leave you exposed.
-    Fast attacks keep you safe but deal less. Read the enemy's timer and choose wisely.
+  <div class="how" style="margin-bottom: 24px; border-color: #3a3a50;">
+    <p style="font-size: 0.85rem; color: #c8b8a0; line-height: 1.8;">
+      A long time ago, everything was connected. Stone knew fire. Wind remembered water.
+      People called it <strong style="color:#b89cff">the Matrimony</strong> — not a metaphor, but the living
+      union of all things. Then something severed it. Nobody alive remembers what.
+    </p>
+    <p style="font-size: 0.85rem; color: #908880; line-height: 1.8;">
+      Now the world is quiet. Ruins hum with frequencies only a few can hear.
+      Weapons remember their owners. Creatures wander alone, not evil — just lonely.
+      You woke up in this world with no memory, carrying a blade that feels like it knows you.
+      A kid named Evan found you. He can't hear the frequencies. He stays human so you don't have to.
+    </p>
+    <p style="font-size: 0.8rem; color: #686060; line-height: 1.8; margin-bottom: 0;">
+      This is a combat prototype. The system below is the foundation — everything else grows from it.
+    </p>
+  </div>
+
+  <p class="desc" style="margin-bottom: 16px;">
+    <em>Eff</em> = damage. <em>Def</em> = damage reduction while waiting. <em>Wait</em> = ticks until your action fires.
+    Both sides count down simultaneously. Powerful attacks leave you exposed. Fast attacks keep you safe.
   </p>
 
   <!-- Mode Tabs -->
@@ -781,42 +796,18 @@
 
   <!-- ═══════════ HOW IT WORKS ═══════════ -->
   <div class="how">
-    <h3>How it works</h3>
+    <h3>Combat Mechanics</h3>
     <p>
-      Based on <strong>Helen's Mysterious Castle</strong> (2014), a brilliant RPGMaker game
-      that proved three numbers are enough for deep combat.
+      <strong>Damage</strong> = <code>Eff − Def</code>. If Def ≥ Eff, fully blocked.
+      <strong>Pierce</strong> ignores defense.
+      <strong>Stun</strong> adds wait ticks.
+      <strong>Absorb</strong> heals for damage dealt.
+      <strong>Seal</strong> locks the target's current action for one turn.
+      <strong>Invigorate</strong> permanently buffs all your Eff (+5, stacks).
     </p>
     <p>
-      <strong>Damage</strong> = attacker's <code>Effectiveness</code> − defender's <code>Defend</code>.
-      If Defend ≥ Effect, the attack is fully blocked (0 damage).
-      <strong>Piercing</strong> attacks (Thunder, Trusty Dagger) ignore defense entirely —
-      the anti-turtle tools.
-    </p>
-    <p>
-      <strong>Wait</strong> counts down simultaneously for both sides. The first to hit 0 acts,
-      then picks a new action. If both hit 0 on the same tick, <strong>you go first</strong>.
-    </p>
-    <p>
-      <strong>Stun</strong> adds wait ticks to the target — delays their action. Use it
-      to buy time for a heal, or to keep a boss locked down while you chip away.
-    </p>
-    <p>
-      <strong>Absorb</strong> heals the attacker for damage dealt. Drain Touch is weaker
-      than Longsword but sustains you through long fights.
-    </p>
-    <p>
-      <strong>Seal</strong> locks the target's current action — they can't use it next turn.
-      Seal the Dragon's Fire Breath to force it into melee. Seal the Skeleton's Reassemble
-      to prevent healing. The Lizardman can seal YOUR shield.
-    </p>
-    <p>
-      <strong>Invigorate</strong> gives +5 Effect to ALL your weapons permanently (stacks).
-      High risk: Wait 10, 0 Def. But two casts turns your Longbow from 10 to 20 damage.
-    </p>
-    <p>
-      <strong>The tension:</strong> No single strategy dominates. Shield walls get pierced.
-      Slow spells get stunned. Heals get rushed down. Turtling gets sealed.
-      Read the enemy, count the ticks, adapt every turn.
+      <strong>The tension:</strong> Shields get pierced. Slow spells get stunned. Heals get rushed. Turtling gets sealed.
+      No single strategy wins — read the enemy, count ticks, adapt.
     </p>
   </div>
 
