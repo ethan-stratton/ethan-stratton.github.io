@@ -695,7 +695,7 @@ function drawCombat() {
   const now = performance.now();
   const elapsed = now - c.startTime;
   
-  const FONT = '"Pixelify Sans", sans-serif';
+  const FONT = '"RM2000Alt", sans-serif';
   const spr = sprites[c.enemySprite];
   
   // Slide-in easing (SmoothStop2: 1-(1-t)^2)
@@ -1100,7 +1100,7 @@ function drawDialogue() {
   if (!state.dialogue) return;
   const W = canvas.width;
   const H = canvas.height;
-  const FONT = '"Pixelify Sans", sans-serif';
+  const FONT = '"RM2000Alt", sans-serif';
   
   // Box in bottom third of canvas
   const boxH = Math.round(H * 0.22);
@@ -1215,7 +1215,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.39', canvas.width - 8, 14);
+  ctx.fillText('v0.40', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1265,7 +1265,7 @@ function draw() {
     // Helper: render crisp pixel text — no anti-aliasing outlines
     // Renders to offscreen canvas, thresholds alpha to kill grey AA fringe,
     // then stamps result with drop shadow
-    function drawCrispText(text, x, y, fontSize, color, spacing) {
+    function drawCrispText(text, x, y, fontSize, color, spacing, fontFamily) {
       if (!drawCrispText._c) {
         drawCrispText._c = document.createElement('canvas');
         drawCrispText._ctx = drawCrispText._c.getContext('2d', { willReadFrequently: true });
@@ -1273,9 +1273,10 @@ function draw() {
       const oc = drawCrispText._c;
       const octx = drawCrispText._ctx;
       const w = 500, h = fontSize + 8;
+      const ff = fontFamily || 'RM2000';
       oc.width = w; oc.height = h;
       octx.clearRect(0, 0, w, h);
-      octx.font = fontSize + 'px "RM2000"';
+      octx.font = fontSize + 'px "' + ff + '"';
       octx.textAlign = 'left';
       octx.textBaseline = 'top';
       octx.fillStyle = '#ffffff';
@@ -1311,7 +1312,7 @@ function draw() {
       const sctx = drawCrispText._ctx2;
       sc.width = w; sc.height = h;
       sctx.clearRect(0, 0, w, h);
-      sctx.font = fontSize + 'px "RM2000"';
+      sctx.font = fontSize + 'px "' + ff + '"';
       sctx.textAlign = 'left';
       sctx.textBaseline = 'top';
       sctx.fillStyle = '#ffffff';
@@ -1339,7 +1340,7 @@ function draw() {
     }
     
     // Render at small native size, threshold AA, then scale up with nearest-neighbor
-    function drawCrispScaled(text, x, y, fontSize, scale, color, spacing) {
+    function drawCrispScaled(text, x, y, fontSize, scale, color, spacing, fontFamily) {
       if (!drawCrispScaled._c) {
         drawCrispScaled._c = document.createElement('canvas');
         drawCrispScaled._ctx = drawCrispScaled._c.getContext('2d', { willReadFrequently: true });
@@ -1349,9 +1350,10 @@ function draw() {
       const oc = drawCrispScaled._c;
       const octx = drawCrispScaled._ctx;
       const w = 500, h = fontSize + 6;
+      const ff = fontFamily || 'RM2000';
       oc.width = w; oc.height = h;
       octx.clearRect(0, 0, w, h);
-      octx.font = fontSize + 'px "RM2000"';
+      octx.font = fontSize + 'px "' + ff + '"';
       octx.textAlign = 'left';
       octx.textBaseline = 'top';
       octx.fillStyle = '#ffffff';
@@ -1382,7 +1384,7 @@ function draw() {
       const sctx = drawCrispScaled._ctx2;
       sc2.width = w; sc2.height = h;
       sctx.clearRect(0, 0, w, h);
-      sctx.font = fontSize + 'px "RM2000"';
+      sctx.font = fontSize + 'px "' + ff + '"';
       sctx.textAlign = 'left';
       sctx.textBaseline = 'top';
       sctx.fillStyle = '#ffffff';
@@ -1413,7 +1415,7 @@ function draw() {
     }
     
     // Like drawCrispText but with adjustable threshold
-    function drawCrispTextThresh(text, x, y, fontSize, color, spacing, threshold) {
+    function drawCrispTextThresh(text, x, y, fontSize, color, spacing, threshold, fontFamily) {
       if (!drawCrispTextThresh._c) {
         drawCrispTextThresh._c = document.createElement('canvas');
         drawCrispTextThresh._ctx = drawCrispTextThresh._c.getContext('2d', { willReadFrequently: true });
@@ -1423,9 +1425,10 @@ function draw() {
       const oc = drawCrispTextThresh._c;
       const octx = drawCrispTextThresh._ctx;
       const w = 500, h = fontSize + 8;
+      const ff = fontFamily || 'RM2000';
       oc.width = w; oc.height = h;
       octx.clearRect(0, 0, w, h);
-      octx.font = fontSize + 'px "RM2000"';
+      octx.font = fontSize + 'px "' + ff + '"';
       octx.textAlign = 'left';
       octx.textBaseline = 'top';
       octx.fillStyle = '#ffffff';
@@ -1451,7 +1454,7 @@ function draw() {
       const sctx = drawCrispTextThresh._ctx2;
       sc.width = w; sc.height = h;
       sctx.clearRect(0, 0, w, h);
-      sctx.font = fontSize + 'px "RM2000"';
+      sctx.font = fontSize + 'px "' + ff + '"';
       sctx.textAlign = 'left';
       sctx.textBaseline = 'top';
       sctx.fillStyle = '#ffffff';
@@ -1508,6 +1511,17 @@ function draw() {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText('thresh ' + thresh + ':', 20, y + 12);
       drawCrispTextThresh(sampleText, 110, y, 32, '#e8e0d0', 2, thresh);
+      y += 40;
+    }
+    y += 10;
+    
+    // RM2000Alt 32px with varying thresholds
+    ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
+    ctx.fillText('RM2000Alt 32px — varying threshold:', 20, y); y += 16;
+    for (const thresh of thresholds) {
+      ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
+      ctx.fillText('thresh ' + thresh + ':', 20, y + 12);
+      drawCrispTextThresh(sampleText, 110, y, 32, '#e8e0d0', 2, thresh, 'RM2000Alt');
       y += 40;
     }
     
