@@ -323,7 +323,7 @@ document.addEventListener('keydown', (e) => {
   
   // ESC — exit combat after 5s
   if (e.key === 'Escape' && state.combat && !state.combatTransition) {
-    if (performance.now() - state.combat.startTime > 5000) {
+    if (performance.now() - state.combat.startTime > 9000) {
       exitCombat();
     }
     return;
@@ -563,6 +563,7 @@ function startCombat(entity, enemyStats) {
     enemySprite: entity.type,
     enemyHp: enemyStats.maxHp,
     enemyMaxHp: enemyStats.maxHp,
+    enemyDisplayHp: enemyStats.maxHp,
     enemyEff: enemyStats.eff,
     enemyDef: enemyStats.def,
     enemyWait: enemyStats.wait,
@@ -814,8 +815,8 @@ function drawCombat() {
   const eased = 1 - (1 - slideT) * (1 - slideT);
   
   // Layout
-  const topH = Math.round(H * 0.12);
-  const arenaH = Math.round(H * 0.40);
+  const topH = Math.round(H * 0.16);
+  const arenaH = Math.round(H * 0.36);
   const arenaY = topH;
   const botContentY = arenaY + arenaH;
   const botH = H - botContentY;
@@ -857,8 +858,12 @@ function drawCombat() {
   const barW = Math.round(W * 0.22);
   const barH = 10;
   const barY = ePortraitY + 4;
+  // Animated HP bar — ease display toward actual
+  if (c.enemyDisplayHp > c.enemyHp) {
+    c.enemyDisplayHp = Math.max(c.enemyHp, c.enemyDisplayHp - (c.enemyMaxHp * 0.02));
+  }
   ctx.fillStyle = '#2a1a1a'; ctx.fillRect(infoX, barY, barW, barH);
-  const hpRatio = c.enemyHp / c.enemyMaxHp;
+  const hpRatio = c.enemyDisplayHp / c.enemyMaxHp;
   ctx.fillStyle = hpRatio > 0.5 ? '#3a8a3a' : hpRatio > 0.25 ? '#b89030' : '#a03030';
   ctx.fillRect(infoX, barY, Math.round(barW * hpRatio), barH);
   drawGoldOutline(infoX - 2, barY - 2, barW + 4, barH + 4, 4);
@@ -867,15 +872,15 @@ function drawCombat() {
   if (c.enemyAction) {
     const act = COMBAT_ACTIONS[c.enemyAction] || {};
     crispText(c.enemyAction, infoX + barW + 8, barY - 4, 32, '#d0c0a0');
-    const statY = barY + barH + 4;
+    const statY = barY + barH + 12;
     let sx = infoX;
     const waitVal = c.enemyWaitCountdown >= 0 ? c.enemyWaitCountdown : (act.wait || 0);
-    sx += crispGradientText('Eff:', sx, statY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 2;
-    sx += crispText('' + (act.eff || 0), sx, statY, 32, '#e8e0d0', 1, CRISP_FONT_ALT) + 8;
-    sx += crispGradientText('Def:', sx, statY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 2;
-    sx += crispText('' + (act.def || 0), sx, statY, 32, '#e8e0d0', 1, CRISP_FONT_ALT) + 8;
-    sx += crispGradientText('Wait:', sx, statY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 2;
-    crispText('' + waitVal, sx, statY, 32, '#e8e0d0', 1, CRISP_FONT_ALT);
+    sx += crispGradientText('Eff:', sx, statY, 32, GOLD_GRADIENT, 0, CRISP_FONT_ALT) + 2;
+    sx += crispText('' + (act.eff || 0), sx, statY, 32, '#e8e0d0', 0, CRISP_FONT_ALT) + 16;
+    sx += crispGradientText('Def:', sx, statY, 32, GOLD_GRADIENT, 0, CRISP_FONT_ALT) + 2;
+    sx += crispText('' + (act.def || 0), sx, statY, 32, '#e8e0d0', 0, CRISP_FONT_ALT) + 16;
+    sx += crispGradientText('Wait:', sx, statY, 32, GOLD_GRADIENT, 0, CRISP_FONT_ALT) + 2;
+    crispText('' + waitVal, sx, statY, 32, '#e8e0d0', 0, CRISP_FONT_ALT);
   }
   
   // ── ARENA ──
@@ -884,18 +889,27 @@ function drawCombat() {
   
   const playerCombatSize = 64;
   const enemyCombatSize = 48;
-  const groundY = arenaY + Math.round(arenaH * 0.78);
+  const groundY = arenaY + Math.round(arenaH * 0.82);
+  
+  // Camera: center on player during action selection, midpoint during attack
+  const midX = W * 0.5;
+  const isActionPhase = c.phase === 'action' && !c.waiting && !c.playerAttackAnim;
+  const camTargetX = isActionPhase ? W * 0.5 : W * 0.5;
+  
+  // Player/enemy base positions relative to camera
+  const enemyBaseX = Math.round(W * 0.28) - enemyCombatSize / 2;
+  const playerBaseX = isActionPhase ? Math.round(W * 0.5) - playerCombatSize / 2 : Math.round(W * 0.72) - playerCombatSize / 2;
   
   // Target positions
-  const enemyTargetX = Math.round(W * 0.28) - enemyCombatSize / 2;
-  const playerTargetX = Math.round(W * 0.72) - playerCombatSize / 2;
+  const enemyTargetX = enemyBaseX;
+  const playerTargetX = playerBaseX;
   
   // Slide in from edges
   const enemySlideFrom = -enemyCombatSize - 20;
   const playerSlideFrom = W + 20;
   const enemyArenaX = Math.round(enemySlideFrom + (enemyTargetX - enemySlideFrom) * eased);
   let playerArenaX = Math.round(playerSlideFrom + (playerTargetX - playerSlideFrom) * eased);
-  const enemyArenaY = groundY - enemyCombatSize;
+  const enemyArenaY = groundY - enemyCombatSize - 8;
   const playerArenaY = groundY - playerCombatSize;
   
   // Player attack animation — rush toward enemy then return
@@ -1043,7 +1057,7 @@ function drawCombat() {
   }
   
   // ESC — after 5s idle
-  if (elapsed > 5000) {
+  if (elapsed > 9000) {
     const alpha = 0.3 + 0.3 * Math.sin(now / 800);
     ctx.globalAlpha = alpha;
     crispText('Esc = Run Away', W - 180, arenaY + 4, 32, '#8c828c');
@@ -1115,21 +1129,19 @@ function drawCombat() {
     const isSelected = (c.phase === 'action') && i === (c.selectedAction || 0);
     const dimmed = c.phase === 'target' || c.waiting;
     
-    // Highlight background — starts at text, rounded corners (clip corner pixels)
+    // Highlight background — starts at first character pixel, rounded corners
     if (isSelected && !dimmed) {
-      const hx = ax;
+      const hx = ax + 4;  // align with text start
       const hy = ay;
-      const hw = colW;
+      const hw = colW - 4;
       const hh = gridRowH;
-      ctx.fillStyle = 'rgba(140, 220, 100, 0.16)';
-      // Fill main rect then clear corner pixels
+      ctx.fillStyle = 'rgba(80, 200, 60, 0.18)';
       ctx.fillRect(hx + 1, hy, hw - 2, 1);
       ctx.fillRect(hx, hy + 1, hw, hh - 2);
       ctx.fillRect(hx + 1, hy + hh - 1, hw - 2, 1);
     }
     
-    const color = isSelected && !dimmed ? '#ffffff' : dimmed ? '#4a4440' : '#a09888';
-    crispText(actions[i], ax + 4, ay + 2, 32, color);
+    crispText(actions[i], ax + 4, ay + 2, 32, '#ffffff');
   }
   
   // Selected action stats — centered on screen, anchored positions for each stat
@@ -1292,7 +1304,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.49', canvas.width - 8, 14);
+  ctx.fillText('v0.50', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1772,25 +1784,18 @@ function drawPlayer(ctx, x, y) {
   ctx.imageSmoothingEnabled = true;
 }
 
+// Load chest sprites
+const CHEST_CLOSED = new Image(); CHEST_CLOSED.src = 'chest_closed.png';
+const CHEST_OPEN = new Image(); CHEST_OPEN.src = 'chest_open.png';
+
 function drawEntity(ctx, entity, x, y) {
   if (entity.type === 'Chest') {
-    // Draw chest as a small orange box
     const s = TILE * SCALE;
-    if (state.openedChests[entity.id]) {
-      ctx.fillStyle = '#4a3a20';
-      ctx.fillRect(x + 4, y + 6, s - 8, s - 8);
-      ctx.strokeStyle = '#6a5a30';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + 4, y + 6, s - 8, s - 8);
-    } else {
-      ctx.fillStyle = '#c87020';
-      ctx.fillRect(x + 2, y + 4, s - 4, s - 6);
-      ctx.strokeStyle = '#e8a040';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + 2, y + 4, s - 4, s - 6);
-      // Latch
-      ctx.fillStyle = '#ffe080';
-      ctx.fillRect(x + s/2 - 2, y + 4, 4, 3);
+    const img = state.openedChests[entity.id] ? CHEST_OPEN : CHEST_CLOSED;
+    if (img.complete && img.naturalWidth) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, x, y, s, s);
+      ctx.imageSmoothingEnabled = true;
     }
     return;
   }
@@ -1897,7 +1902,12 @@ function gameLoop(time) {
 // INIT
 // ══════════════════════════════════
 loadLevel().then(() => {
-  requestAnimationFrame(gameLoop);
+  // Wait for fonts before first render to prevent flash
+  Promise.all([
+    document.fonts.load('32px "RM2000"'),
+    document.fonts.load('32px "RM2000Alt"')
+  ]).then(() => requestAnimationFrame(gameLoop))
+    .catch(() => requestAnimationFrame(gameLoop));
 });
 
 </script>
