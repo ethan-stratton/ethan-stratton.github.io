@@ -287,29 +287,30 @@ function tryMove(dx, dy) {
   state.player.y = ny;
 }
 
-const MOVE_DURATION = 120; // ms for grid movement
-let lastMoveTime = 0;
-const MOVE_COOLDOWN = 150;
+const MOVE_DURATION = 150; // ms for grid movement
 let lastFrameTime = 0;
 
 function handleMovement(now) {
-  const dt = lastFrameTime ? (now - lastFrameTime) : 16;
+  const dt = lastFrameTime ? Math.min(now - lastFrameTime, 50) : 16; // cap to avoid jumps on tab-back
   lastFrameTime = now;
 
   if (state.moving) {
     state.moveTimer += dt;
     if (state.moveTimer >= MOVE_DURATION) {
       state.moving = false;
+      // Chain movement immediately if key held — no gap between steps
+      if (keys['ArrowLeft'] || keys['a']) tryMove(-1, 0);
+      else if (keys['ArrowRight'] || keys['d']) tryMove(1, 0);
+      else if (keys['ArrowUp'] || keys['w']) tryMove(0, -1);
+      else if (keys['ArrowDown'] || keys['s']) tryMove(0, 1);
     }
     return;
   }
-  
-  if (now - lastMoveTime < MOVE_COOLDOWN) return;
-  
-  if (keys['ArrowLeft'] || keys['a']) { tryMove(-1, 0); lastMoveTime = now; }
-  else if (keys['ArrowRight'] || keys['d']) { tryMove(1, 0); lastMoveTime = now; }
-  else if (keys['ArrowUp'] || keys['w']) { tryMove(0, -1); lastMoveTime = now; }
-  else if (keys['ArrowDown'] || keys['s']) { tryMove(0, 1); lastMoveTime = now; }
+
+  if (keys['ArrowLeft'] || keys['a']) tryMove(-1, 0);
+  else if (keys['ArrowRight'] || keys['d']) tryMove(1, 0);
+  else if (keys['ArrowUp'] || keys['w']) tryMove(0, -1);
+  else if (keys['ArrowDown'] || keys['s']) tryMove(0, 1);
 }
 
 // ══════════════════════════════════
