@@ -215,22 +215,19 @@ function updateCamera() {
 }
 
 function getPlayerVisualPos() {
-  // Returns the player's visual position in tile coords (fractional during movement)
   if (!state.moving) return { x: state.player.x, y: state.player.y };
   const t = Math.min(1, state.moveTimer / MOVE_DURATION);
-  const ease = t * t * (3 - 2 * t); // smoothstep
+  // Linear interpolation for chained movement (no decel pulse between steps)
   return {
-    x: state.moveFrom.x + (state.player.x - state.moveFrom.x) * ease,
-    y: state.moveFrom.y + (state.player.y - state.moveFrom.y) * ease,
+    x: state.moveFrom.x + (state.player.x - state.moveFrom.x) * t,
+    y: state.moveFrom.y + (state.player.y - state.moveFrom.y) * t,
   };
 }
 
 function getCameraOffset() {
-  // Camera centers on the player's visual (interpolated) position
   const vis = getPlayerVisualPos();
   let camX = vis.x - Math.floor(CANVAS_TILES / 2);
   let camY = vis.y - Math.floor(CANVAS_TILES / 2);
-  // Clamp
   camX = Math.max(0, Math.min(state.mapW - CANVAS_TILES, camX));
   camY = Math.max(0, Math.min(state.mapH - CANVAS_TILES, camY));
   return { x: camX, y: camY };
@@ -381,7 +378,7 @@ function draw() {
       const sx = (x - camX) * TILE * SCALE;
       const sy = (y - camY) * TILE * SCALE;
       ctx.fillStyle = INTGRID_COLORS[val] || '#1a1520';
-      ctx.fillRect(sx, sy, TILE * SCALE + 1, TILE * SCALE + 1); // +1 to avoid seams
+      ctx.fillRect(Math.round(sx), Math.round(sy), TILE * SCALE + 1, TILE * SCALE + 1); // +1 to avoid seams
     }
   }
   
@@ -397,7 +394,7 @@ function draw() {
         const sy = (gy - camY) * TILE * SCALE;
         ctx.drawImage(tilesetImg,
           tile.src[0], tile.src[1], TILE, TILE,
-          sx, sy, TILE * SCALE, TILE * SCALE
+          Math.round(sx), Math.round(sy), TILE * SCALE, TILE * SCALE
         );
       }
     }
@@ -408,21 +405,21 @@ function draw() {
   for (const e of state.entities) {
     if (state.defeatedEnemies[e.id]) continue;
     if (e.x < startX || e.x > endX || e.y < startY || e.y > endY) continue;
-    const sx = (e.x - camX) * TILE * SCALE;
-    const sy = (e.y - camY) * TILE * SCALE;
+    const sx = Math.round((e.x - camX) * TILE * SCALE);
+    const sy = Math.round((e.y - camY) * TILE * SCALE);
     drawEntity(ctx, e, sx, sy);
   }
   
   // Draw player at visual (interpolated) position
-  const playerDrawX = (vis.x - camX) * TILE * SCALE;
-  const playerDrawY = (vis.y - camY) * TILE * SCALE;
+  const playerDrawX = Math.round((vis.x - camX) * TILE * SCALE);
+  const playerDrawY = Math.round((vis.y - camY) * TILE * SCALE);
   drawPlayer(ctx, playerDrawX, playerDrawY);
   
   // Version number (top right)
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.01', canvas.width - 8, 14);
+  ctx.fillText('v0.02', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
