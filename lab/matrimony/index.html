@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Matrimony Beyond Space and Time</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=JetBrains+Mono:wght@300;400&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=JetBrains+Mono:wght@300;400&family=Pixelify+Sans:wght@400;700&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     background: #0a0a0f; color: #c8c0b8;
@@ -176,6 +176,9 @@ const state = {
   // Smooth camera position (in tile coords, fractional)
   smoothX: 0,
   smoothY: 0,
+  // Combat
+  combat: null, // { enemy, enemyHp, enemyMaxHp, enemyEff, enemyDef, enemyWait, playerHp, playerMaxHp, playerEff, playerDef, playerWait, attackText }
+  combatTransition: null, // { type: 'in'|'out', startTime, duration }
 };
 
 // ══════════════════════════════════
@@ -274,11 +277,15 @@ function getCameraOffset() {
 const keys = {};
 document.addEventListener('keydown', (e) => {
   keys[e.key] = true;
+  if (e.key === 'Escape' && state.combat && !state.combatTransition) {
+    exitCombat();
+    return;
+  }
   if (e.key === ' ') {
     e.preventDefault();
     if (state.dialogue) {
       closeDialogue();
-    } else {
+    } else if (!state.combat) {
       interact();
     }
   }
@@ -286,7 +293,7 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keyup', (e) => { keys[e.key] = false; });
 
 function tryMove(dx, dy) {
-  if (state.moving || state.dialogue) return;
+  if (state.moving || state.dialogue || state.combat || state.combatTransition) return;
   
   // Set facing
   if (dx < 0) state.facing = 'left';
@@ -364,11 +371,243 @@ function interact() {
 
 function handleEntityContact(entity) {
   if (entity.type === 'Enemy1') {
-    showDialogue('???', 'A creature stirs... it doesn\'t seem hostile, just... lonely. [Press Space]');
-    // After dialogue, could trigger combat
-    // For now just mark encountered
+    startCombat(entity, {
+      name: 'Fire Elemental',
+      maxHp: 20, hp: 20,
+      eff: 8, def: 3, wait: 5,
+    });
   } else {
     showDialogue('', 'Nothing happens.');
+  }
+}
+
+// ══════════════════════════════════
+// COMBAT SYSTEM
+// ══════════════════════════════════
+const ENEMY_DATA = {
+  'Enemy1': {
+    name: 'Fire Elemental',
+    sprite: 'Enemy1',
+    maxHp: 20, eff: 8, def: 3, wait: 5,
+  },
+};
+
+function startCombat(entity, enemyStats) {
+  state.combatTransition = { type: 'in', startTime: performance.now(), duration: 600 };
+  // Set up combat state after transition
+  setTimeout(() => {
+    state.combat = {
+      enemy: entity,
+      enemyName: enemyStats.name || entity.type,
+      enemySprite: entity.type,
+      enemyHp: enemyStats.maxHp,
+      enemyMaxHp: enemyStats.maxHp,
+      enemyEff: enemyStats.eff,
+      enemyDef: enemyStats.def,
+      enemyWait: enemyStats.wait,
+      playerHp: 30,
+      playerMaxHp: 30,
+      playerEff: 10,
+      playerDef: 2,
+      playerWait: 0,
+      attackText: '',
+    };
+  }, 600);
+}
+
+function exitCombat() {
+  state.combatTransition = { type: 'out', startTime: performance.now(), duration: 400 };
+  const enemy = state.combat.enemy;
+  if (state.combat.enemyHp <= 0) {
+    state.defeatedEnemies[enemy.id] = true;
+  }
+  setTimeout(() => {
+    state.combat = null;
+    state.combatTransition = null;
+  }, 400);
+}
+
+function drawCombat() {
+  const c = state.combat;
+  const W = canvas.width;
+  const H = canvas.height;
+  
+  // Background
+  ctx.fillStyle = '#0c0c14';
+  ctx.fillRect(0, 0, W, H);
+  
+  const FONT = '"Pixelify Sans", sans-serif';
+  
+  // ── TOP: Enemy info bar (~18% of screen height) ──
+  const topH = Math.round(H * 0.18);
+  
+  // Enemy portrait box (left side)
+  const portraitSize = Math.round(topH * 0.75);
+  const portraitX = 12;
+  const portraitY = Math.round((topH - portraitSize) / 2);
+  
+  // Portrait border
+  ctx.strokeStyle = '#5a5060';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(portraitX, portraitY, portraitSize, portraitSize);
+  
+  // Draw enemy sprite in portrait
+  const spr = sprites[c.enemySprite];
+  if (spr && spr.loaded) {
+    const frame = Math.floor(performance.now() / ANIM_SPEED) % SPRITE_FRAMES;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(spr.img,
+      frame * SPRITE_FRAME_SIZE, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
+      portraitX + 4, portraitY + 4, portraitSize - 8, portraitSize - 8
+    );
+    ctx.imageSmoothingEnabled = true;
+  }
+  
+  // Enemy name + HP bar (to the right of portrait)
+  const infoX = portraitX + portraitSize + 14;
+  const infoY = portraitY + 4;
+  
+  // HP bar
+  const barW = Math.round(W * 0.25);
+  const barH = 10;
+  const barY = infoY + 2;
+  
+  // HP bar background
+  ctx.fillStyle = '#2a1a1a';
+  ctx.fillRect(infoX, barY, barW, barH);
+  // HP bar fill
+  const hpRatio = c.enemyHp / c.enemyMaxHp;
+  ctx.fillStyle = hpRatio > 0.5 ? '#3a8a3a' : hpRatio > 0.25 ? '#b89030' : '#a03030';
+  ctx.fillRect(infoX, barY, Math.round(barW * hpRatio), barH);
+  // HP bar border
+  ctx.strokeStyle = '#6a6070';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(infoX, barY, barW, barH);
+  
+  // Attack text area (to the right of HP bar)
+  const textX = infoX + barW + 16;
+  ctx.fillStyle = '#e8e0d0';
+  ctx.font = '14px ' + FONT;
+  ctx.textAlign = 'left';
+  ctx.fillText(c.enemyName, infoX, barY + barH + 18);
+  
+  // Attack text
+  if (c.attackText) {
+    ctx.fillStyle = '#d0c0a0';
+    ctx.font = '13px ' + FONT;
+    ctx.fillText(c.attackText, textX, barY + 9);
+  }
+  
+  // EFF DEF WAIT under portrait and HP bar
+  const statY = portraitY + portraitSize + 6;
+  ctx.fillStyle = '#a098a0';
+  ctx.font = '12px ' + FONT;
+  ctx.fillText('Eff: ' + c.enemyEff, portraitX, statY + 12);
+  ctx.fillText('Def: ' + c.enemyDef, portraitX + 70, statY + 12);
+  ctx.fillText('Wait: ' + c.enemyWait, portraitX + 140, statY + 12);
+  
+  // ── MIDDLE: Battle arena (~50% of screen, starts at ~20%) ──
+  const arenaY = Math.round(H * 0.20);
+  const arenaH = Math.round(H * 0.50);
+  
+  // Arena background (simple gradient floor)
+  const grad = ctx.createLinearGradient(0, arenaY, 0, arenaY + arenaH);
+  grad.addColorStop(0, '#1a1820');
+  grad.addColorStop(0.4, '#1e2418');
+  grad.addColorStop(1, '#222818');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, arenaY, W, arenaH);
+  
+  // Simple ground line
+  const groundY = arenaY + Math.round(arenaH * 0.7);
+  ctx.strokeStyle = '#3a3830';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, groundY);
+  ctx.lineTo(W, groundY);
+  ctx.stroke();
+  
+  // Draw player character (left side of arena)
+  const playerArenaX = Math.round(W * 0.2);
+  const playerArenaY = groundY - 64;
+  if (PLAYER_SHEET.loaded) {
+    const anim = PLAYER_SHEET.anims['idle_right'];
+    const frame = Math.floor(performance.now() / 400) % anim.frames;
+    const srcX = frame * PLAYER_SHEET.frameW;
+    const srcY = anim.row * PLAYER_SHEET.frameH;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(PLAYER_SHEET.img,
+      srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
+      playerArenaX, playerArenaY, 64, 64
+    );
+    ctx.imageSmoothingEnabled = true;
+  }
+  
+  // Draw enemy (right side of arena)
+  const enemyArenaX = Math.round(W * 0.7);
+  const enemyArenaY = groundY - 48;
+  if (spr && spr.loaded) {
+    const frame = Math.floor(performance.now() / ANIM_SPEED) % SPRITE_FRAMES;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(spr.img,
+      frame * SPRITE_FRAME_SIZE, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
+      enemyArenaX, enemyArenaY, 48, 48
+    );
+    ctx.imageSmoothingEnabled = true;
+  }
+  
+  // ── BOTTOM: Player info bar ──
+  const botY = arenaY + arenaH + 8;
+  
+  // Player HP
+  const pBarX = portraitX;
+  const pBarY = botY + 4;
+  ctx.fillStyle = '#1a1a2a';
+  ctx.fillRect(pBarX, pBarY, barW, barH);
+  const pHpRatio = c.playerHp / c.playerMaxHp;
+  ctx.fillStyle = pHpRatio > 0.5 ? '#3a6aba' : pHpRatio > 0.25 ? '#b89030' : '#a03030';
+  ctx.fillRect(pBarX, pBarY, Math.round(barW * pHpRatio), barH);
+  ctx.strokeStyle = '#6a6070';
+  ctx.strokeRect(pBarX, pBarY, barW, barH);
+  
+  // Player HP text
+  ctx.fillStyle = '#e8e0d0';
+  ctx.font = '13px ' + FONT;
+  ctx.fillText('HP ' + c.playerHp + '/' + c.playerMaxHp, pBarX, pBarY + barH + 16);
+  
+  // Player stats
+  ctx.fillStyle = '#a098a0';
+  ctx.font = '12px ' + FONT;
+  ctx.fillText('Eff: ' + c.playerEff, pBarX + barW + 16, pBarY + 9);
+  ctx.fillText('Def: ' + c.playerDef, pBarX + barW + 86, pBarY + 9);
+  ctx.fillText('Wait: ' + c.playerWait, pBarX + barW + 156, pBarY + 9);
+  
+  // Temporary: ESC to exit
+  ctx.fillStyle = '#484048';
+  ctx.font = '10px ' + FONT;
+  ctx.textAlign = 'right';
+  ctx.fillText('[ESC] Exit', W - 10, H - 10);
+  ctx.textAlign = 'left';
+}
+
+function drawCombatTransition() {
+  const t = state.combatTransition;
+  if (!t) return;
+  const elapsed = performance.now() - t.startTime;
+  const progress = Math.min(1, elapsed / t.duration);
+  
+  if (t.type === 'in') {
+    // Horizontal bars closing in from top and bottom
+    const barH = Math.round((canvas.height / 2) * progress);
+    ctx.fillStyle = '#0c0c14';
+    ctx.fillRect(0, 0, canvas.width, barH);
+    ctx.fillRect(0, canvas.height - barH, canvas.width, barH);
+  } else {
+    // Reverse — bars opening
+    const barH = Math.round((canvas.height / 2) * (1 - progress));
+    ctx.fillStyle = '#0c0c14';
+    ctx.fillRect(0, 0, canvas.width, barH);
+    ctx.fillRect(0, canvas.height - barH, canvas.width, barH);
   }
 }
 
@@ -454,7 +693,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.07', canvas.width - 8, 14);
+  ctx.fillText('v0.08', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
@@ -532,8 +771,15 @@ function drawEntity(ctx, entity, x, y) {
 let lastTime = 0;
 
 function gameLoop(time) {
-  handleMovement(time);
-  draw();
+  if (state.combat) {
+    drawCombat();
+  } else {
+    handleMovement(time);
+    draw();
+  }
+  if (state.combatTransition) {
+    drawCombatTransition();
+  }
   requestAnimationFrame(gameLoop);
 }
 
