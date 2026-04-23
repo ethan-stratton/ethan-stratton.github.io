@@ -88,6 +88,31 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 canvas.width = CANVAS_W;
 canvas.height = CANVAS_H;
+
+// ══════════════════════════════════
+// AUDIO
+// ══════════════════════════════════
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+let footstepAlt = false;
+function playFootstep() {
+  const ac = getAudioCtx();
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = 'square';
+  // Alternate between two pitches for L/R foot feel
+  osc.frequency.value = footstepAlt ? 180 : 150;
+  footstepAlt = !footstepAlt;
+  gain.gain.setValueAtTime(0.06, ac.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.08);
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.start(ac.currentTime);
+  osc.stop(ac.currentTime + 0.08);
+}
 canvas.style.width = (CANVAS_W * DISPLAY_SCALE) + 'px';
 canvas.style.height = (CANVAS_H * DISPLAY_SCALE) + 'px';
 
@@ -295,9 +320,11 @@ document.addEventListener('keydown', (e) => {
     const c = state.combat;
     
     if (c.phase === 'target') {
-      // Target selection phase — arrows would cycle enemies (only 1 for now)
-      // Z confirms target, moves to action phase
-      // No arrow handling needed yet (single enemy)
+      // Left/Right to toggle between enemy and self
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        c.targetSelf = !c.targetSelf;
+        e.preventDefault(); return;
+      }
     } else if (c.phase === 'action') {
       // Action selection phase — 2x4 grid navigation
       const numActions = Math.min((c.actions || []).length, 8);
@@ -338,12 +365,14 @@ document.addEventListener('keydown', (e) => {
         // Confirm enemy target → move to action selection
         c.phase = 'action';
         c.selectedAction = 0;
-      } else if (c.phase === 'action') {
+      } else if (c.phase === 'action' && !c.waiting) {
         const action = (c.actions || [])[c.selectedAction || 0];
         if (action) {
-          c.firstAttackDone = true;
+          const act = COMBAT_ACTIONS[action] || {};
+          c.waitCountdown = act.wait || 0;
+          c.lastWaitTick = performance.now();
+          c.waiting = true;
           c.attackText = action;
-          // TODO: wire actual combat logic
         }
       }
     } else if (state.dialogue) {
@@ -360,8 +389,14 @@ document.addEventListener('keydown', (e) => {
     if (state.combat) {
       const c = state.combat;
       if (c.phase === 'action') {
-        // Cancel back to target selection
-        c.phase = 'target';
+        if (c.waiting) {
+          // Cancel wait, go back to action select
+          c.waiting = false;
+          c.waitCountdown = -1;
+        } else {
+          // Cancel back to target selection
+          c.phase = 'target';
+        }
       }
     } else if (state.dialogue) {
       closeDialogue();
@@ -401,9 +436,10 @@ function tryMove(dx, dy) {
   state.moveFrom.y = state.player.y;
   state.player.x = nx;
   state.player.y = ny;
+  playFootstep();
 }
 
-const MOVE_DURATION = 150; // ms for grid movement
+const MOVE_DURATION = 200; // ms for grid movement
 let lastFrameTime = 0;
 
 function handleMovement(now) {
@@ -500,11 +536,15 @@ function startCombat(entity, enemyStats) {
     attackText: '',
     startTime: performance.now(),
     slideInDuration: 500,
-    phase: 'target', // 'target' = select enemy, 'action' = select attack
-    selectedEnemy: 0, // index into enemies list (for multi-enemy later)
+    phase: 'target', // 'target' = select enemy/self, 'action' = select attack
+    targetSelf: false, // false = targeting enemy, true = targeting self
+    selectedEnemy: 0,
     actions: ['Punch', 'Kick', ...(state.inventory.includes('Shortbow') ? ['Shortbow'] : [])],
     selectedAction: 0,
-    firstAttackDone: false,
+    waitCountdown: -1, // -1 = not counting, >=0 = ticking down
+    waitTickSpeed: 500, // ms per tick
+    lastWaitTick: 0,
+    waiting: false, // true while wait is counting down
   };
 }
 
@@ -667,8 +707,8 @@ function drawCombat() {
       enemyArenaX, enemyArenaY, enemyCombatSize, enemyCombatSize);
     
     // White flash on enemy pixels only — during target phase after slide-in
-    if (slideT >= 1 && c.phase === 'target') {
-      const flashAlpha = 0.3 + 0.5 * Math.sin(now / 150); // fast pulse
+    if (slideT >= 1 && c.phase === 'target' && !c.targetSelf) {
+      const flashAlpha = 0.1 + 0.2 * Math.sin(now / 180); // subtle, never fully white
       if (flashAlpha > 0) {
         // Use offscreen canvas to create white silhouette
         if (!drawCombat._flashCanvas) {
@@ -711,6 +751,36 @@ function drawCombat() {
     ctx.drawImage(PLAYER_SHEET.img, srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
       0, 0, playerCombatSize, playerCombatSize);
     ctx.restore();
+    
+    // White flash on player pixels — when self-targeting
+    if (slideT >= 1 && c.phase === 'target' && c.targetSelf) {
+      const flashAlpha = 0.1 + 0.2 * Math.sin(now / 180);
+      if (flashAlpha > 0) {
+        if (!drawCombat._flashCanvas2) {
+          drawCombat._flashCanvas2 = document.createElement('canvas');
+          drawCombat._flashCtx2 = drawCombat._flashCanvas2.getContext('2d');
+        }
+        const fc = drawCombat._flashCanvas2;
+        const fctx = drawCombat._flashCtx2;
+        fc.width = playerCombatSize;
+        fc.height = playerCombatSize;
+        fctx.clearRect(0, 0, fc.width, fc.height);
+        fctx.imageSmoothingEnabled = false;
+        fctx.save();
+        fctx.translate(playerCombatSize, 0);
+        fctx.scale(-1, 1);
+        fctx.drawImage(PLAYER_SHEET.img, srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
+          0, 0, playerCombatSize, playerCombatSize);
+        fctx.restore();
+        fctx.globalCompositeOperation = 'source-atop';
+        fctx.fillStyle = 'white';
+        fctx.fillRect(0, 0, fc.width, fc.height);
+        fctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = flashAlpha;
+        ctx.drawImage(fc, playerArenaX, playerArenaY);
+        ctx.globalAlpha = 1;
+      }
+    }
     ctx.imageSmoothingEnabled = true;
   }
   
@@ -755,31 +825,23 @@ function drawCombat() {
     ctx.restore();
   }
   
-  // HP below portrait
+  // HP below portrait — bigger
   ctx.fillStyle = '#e8e0d0';
-  ctx.font = 'bold 13px ' + FONT;
+  ctx.font = 'bold 16px ' + FONT;
   ctx.textAlign = 'left';
-  ctx.fillText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 14);
+  ctx.fillText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 16);
   
-  // ── ACTION GRID: 2 columns × 4 rows, aligned with portrait center ──
+  // ── ACTION GRID: always visible, 2 columns × 4 rows ──
   const gridX = pPortraitX + portraitW + 16;
-  const portraitCenterY = pPortraitY + Math.round(portraitH / 2);
-  const gridRowH = 20;
-  const gridTotalH = 4 * gridRowH;
-  const gridY = pPortraitY + 2; // start near top of portrait area
+  const gridRowH = 22;
+  const gridY = pPortraitY + 2;
   const colW = Math.round((W - gridX - 16) / 2);
   
   const actions = c.actions || ['Punch', 'Kick'];
   
-  if (c.phase === 'target') {
-    // Show "Select Target" prompt
-    ctx.font = '14px ' + FONT;
-    ctx.fillStyle = '#b0a898';
-    ctx.textAlign = 'left';
-    ctx.fillText('Z = Select Target', gridX + 4, portraitCenterY + 4);
-  } else if (c.phase === 'action') {
-    // Mouse hover
-    let hovered = -1;
+  // Mouse hover (only when in action phase and not waiting)
+  let hovered = -1;
+  if (c.phase === 'action' && !c.waiting) {
     for (let i = 0; i < actions.length && i < 8; i++) {
       const col = i < 4 ? 0 : 1;
       const row = i < 4 ? i : i - 4;
@@ -790,37 +852,72 @@ function drawCombat() {
       }
     }
     if (hovered >= 0) c.selectedAction = hovered;
+  }
+  
+  // Draw grid items
+  for (let i = 0; i < actions.length && i < 8; i++) {
+    const col = i < 4 ? 0 : 1;
+    const row = i < 4 ? i : i - 4;
+    const ax = gridX + col * colW;
+    const ay = gridY + row * gridRowH;
+    const isSelected = (c.phase === 'action') && i === (c.selectedAction || 0);
+    const dimmed = c.phase === 'target' || c.waiting;
     
-    // Draw grid items
-    for (let i = 0; i < actions.length && i < 8; i++) {
-      const col = i < 4 ? 0 : 1;
-      const row = i < 4 ? i : i - 4;
-      const ax = gridX + col * colW;
-      const ay = gridY + row * gridRowH;
-      const isSelected = i === (c.selectedAction || 0);
-      
-      ctx.font = '15px ' + FONT;
-      ctx.fillStyle = isSelected ? '#ffe8c0' : '#706860';
-      ctx.textAlign = 'left';
-      ctx.fillText(actions[i], ax + 4, ay + gridRowH - 4);
+    ctx.font = '16px ' + FONT;
+    if (isSelected && !dimmed) {
+      ctx.fillStyle = '#ffe8c0';
+    } else {
+      ctx.fillStyle = dimmed ? '#4a4440' : '#706860';
     }
+    ctx.textAlign = 'left';
+    ctx.fillText(actions[i], ax + 4, ay + gridRowH - 5);
+  }
+  
+  // Selected action stats at bottom — gold labels, white numbers, bigger and spread out
+  const sel = c.selectedAction || 0;
+  if (c.phase === 'action' && sel < actions.length) {
+    const act = COMBAT_ACTIONS[actions[sel]] || {};
+    const statsY = H - pad - 2;
+    const labelFont = 'bold 14px ' + FONT;
+    const numFont = '14px ' + FONT;
+    const goldColor = '#d4a830';
+    const whiteColor = '#e8e0d0';
+    let sx = gridX + 4;
     
-    // Selected action stats at bottom of screen
-    const sel = c.selectedAction || 0;
-    if (sel < actions.length) {
-      const act = COMBAT_ACTIONS[actions[sel]] || {};
-      ctx.font = '13px ' + FONT;
-      ctx.fillStyle = '#b0a898';
-      ctx.textAlign = 'left';
-      const statsY = H - pad;
-      ctx.fillText('EFF: ' + (act.eff || 0) + '    DEF: ' + (act.def || 0) + '    WAIT: ' + (act.wait || 0), gridX + 4, statsY);
-    }
+    ctx.textAlign = 'left';
+    ctx.font = labelFont; ctx.fillStyle = goldColor;
+    ctx.fillText('EFF:', sx, statsY);
+    ctx.font = numFont; ctx.fillStyle = whiteColor;
+    ctx.fillText(' ' + (act.eff || 0), sx + ctx.measureText('EFF:').width, statsY);
+    sx += 80;
     
-    // X = Back hint
+    ctx.font = labelFont; ctx.fillStyle = goldColor;
+    ctx.fillText('DEF:', sx, statsY);
+    ctx.font = numFont; ctx.fillStyle = whiteColor;
+    ctx.fillText(' ' + (act.def || 0), sx + ctx.measureText('DEF:').width, statsY);
+    sx += 80;
+    
+    ctx.font = labelFont; ctx.fillStyle = goldColor;
+    ctx.fillText('WAIT:', sx, statsY);
+    ctx.font = numFont; ctx.fillStyle = whiteColor;
+    // Show countdown if waiting, otherwise show base value
+    const waitVal = c.waiting ? c.waitCountdown : (act.wait || 0);
+    ctx.fillText(' ' + waitVal, sx + ctx.measureText('WAIT:').width, statsY);
+  }
+  
+  // Hints
+  if (c.phase === 'action' && !c.waiting) {
     ctx.font = '11px ' + FONT;
     ctx.fillStyle = 'rgba(140, 130, 140, 0.5)';
     ctx.textAlign = 'right';
     ctx.fillText('X = Back', W - pad, H - pad);
+    ctx.textAlign = 'left';
+  }
+  if (c.waiting) {
+    ctx.font = '11px ' + FONT;
+    ctx.fillStyle = 'rgba(140, 130, 140, 0.5)';
+    ctx.textAlign = 'right';
+    ctx.fillText('X = Cancel', W - pad, H - pad);
     ctx.textAlign = 'left';
   }
 }
@@ -956,7 +1053,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.21', canvas.width - 8, 14);
+  ctx.fillText('v0.22', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
@@ -1057,6 +1154,20 @@ let lastTime = 0;
 function gameLoop(time) {
   if (!state.combat) {
     handleMovement(time);
+  }
+  // Update combat wait countdown
+  if (state.combat && state.combat.waiting && state.combat.waitCountdown > 0) {
+    const c = state.combat;
+    if (time - c.lastWaitTick >= c.waitTickSpeed) {
+      c.waitCountdown--;
+      c.lastWaitTick = time;
+      if (c.waitCountdown <= 0) {
+        // Wait done — attack executes, return to action select
+        c.waiting = false;
+        c.waitCountdown = -1;
+        // TODO: apply damage here
+      }
+    }
   }
   draw(); // Always draw overworld
   if (state.combat) {
