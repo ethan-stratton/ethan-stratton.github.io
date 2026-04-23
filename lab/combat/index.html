@@ -1461,6 +1461,16 @@ const ITEMS = [
   { name: 'Invigorate', eff: 0, def: 0, wait: 10, buff: { stat: 'eff', amount: 5 }, desc: 'Buff: +5 Effect on all weapons', type: 'buff' },
 ];
 
+// ── Equipment (passive, occupies a slot but applies global modifiers) ──
+const EQUIPMENT = [
+  { name: 'Swift Boots', equip: true, mod: { wait: -1 }, desc: 'All Wait −1', symbol: '👢' },
+  { name: 'Power Bracelet', equip: true, mod: { eff: 2 }, desc: 'All Eff +2', symbol: '💪' },
+  { name: 'Iron Cloak', equip: true, mod: { def: 2 }, desc: 'All Def +2', symbol: '🧥' },
+  { name: 'War Ring', equip: true, mod: { eff: 1, wait: -1 }, desc: 'Eff +1, Wait −1', symbol: '💍' },
+  { name: 'Guardian Charm', equip: true, mod: { def: 3, eff: -1 }, desc: 'Def +3, Eff −1', symbol: '🔮' },
+  { name: 'Feather Anklet', equip: true, mod: { wait: -2, def: -1 }, desc: 'Wait −2, Def −1', symbol: '🪶' },
+];
+
 // ── Enemies ──
 const ENEMIES = [
   {
@@ -1975,16 +1985,19 @@ const ITEM_LIBRARY = ITEMS.flatMap(item => generateUpgrades(item));
 const MAX_SANDBOX_SLOTS = 8;
 let sandboxLoadout = ITEMS.slice(0, 8).map(it => ({ base: it.name, plus: 0 }));
 
-function getSandboxItems() {
-  return sandboxLoadout.map(name => ITEM_LIBRARY.find(it => it.name === name)).filter(Boolean);
-}
-
 function buildSandboxLibrary() {
   const lib = document.getElementById('sandboxLibrary');
   lib.innerHTML = '';
+
+  // Weapons
+  const weaponHeader = document.createElement('div');
+  weaponHeader.className = 'lib-section-title';
+  weaponHeader.textContent = 'weapons & spells';
+  lib.appendChild(weaponHeader);
+
   ITEMS.forEach(baseItem => {
     const div = document.createElement('div');
-    const inLoadout = sandboxLoadout.some(s => s.base === baseItem.name);
+    const inLoadout = sandboxLoadout.some(s => !s.equip && s.base === baseItem.name);
     div.className = 'lib-item' + (inLoadout ? ' in-loadout' : '');
     let specials = '';
     if (baseItem.type === 'pierce') specials = ' ⟁';
@@ -2002,15 +2015,58 @@ function buildSandboxLibrary() {
     };
     lib.appendChild(div);
   });
+
+  // Equipment
+  const equipHeader = document.createElement('div');
+  equipHeader.className = 'lib-section-title';
+  equipHeader.style.marginTop = '10px';
+  equipHeader.textContent = 'equipment';
+  lib.appendChild(equipHeader);
+
+  EQUIPMENT.forEach(eq => {
+    const div = document.createElement('div');
+    const inLoadout = sandboxLoadout.some(s => s.equip && s.base === eq.name);
+    div.className = 'lib-item' + (inLoadout ? ' in-loadout' : '');
+    div.innerHTML = `<span class="lib-name">${eq.symbol} ${eq.name}</span><span class="lib-stats" style="color:#b89cff">${eq.desc}</span>`;
+    div.onclick = () => {
+      if (sandboxLoadout.length >= MAX_SANDBOX_SLOTS) return;
+      if (inLoadout) return; // only one of each
+      sandboxLoadout.push({ base: eq.name, equip: true });
+      buildSandboxLibrary();
+      buildSandboxSlots();
+    };
+    lib.appendChild(div);
+  });
 }
 
 function getItemForSlot(slot) {
+  // Equipment slots
+  if (slot.equip) return EQUIPMENT.find(e => e.name === slot.base);
   if (slot.plus === 0) return ITEM_LIBRARY.find(it => it.name === slot.base);
   return ITEM_LIBRARY.find(it => it.name === `${slot.base} +${slot.plus}`);
 }
 
+function getEquipMods() {
+  const mods = { eff: 0, def: 0, wait: 0 };
+  sandboxLoadout.filter(s => s.equip).forEach(s => {
+    const eq = EQUIPMENT.find(e => e.name === s.base);
+    if (eq) { for (const k in eq.mod) mods[k] += eq.mod[k]; }
+  });
+  return mods;
+}
+
 function getSandboxItems() {
-  return sandboxLoadout.map(s => getItemForSlot(s)).filter(Boolean);
+  const mods = getEquipMods();
+  return sandboxLoadout.filter(s => !s.equip).map(s => {
+    const base = getItemForSlot(s);
+    if (!base) return null;
+    return {
+      ...base,
+      eff: Math.max(0, base.eff + mods.eff),
+      def: Math.max(0, base.def + mods.def),
+      wait: Math.max(1, base.wait + mods.wait),
+    };
+  }).filter(Boolean);
 }
 
 function buildSandboxSlots() {
@@ -2024,11 +2080,22 @@ function buildSandboxSlots() {
     const div = document.createElement('div');
     if (i < sandboxLoadout.length) {
       const slot = sandboxLoadout[i];
-      const item = getItemForSlot(slot);
       div.className = 'slot-entry filled';
-      if (item) {
-        const plusLabel = slot.plus > 0 ? ` <span class="stat-special">+${slot.plus}</span>` : '';
-        div.innerHTML = `<span class="slot-name">${slot.base}${plusLabel}</span><span class="slot-controls"><span class="slot-stats"><span class="stat-eff">${item.eff}</span>/<span class="stat-def">${item.def}</span>/<span class="stat-wait">${item.wait}</span></span> <span class="slot-upgrade" data-idx="${i}" data-dir="-1">−</span><span class="slot-upgrade" data-idx="${i}" data-dir="1">+</span><span class="slot-remove" data-idx="${i}">✕</span></span>`;
+      if (slot.equip) {
+        const eq = EQUIPMENT.find(e => e.name === slot.base);
+        if (eq) {
+          div.innerHTML = `<span class="slot-name">${eq.symbol} ${eq.name}</span><span class="slot-controls"><span class="slot-stats" style="color:#b89cff">${eq.desc}</span><span class="slot-remove" data-idx="${i}">✕</span></span>`;
+        }
+      } else {
+        const item = getItemForSlot(slot);
+        if (item) {
+          const mods = getEquipMods();
+          const effFinal = Math.max(0, item.eff + mods.eff);
+          const defFinal = Math.max(0, item.def + mods.def);
+          const waitFinal = Math.max(1, item.wait + mods.wait);
+          const plusLabel = slot.plus > 0 ? ` <span class="stat-special">+${slot.plus}</span>` : '';
+          div.innerHTML = `<span class="slot-name">${slot.base}${plusLabel}</span><span class="slot-controls"><span class="slot-stats"><span class="stat-eff">${effFinal}</span>/<span class="stat-def">${defFinal}</span>/<span class="stat-wait">${waitFinal}</span></span> <span class="slot-upgrade" data-idx="${i}" data-dir="-1">−</span><span class="slot-upgrade" data-idx="${i}" data-dir="1">+</span><span class="slot-remove" data-idx="${i}">✕</span></span>`;
+        }
       }
     } else {
       div.className = 'slot-entry';
