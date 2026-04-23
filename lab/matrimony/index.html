@@ -119,25 +119,35 @@ function loadSprite(name, src) {
 
 // Player sprite (Snoblin prototype character)
 // 128x384 sheet, 32x32 frames, 4 cols × 12 rows
-// Layout per direction (down=0, side=4, up=8):
-//   +0: Idle (2 frames), +1: Walk (4 frames), +2: Hurt (2 frames), +3: Death (3 frames)
-// Side faces right; flip for left
+// Actual layout from visual inspection:
+//   Row 0: Idle down (2 frames)
+//   Row 1: Idle down alt/blink (2 frames)
+//   Row 2: Walk down (4 frames)
+//   Row 3: Walk side (4 frames)  
+//   Row 4: Idle side (2 frames)
+//   Row 5: Idle up (2 frames)
+//   Row 6: Walk up (4 frames)
+//   Row 7: Hurt (2 frames)
+//   Row 8: Death down (3 frames)
+//   Row 9: Death side (3 frames)
+//   Row 10: Death up? (3 frames)
+//   Row 11: extra?
 const PLAYER_SHEET = {
   img: null, loaded: false,
   frameW: 32, frameH: 32, cols: 4,
   anims: {
     idle_down:  { row: 0, frames: 2 },
-    walk_down:  { row: 1, frames: 4 },
-    hurt_down:  { row: 2, frames: 2 },
-    death_down: { row: 3, frames: 3 },
+    walk_down:  { row: 2, frames: 4 },
     idle_side:  { row: 4, frames: 2 },
-    walk_side:  { row: 5, frames: 4 },
-    hurt_side:  { row: 6, frames: 2 },
-    death_side: { row: 7, frames: 3 },
-    idle_up:    { row: 8, frames: 2 },
-    walk_up:    { row: 9, frames: 4 },
-    hurt_up:    { row: 10, frames: 2 },
-    death_up:   { row: 11, frames: 3 },
+    walk_side:  { row: 3, frames: 4 },
+    idle_up:    { row: 5, frames: 2 },
+    walk_up:    { row: 6, frames: 4 },
+    hurt_down:  { row: 7, frames: 2 },
+    hurt_side:  { row: 7, frames: 2 },
+    hurt_up:    { row: 7, frames: 2 },
+    death_down: { row: 8, frames: 3 },
+    death_side: { row: 9, frames: 3 },
+    death_up:   { row: 10, frames: 3 },
   }
 };
 {
@@ -447,7 +457,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.04', canvas.width - 8, 14);
+  ctx.fillText('v0.05', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
