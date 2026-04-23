@@ -175,6 +175,8 @@ const state = {
   dialogue: null,
   flags: {},
   defeatedEnemies: {},
+  openedChests: {},
+  inventory: [],
   // Smooth camera position (in tile coords, fractional)
   smoothX: 0,
   smoothY: 0,
@@ -232,7 +234,7 @@ async function loadLevel() {
             type: e.__identifier,
             x: gx, y: gy,
             id: `${e.__identifier}_${gx}_${gy}`,
-            fields: {},
+            fields: e.fieldInstances ? Object.fromEntries(e.fieldInstances.map(f => [f.__identifier, f.__value])) : {},
           });
         }
       }
@@ -404,6 +406,19 @@ function handleEntityContact(entity) {
       maxHp: 20, hp: 20,
       eff: 8, def: 3, wait: 5,
     });
+  } else if (entity.type === 'Chest') {
+    if (!state.openedChests[entity.id]) {
+      state.openedChests[entity.id] = true;
+      const item = entity.fields.Item || 'Shortbow';
+      state.inventory.push(item);
+      showDialogue('', 'Found ' + item + '!');
+      // Add Shortbow as combat action
+      if (item === 'Shortbow' && !COMBAT_ACTIONS['Shortbow']) {
+        COMBAT_ACTIONS['Shortbow'] = { eff: 10, def: 0, wait: 3 };
+      }
+    } else {
+      showDialogue('', 'The chest is empty.');
+    }
   } else {
     showDialogue('', 'Nothing happens.');
   }
@@ -437,7 +452,7 @@ function startCombat(entity, enemyStats) {
     playerWait: 0,
     attackText: '',
     startTime: performance.now(),
-    actions: ['Punch', 'Kick'],
+    actions: ['Punch', 'Kick', ...(state.inventory.includes('Shortbow') ? ['Shortbow'] : [])],
     selectedAction: 0,
     firstAttackDone: false,
   };
@@ -692,18 +707,20 @@ function drawCombat() {
   const actions = c.actions || ['Punch', 'Kick'];
   const selectedIdx = c.selectedAction || 0;
   
-  // Check mouse hover
+  // Check mouse hover — only highlight if mouse is over a menu item
+  let hovered = -1;
   for (let i = 0; i < actions.length; i++) {
     const ay = menuStartY + i * rowH;
     if (mouse.x >= menuX && mouse.x <= W - 6 && mouse.y >= ay && mouse.y <= ay + rowH) {
-      c.selectedAction = i;
+      hovered = i;
     }
   }
+  if (hovered >= 0) c.selectedAction = hovered;
   
   for (let i = 0; i < actions.length; i++) {
     const ay = menuStartY + i * rowH;
     const act = COMBAT_ACTIONS[actions[i]] || {};
-    const isSelected = i === (c.selectedAction || 0);
+    const isSelected = (hovered >= 0) ? (i === hovered) : false;
     
     // Action name
     ctx.font = '12px ' + FONT;
@@ -856,7 +873,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.14', canvas.width - 8, 14);
+  ctx.fillText('v0.15', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
@@ -925,6 +942,27 @@ function drawPlayer(ctx, x, y) {
 }
 
 function drawEntity(ctx, entity, x, y) {
+  if (entity.type === 'Chest') {
+    // Draw chest as a small orange box
+    const s = TILE * SCALE;
+    if (state.openedChests[entity.id]) {
+      ctx.fillStyle = '#4a3a20';
+      ctx.fillRect(x + 4, y + 6, s - 8, s - 8);
+      ctx.strokeStyle = '#6a5a30';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 4, y + 6, s - 8, s - 8);
+    } else {
+      ctx.fillStyle = '#c87020';
+      ctx.fillRect(x + 2, y + 4, s - 4, s - 6);
+      ctx.strokeStyle = '#e8a040';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 2, y + 4, s - 4, s - 6);
+      // Latch
+      ctx.fillStyle = '#ffe080';
+      ctx.fillRect(x + s/2 - 2, y + 4, 4, 3);
+    }
+    return;
+  }
   drawSprite(ctx, entity.type, x, y, performance.now());
 }
 
