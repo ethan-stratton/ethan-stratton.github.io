@@ -379,10 +379,15 @@
     border: 1px solid #2a2530; border-radius: 8px;
     padding: 20px; margin-top: 32px;
   }
-  .how h3 {
+  .how h3, details.how summary {
     font-family: 'Cinzel', serif; font-weight: 400;
     font-size: 0.9rem; color: #e8e0d8; margin-bottom: 12px;
+    cursor: pointer; list-style: none;
   }
+  details.how summary { display: flex; align-items: center; gap: 8px; }
+  details.how summary::before { content: '▸'; color: #585050; font-size: 0.7rem; transition: transform 0.2s; }
+  details.how[open] summary::before { transform: rotate(90deg); }
+  details.how summary::-webkit-details-marker { display: none; }
   .how h4 {
     font-family: 'Cinzel', serif; font-weight: 400;
     font-size: 0.85rem; color: #c8b8a0; margin: 16px 0 8px;
@@ -795,8 +800,7 @@
   </div>
 
   <!-- ═══════════ HOW IT WORKS ═══════════ -->
-  <div class="how">
-    <h3>Combat Mechanics</h3>
+  <details class="how"><summary>Combat Mechanics</summary>
     <p>
       <strong>Damage</strong> = <code>Eff − Def</code>. If Def ≥ Eff, fully blocked.
       <strong>Pierce</strong> ignores defense.
@@ -809,11 +813,10 @@
       <strong>The tension:</strong> Shields get pierced. Slow spells get stunned. Heals get rushed. Turtling gets sealed.
       No single strategy wins — read the enemy, count ticks, adapt.
     </p>
-  </div>
+  </details>
 
   <!-- ═══════════ GDD — TRANSFORMATIONS ═══════════ -->
-  <div class="how" style="margin-top: 16px; border-color: #3a2a40;">
-    <h3>Design Document — Transformations</h3>
+  <details class="how" style="margin-top: 16px; border-color: #3a2a40;"><summary>Transformations</summary>
     <p>
       Transformations change <strong>HOW</strong> you interact with the Eff / Def / Wait triangle — not just stat bonuses.
       Each one redefines your relationship to the combat system. These are not implemented yet — this is the design spec.
@@ -903,8 +906,7 @@
   </div>
 
   <!-- ═══════════ GDD — INTERFACE SHIFTS ═══════════ -->
-  <div class="how" style="margin-top: 16px; border-color: #2a3a4a;">
-    <h3>Design Document — Transformation Interface Shifts</h3>
+  <details class="how" style="margin-top: 16px; border-color: #2a3a4a;"><summary>Transformation Interface Shifts</summary>
     <p>
       Each transformation doesn't just change your stats — it changes <strong>what you see</strong>.
       The interface itself shifts to reflect your new nature. Information is power in this system,
@@ -959,11 +961,10 @@
       except the next hit. Breaking the streak with Shield or Heal snaps the view back to normal —
       the sudden clarity feels like waking up.
     </p>
-  </div>
+  </details>
 
   <!-- ═══════════ GDD — ACTION COMBOS ═══════════ -->
-  <div class="how" style="margin-top: 16px; border-color: #3a2a2a;">
-    <h3>Design Document — Action Combos</h3>
+  <details class="how" style="margin-top: 16px; border-color: #3a2a2a;"><summary>Action Combos</summary>
     <p>
       Using specific actions in sequence triggers <strong>combo effects</strong> — bonus damage,
       status effects, or defensive reactions. These are NOT listed in the UI. Players discover them
@@ -1012,11 +1013,10 @@
       <li><strong>Chronomancer + Seal (on predicted action):</strong> "Paradox" — if you seal the action Chronomancer revealed as "next," seal lasts 3 cycles (you broke their timeline)</li>
       <li><strong>Revenant + any action at 1 HP:</strong> "Defiance" — Eff doubled (fighting with nothing left to lose)</li>
     </ul>
-  </div>
+  </details>
 
   <!-- ═══════════ GDD — WEAPON IDENTITY & ENCHANTMENTS ═══════════ -->
-  <div class="how" style="margin-top: 16px; border-color: #2a3a2a;">
-    <h3>Design Document — Weapon Identity & Enchantments</h3>
+  <details class="how" style="margin-top: 16px; border-color: #2a3a2a;"><summary>Weapon Identity & Enchantments</summary>
     <p>
       Weapons aren't disposable tools — they grow, remember, and develop personality.
       Two players' Longswords should feel different after 20 fights.
@@ -1081,11 +1081,10 @@
       it should feel like something that grew out of the player's choices. "This is MY Oathblade.
       It exists because of how I played." That's the attachment.
     </p>
-  </div>
+  </details>
 
   <!-- ═══════════ GDD — CLASH SYSTEM ═══════════ -->
-  <div class="how" style="margin-top: 16px; border-color: #4a3a2a;">
-    <h3>Design Document — The Clash</h3>
+  <details class="how" style="margin-top: 16px; border-color: #4a3a2a;"><summary>The Clash</summary>
     <p>
       When both combatants' Wait timers hit <strong>0 on the same tick</strong>, a <strong>Clash</strong>
       occurs. Both actions resolve simultaneously, but with bonus effects:
@@ -1107,11 +1106,10 @@
       See the enemy at Wait 6? Pick an action with Wait 6. You're betting you can win the simultaneous
       exchange. That's the "finisher" energy — not random, but earned through reading the fight.
     </p>
-  </div>
+  </details>
 
   <!-- ═══════════ GDD — WORLD: MATRIMONY BEYOND SPACE AND TIME ═══════════ -->
-  <div class="how" style="margin-top: 16px; border-color: #3a3a50;">
-    <h3>Design Document — World: Matrimony Beyond Space and Time</h3>
+  <details class="how" style="margin-top: 16px; border-color: #3a3a50;"><summary>World: Matrimony Beyond Space and Time</summary>
 
     <h4>The Premise</h4>
     <p>
@@ -1332,7 +1330,7 @@
       <li>The ending — complete the Matrimony (lose self, become the world) vs. stay human (stay separate,
       stay with Evanui, accept incompleteness)? Or a third option nobody expected?</li>
     </ul>
-  </div>
+  </details>
 </div>
 
 <script>
