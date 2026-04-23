@@ -318,6 +318,10 @@
         <canvas class="tile-canvas" data-tile="terrain"></canvas>
         <div class="tile-label">Alien Terrain</div>
       </a>
+      <a href="/lab/matrimony/" class="sidebar-tile" title="Matrimony Beyond Space and Time">
+        <canvas class="tile-canvas" data-tile="matrimony"></canvas>
+        <div class="tile-label">Matrimony</div>
+      </a>
       <a href="/lab/combat/" class="sidebar-tile" title="Wait Combat — Helen's Mysterious Castle Combat Demo">
         <canvas class="tile-canvas" data-tile="combat"></canvas>
         <div class="tile-label">Wait Combat</div>
@@ -618,6 +622,37 @@
           imgData.data[i+3] = 255;
         }
         ctx.putImageData(imgData, 0, 0);
+      } else if (type === 'matrimony') {
+        // Top-down RPG dungeon scene
+        ctx.fillStyle = '#2a2820'; ctx.fillRect(0, 0, w, h);
+        // Floor tiles
+        for (let tx = 0; tx < w; tx += 12) {
+          for (let ty = 0; ty < h; ty += 12) {
+            ctx.fillStyle = (tx+ty)%24===0 ? '#302e25' : '#2a2820';
+            ctx.fillRect(tx, ty, 12, 12);
+          }
+        }
+        // Walls top
+        ctx.fillStyle = '#4a4540'; ctx.fillRect(0, 0, w, 14);
+        ctx.fillStyle = '#3a3530'; ctx.fillRect(0, 14, w, 3);
+        // Player character (blue robe, moving)
+        const ppx = w/2 + Math.sin(time*0.8)*10;
+        const ppy = h/2 + Math.cos(time*0.6)*6;
+        ctx.fillStyle = '#6a8aca'; ctx.fillRect(ppx-4, ppy-3, 8, 10);
+        ctx.fillStyle = '#c8b8a0'; ctx.fillRect(ppx-3, ppy-6, 6, 5);
+        // Enemy (green blob, pulsing)
+        const epx = w*0.75, epy = h*0.35;
+        const pulse = 1 + 0.1*Math.sin(time*3);
+        ctx.fillStyle = '#5a8a5a';
+        ctx.beginPath(); ctx.ellipse(epx, epy, 6*pulse, 5*pulse, 0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#1a1520';
+        ctx.fillRect(epx-3, epy-2, 2, 2); ctx.fillRect(epx+1, epy-2, 2, 2);
+        // Glowing wisp accent
+        const wx = w*0.25 + Math.sin(time*1.5)*8, wy = h*0.6 + Math.cos(time*2)*5;
+        ctx.fillStyle = `rgba(180,156,255,${0.3+0.2*Math.sin(time*2.5)})`;
+        ctx.beginPath(); ctx.arc(wx, wy, 4, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = `rgba(180,156,255,${0.15+0.1*Math.sin(time*2.5)})`;
+        ctx.beginPath(); ctx.arc(wx, wy, 8, 0, Math.PI*2); ctx.fill();
       } else if (type === 'combat') {
         // Two figures facing off with wait bars
         ctx.fillStyle = '#0a0a10'; ctx.fillRect(0, 0, w, h);

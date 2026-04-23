@@ -76,9 +76,6 @@
 // ══════════════════════════════════
 // LDtk LEVEL DATA (embedded)
 // ══════════════════════════════════
-const LDTK_DATA = LEVEL_DATA_PLACEHOLDER;
-
-// We'll inline the actual data below at load time
 let levelData = null;
 
 // ══════════════════════════════════
@@ -104,6 +101,26 @@ const INTGRID_COLORS = {
   0: '#2a2820', // walkable floor
   1: '#4a4540', // wall
 };
+
+// ══════════════════════════════════
+// SPRITES (DeepDive 16x16, 4-frame strips)
+// ══════════════════════════════════
+const SPRITE_FRAME_SIZE = 16;
+const SPRITE_FRAMES = 4;
+const ANIM_SPEED = 200; // ms per frame
+
+const sprites = {};
+function loadSprite(name, src) {
+  const img = new Image();
+  img.src = src;
+  sprites[name] = { img, loaded: false };
+  img.onload = () => { sprites[name].loaded = true; };
+}
+
+// Player sprite
+loadSprite('player', 'sprites/AdeptNecromancer.png');
+// Enemy sprites
+loadSprite('Enemy1', 'sprites/FireElemental.png');
 
 // ══════════════════════════════════
 // GAME STATE
@@ -385,61 +402,30 @@ function draw() {
   ctx.restore();
 }
 
-function drawPlayer(ctx, x, y) {
+function drawSprite(ctx, spriteName, x, y, time) {
   const s = TILE * SCALE;
-  // Body
-  ctx.fillStyle = '#6a8aca';
-  ctx.fillRect(x + s*0.2, y + s*0.15, s*0.6, s*0.7);
-  // Head
-  ctx.fillStyle = '#c8b8a0';
-  ctx.fillRect(x + s*0.3, y + s*0.05, s*0.4, s*0.3);
-  // Eyes based on facing
-  ctx.fillStyle = '#1a1520';
-  if (state.facing === 'down') {
-    ctx.fillRect(x + s*0.35, y + s*0.18, s*0.08, s*0.08);
-    ctx.fillRect(x + s*0.57, y + s*0.18, s*0.08, s*0.08);
-  } else if (state.facing === 'up') {
-    // back of head, no eyes
-  } else if (state.facing === 'left') {
-    ctx.fillRect(x + s*0.3, y + s*0.18, s*0.08, s*0.08);
+  const spr = sprites[spriteName];
+  if (spr && spr.loaded) {
+    const frame = Math.floor((time || performance.now()) / ANIM_SPEED) % SPRITE_FRAMES;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(spr.img,
+      frame * SPRITE_FRAME_SIZE, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
+      x, y, s, s
+    );
+    ctx.imageSmoothingEnabled = true;
   } else {
-    ctx.fillRect(x + s*0.62, y + s*0.18, s*0.08, s*0.08);
+    // Fallback rectangle
+    ctx.fillStyle = spriteName === 'player' ? '#6a8aca' : '#d77643';
+    ctx.fillRect(x + s*0.2, y + s*0.15, s*0.6, s*0.7);
   }
-  // Direction indicator (small triangle)
-  ctx.fillStyle = 'rgba(184, 156, 255, 0.4)';
-  const cx = x + s/2, cy = y + s/2;
-  const dx = state.facing === 'left' ? -1 : state.facing === 'right' ? 1 : 0;
-  const dy = state.facing === 'up' ? -1 : state.facing === 'down' ? 1 : 0;
-  ctx.beginPath();
-  ctx.moveTo(cx + dx * s*0.5, cy + dy * s*0.5);
-  ctx.lineTo(cx + dx * s*0.3 - dy * s*0.1, cy + dy * s*0.3 + dx * s*0.1);
-  ctx.lineTo(cx + dx * s*0.3 + dy * s*0.1, cy + dy * s*0.3 - dx * s*0.1);
-  ctx.fill();
+}
+
+function drawPlayer(ctx, x, y) {
+  drawSprite(ctx, 'player', x, y, performance.now());
 }
 
 function drawEntity(ctx, entity, x, y) {
-  const s = TILE * SCALE;
-  if (entity.type === 'Enemy1') {
-    // Slime-like blob
-    ctx.fillStyle = '#5a8a5a';
-    ctx.beginPath();
-    ctx.ellipse(x + s/2, y + s*0.6, s*0.4, s*0.35, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Eyes
-    ctx.fillStyle = '#1a1520';
-    ctx.fillRect(x + s*0.3, y + s*0.45, s*0.1, s*0.1);
-    ctx.fillRect(x + s*0.55, y + s*0.45, s*0.1, s*0.1);
-    // Highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.fillRect(x + s*0.35, y + s*0.38, s*0.08, s*0.06);
-  } else {
-    // Generic NPC
-    ctx.fillStyle = '#ca9a5a';
-    ctx.fillRect(x + s*0.2, y + s*0.1, s*0.6, s*0.8);
-    ctx.fillStyle = '#1a1520';
-    ctx.fillRect(x + s*0.35, y + s*0.25, s*0.08, s*0.08);
-    ctx.fillRect(x + s*0.57, y + s*0.25, s*0.08, s*0.08);
-  }
+  drawSprite(ctx, entity.type, x, y, performance.now());
 }
 
 // ══════════════════════════════════
