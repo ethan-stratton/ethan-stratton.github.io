@@ -387,6 +387,12 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (state.combat) {
       const c = state.combat;
+      // Win state — Z starts fade out
+      if (c.winState && !c.winState.fading) {
+        c.winState.fading = true;
+        c.winState.fadeStart = performance.now();
+        return;
+      }
       if (c.phase === 'target') {
         // Confirm enemy target → move to action selection
         c.phase = 'action';
@@ -832,8 +838,8 @@ function drawCombat() {
   const botContentY = arenaY + arenaH;
   const botH = H - botContentY;
   
-  const portraitH = Math.round(topH * 0.62) - 16;
-  const portraitW = Math.round(portraitH * 2.5);
+  const portraitH = Math.round(topH * 0.42);
+  const portraitW = Math.round(portraitH * 3.5);
   
   // ── TOP BAR ──
   ctx.fillStyle = 'rgba(8, 8, 14, 0.90)';
@@ -855,11 +861,11 @@ function drawCombat() {
     ctx.rect(ePortraitX + 1, ePortraitY + 1, portraitW - 2, portraitH - 2);
     ctx.clip();
     ctx.imageSmoothingEnabled = false;
-    const innerH = portraitH - 2;
-    const sprScale = innerH / SPRITE_FRAME_SIZE;
-    const drawSz = Math.round(SPRITE_FRAME_SIZE * sprScale);
-    const dx = ePortraitX + 1 + Math.round((portraitW - 2 - drawSz) / 2);
-    ctx.drawImage(spr.img, 0, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE, dx, ePortraitY + 1, drawSz, drawSz);
+    // Draw sprite at natural scale, centered, clipped by portrait rect
+    const sprDrawSize = Math.round(portraitW * 0.7);
+    const dx = ePortraitX + 1 + Math.round((portraitW - 2 - sprDrawSize) / 2);
+    const dy = ePortraitY + 1 + Math.round((portraitH - 2 - sprDrawSize) / 2);
+    ctx.drawImage(spr.img, 0, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE, dx, dy, sprDrawSize, sprDrawSize);
     ctx.imageSmoothingEnabled = true;
     ctx.restore();
   }
@@ -869,9 +875,11 @@ function drawCombat() {
   const barW = Math.round(W * 0.22);
   const barH = 10;
   const barY = ePortraitY + 4;
-  // Animated HP bar — ease display toward actual
+  // Animated HP bar — ease display toward actual, speed proportional to damage
   if (c.enemyDisplayHp > c.enemyHp) {
-    c.enemyDisplayHp = Math.max(c.enemyHp, c.enemyDisplayHp - (c.enemyMaxHp * 0.02));
+    const diff = c.enemyDisplayHp - c.enemyHp;
+    const speed = Math.max(0.5, diff * 0.08); // faster for bigger hits
+    c.enemyDisplayHp = Math.max(c.enemyHp, c.enemyDisplayHp - speed);
   }
   ctx.fillStyle = '#2a1a1a'; ctx.fillRect(infoX, barY, barW, barH);
   const hpRatio = c.enemyDisplayHp / c.enemyMaxHp;
@@ -1099,12 +1107,12 @@ function drawCombat() {
     ctx.rect(pPortraitX + 1, pPortraitY + 1, portraitW - 2, portraitH - 2);
     ctx.clip();
     ctx.imageSmoothingEnabled = false;
-    const pInnerH = portraitH - 2;
-    const pScale = pInnerH / PLAYER_SHEET.frameH;
-    const pDrawW = Math.round(PLAYER_SHEET.frameW * pScale);
-    const pdx = pPortraitX + 1 + Math.round((portraitW - 2 - pDrawW) / 2);
+    // Draw sprite at natural scale, centered, clipped by portrait rect
+    const pDrawSize = Math.round(portraitW * 0.7);
+    const pdx = pPortraitX + 1 + Math.round((portraitW - 2 - pDrawSize) / 2);
+    const pdy = pPortraitY + 1 + Math.round((portraitH - 2 - pDrawSize) / 2);
     ctx.drawImage(PLAYER_SHEET.img, 0, anim.row * PLAYER_SHEET.frameH, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
-      pdx, pPortraitY + 1, pDrawW, pInnerH);
+      pdx, pdy, pDrawSize, pDrawSize);
     ctx.imageSmoothingEnabled = true;
     ctx.restore();
   }
@@ -1184,6 +1192,49 @@ function drawCombat() {
   // Hints
   if (c.waiting) {
     crispText('X = Cancel', W - pad - 110, H - pad - 14, 32, '#8c828c');
+  }
+  
+  // Win state overlay
+  if (c.winState && c.enemyDisplayHp <= 0.5) {
+    const ws = c.winState;
+    const wt = (now - ws.startTime) / 1000;
+    
+    // Fade out when Z pressed
+    if (ws.fading) {
+      const fadeT = Math.min(1, (now - ws.fadeStart) / 500);
+      ctx.globalAlpha = 1 - fadeT;
+      if (fadeT >= 1) {
+        exitCombat();
+        ctx.globalAlpha = 1;
+        return;
+      }
+    }
+    
+    // Darken
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.fillRect(0, 0, W, H);
+    
+    // "You Win!" with flashing vertical gradient
+    const textY = Math.round(H * 0.42);
+    const gradShift = (now / 400) % 1;
+    const winStops = [
+      [Math.max(0, gradShift - 0.3), '#f0d060'],
+      [gradShift, '#fffce0'],
+      [Math.min(1, gradShift + 0.3), '#f0d060'],
+    ];
+    // Clamp stops
+    const clampedStops = winStops.map(([s, c]) => [Math.max(0, Math.min(1, s)), c]);
+    crispGradientText('You Win!', Math.round(W / 2) - 60, textY, 32, clampedStops, 0, 'Pixelify Sans');
+    
+    // "Press Z" hint (fade in after 1s)
+    if (wt > 1) {
+      const hint = Math.min(1, (wt - 1) / 0.5);
+      ctx.globalAlpha = hint * (0.5 + 0.3 * Math.sin(now / 600));
+      crispText('Press Z', Math.round(W / 2) - 40, textY + 36, 32, '#c8c0b8');
+      ctx.globalAlpha = 1;
+    }
+    
+    if (ws.fading) ctx.globalAlpha = 1;
   }
 }
 
@@ -1319,7 +1370,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.51', canvas.width - 8, 14);
+  ctx.fillText('v0.52', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1840,9 +1891,9 @@ function gameLoop(time) {
         if (c.attackText) {
           const act = COMBAT_ACTIONS[c.attackText] || {};
           c.enemyHp = Math.max(0, c.enemyHp - (act.eff || 0));
-          // Exit combat when enemy dies
-          if (c.enemyHp <= 0) {
-            setTimeout(() => { if (state.combat) exitCombat(); }, 600);
+          // Trigger win state when enemy dies (after HP bar drains)
+          if (c.enemyHp <= 0 && !c.winState) {
+            c.winState = { startTime: performance.now() };
           }
         }
         // Reset — player's attack executed, clear waiting state
@@ -1925,7 +1976,8 @@ loadLevel().then(() => {
   // Wait for fonts before first render to prevent flash
   Promise.all([
     document.fonts.load('32px "RM2000"'),
-    document.fonts.load('32px "RM2000Alt"')
+    document.fonts.load('32px "RM2000Alt"'),
+    document.fonts.load('32px "Pixelify Sans"')
   ]).then(() => requestAnimationFrame(gameLoop))
     .catch(() => requestAnimationFrame(gameLoop));
 });
