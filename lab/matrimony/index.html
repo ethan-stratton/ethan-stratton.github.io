@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrimony Beyond Space and Time</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=JetBrains+Mono:wght@300;400&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0a0f; color: #c8c0b8;
+    font-family: 'JetBrains Mono', monospace;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh; overflow: hidden;
+  }
+  h1 {
+    font-family: 'Cinzel', serif; font-weight: 400;
+    font-size: 1.2rem; color: #e8e0d8;
+    letter-spacing: 0.06em; margin-bottom: 12px;
+    text-shadow: 0 0 30px rgba(180, 140, 255, 0.3);
+  }
+  canvas#game {
+    border: 2px solid #2a2530;
+    image-rendering: pixelated;
+    background: #0a0a0f;
+  }
+  .info {
+    font-size: 0.6rem; color: #484040; margin-top: 8px;
+  }
+  .dialogue-box {
+    position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+    width: 480px; max-width: 90vw;
+    background: rgba(10, 8, 15, 0.95);
+    border: 2px solid #3a3540; border-radius: 6px;
+    padding: 14px 18px;
+    font-size: 0.75rem; color: #c8b8a0; line-height: 1.7;
+    display: none; z-index: 10;
+  }
+  .dialogue-box .speaker {
+    font-family: 'Cinzel', serif; font-size: 0.7rem;
+    color: #b89cff; margin-bottom: 6px;
+  }
+  .combat-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(5, 3, 10, 0.95);
+    display: none; z-index: 20;
+    align-items: center; justify-content: center;
+    flex-direction: column;
+  }
+  .combat-overlay.active { display: flex; }
+  .combat-overlay iframe {
+    width: 900px; max-width: 95vw; height: 700px; max-height: 80vh;
+    border: 2px solid #3a3540; border-radius: 6px;
+  }
+  .combat-close {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+    color: #908880; margin-top: 10px; cursor: pointer;
+    padding: 6px 16px; border: 1px solid #3a3540; border-radius: 4px;
+    background: rgba(20, 18, 25, 0.9);
+  }
+  .combat-close:hover { border-color: #b89cff; color: #e8e0d8; }
+</style>
+</head>
+<body>
+
+<h1>Matrimony Beyond Space and Time</h1>
+<canvas id="game" width="512" height="512"></canvas>
+<div class="info">Arrow keys to move · Space to interact</div>
+<div class="dialogue-box" id="dialogueBox">
+  <div class="speaker" id="dialogueSpeaker"></div>
+  <div id="dialogueText"></div>
+</div>
+
+<script>
+// ══════════════════════════════════
+// LDtk LEVEL DATA (embedded)
+// ══════════════════════════════════
+const LDTK_DATA = LEVEL_DATA_PLACEHOLDER;
+
+// We'll inline the actual data below at load time
+let levelData = null;
+
+// ══════════════════════════════════
+// GAME CONFIG
+// ══════════════════════════════════
+const TILE = 16;       // tile size in pixels
+const SCALE = 2;       // render scale (16px tiles → 32px on screen)
+const CANVAS_TILES = 16; // viewport in tiles
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+canvas.width = CANVAS_TILES * TILE * SCALE;
+canvas.height = CANVAS_TILES * TILE * SCALE;
+
+// ══════════════════════════════════
+// TILESET (fallback colors until real art)
+// ══════════════════════════════════
+let tilesetImg = null;
+let tilesetLoaded = false;
+let tilesetCols = 0;
+
+// Color fallback for IntGrid values
+const INTGRID_COLORS = {
+  0: '#2a2820', // walkable floor
+  1: '#4a4540', // wall
+};
+
+// ══════════════════════════════════
+// GAME STATE
+// ══════════════════════════════════
+const state = {
+  player: { x: 0, y: 0 },  // grid coords
+  entities: [],
+  collision: [],  // 2D array: 0=walk, 1=wall
+  mapW: 0, mapH: 0,
+  tiles: [],  // from LDtk tile layer
+  camera: { x: 0, y: 0 },
+  facing: 'down',
+  moving: false,
+  moveTimer: 0,
+  moveFrom: { x: 0, y: 0 },
+  dialogue: null,
+  flags: {},
+  defeatedEnemies: {},
+};
+
+// ══════════════════════════════════
+// LOAD LEVEL
+// ══════════════════════════════════
+async function loadLevel() {
+  const resp = await fetch('LDtK_Matrimony/Matrimony.ldtk');
+  const data = await resp.json();
+  const level = data.levels[0];
+  
+  // Load tileset image
+  const tsDef = data.defs.tilesets[0];
+  if (tsDef && tsDef.relPath) {
+    tilesetCols = Math.floor(tsDef.pxWid / tsDef.tileGridSize);
+    tilesetImg = new Image();
+    tilesetImg.onload = () => { tilesetLoaded = true; };
+    tilesetImg.src = 'LDtK_Matrimony/' + tsDef.relPath;
+  }
+
+  for (const layer of level.layerInstances) {
+    if (layer.__identifier === 'IntGrid') {
+      state.mapW = layer.__cWid;
+      state.mapH = layer.__cHei;
+      // Convert flat array to 2D
+      state.collision = [];
+      for (let y = 0; y < state.mapH; y++) {
+        const row = [];
+        for (let x = 0; x < state.mapW; x++) {
+          row.push(layer.intGridCsv[y * state.mapW + x]);
+        }
+        state.collision.push(row);
+      }
+    }
+    if (layer.__identifier === 'Tiles') {
+      state.tiles = layer.gridTiles || [];
+    }
+    if (layer.__identifier === 'Entities') {
+      state.entities = [];
+      for (const e of layer.entityInstances) {
+        const gx = Math.floor(e.px[0] / TILE);
+        const gy = Math.floor(e.px[1] / TILE);
+        if (e.__identifier === 'Main') {
+          state.player.x = gx;
+          state.player.y = gy;
+        } else {
+          state.entities.push({
+            type: e.__identifier,
+            x: gx, y: gy,
+            id: `${e.__identifier}_${gx}_${gy}`,
+            fields: {},
+          });
+        }
+      }
+    }
+  }
+  
+  updateCamera();
+}
+
+// ══════════════════════════════════
+// CAMERA
+// ══════════════════════════════════
+function updateCamera() {
+  // Center on player
+  state.camera.x = state.player.x - Math.floor(CANVAS_TILES / 2);
+  state.camera.y = state.player.y - Math.floor(CANVAS_TILES / 2);
+  // Clamp
+  state.camera.x = Math.max(0, Math.min(state.mapW - CANVAS_TILES, state.camera.x));
+  state.camera.y = Math.max(0, Math.min(state.mapH - CANVAS_TILES, state.camera.y));
+}
+
+// ══════════════════════════════════
+// INPUT
+// ══════════════════════════════════
+const keys = {};
+document.addEventListener('keydown', (e) => {
+  keys[e.key] = true;
+  if (e.key === ' ') {
+    e.preventDefault();
+    if (state.dialogue) {
+      closeDialogue();
+    } else {
+      interact();
+    }
+  }
+});
+document.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+function tryMove(dx, dy) {
+  if (state.moving || state.dialogue) return;
+  
+  // Set facing
+  if (dx < 0) state.facing = 'left';
+  if (dx > 0) state.facing = 'right';
+  if (dy < 0) state.facing = 'up';
+  if (dy > 0) state.facing = 'down';
+  
+  const nx = state.player.x + dx;
+  const ny = state.player.y + dy;
+  
+  // Bounds check
+  if (nx < 0 || nx >= state.mapW || ny < 0 || ny >= state.mapH) return;
+  // Collision check
+  if (state.collision[ny][nx] !== 0) return;
+  // Entity collision (non-defeated enemies block)
+  const blocking = state.entities.find(e => e.x === nx && e.y === ny && !state.defeatedEnemies[e.id]);
+  if (blocking) {
+    // Face the entity
+    state.facing = dx > 0 ? 'right' : dx < 0 ? 'left' : dy > 0 ? 'down' : 'up';
+    handleEntityContact(blocking);
+    return;
+  }
+  
+  // Start movement
+  state.moving = true;
+  state.moveTimer = 0;
+  state.moveFrom.x = state.player.x;
+  state.moveFrom.y = state.player.y;
+  state.player.x = nx;
+  state.player.y = ny;
+}
+
+const MOVE_DURATION = 120; // ms for grid movement
+let lastMoveTime = 0;
+const MOVE_COOLDOWN = 150;
+
+function handleMovement(now) {
+  if (state.moving) {
+    state.moveTimer += 16;
+    if (state.moveTimer >= MOVE_DURATION) {
+      state.moving = false;
+      updateCamera();
+    }
+    return;
+  }
+  
+  if (now - lastMoveTime < MOVE_COOLDOWN) return;
+  
+  if (keys['ArrowLeft'] || keys['a']) { tryMove(-1, 0); lastMoveTime = now; }
+  else if (keys['ArrowRight'] || keys['d']) { tryMove(1, 0); lastMoveTime = now; }
+  else if (keys['ArrowUp'] || keys['w']) { tryMove(0, -1); lastMoveTime = now; }
+  else if (keys['ArrowDown'] || keys['s']) { tryMove(0, 1); lastMoveTime = now; }
+}
+
+// ══════════════════════════════════
+// INTERACTION
+// ══════════════════════════════════
+function getFacingTile() {
+  const dx = state.facing === 'left' ? -1 : state.facing === 'right' ? 1 : 0;
+  const dy = state.facing === 'up' ? -1 : state.facing === 'down' ? 1 : 0;
+  return { x: state.player.x + dx, y: state.player.y + dy };
+}
+
+function interact() {
+  const { x, y } = getFacingTile();
+  const entity = state.entities.find(e => e.x === x && e.y === y && !state.defeatedEnemies[e.id]);
+  if (entity) {
+    handleEntityContact(entity);
+  }
+}
+
+function handleEntityContact(entity) {
+  if (entity.type === 'Enemy1') {
+    showDialogue('???', 'A creature stirs... it doesn\'t seem hostile, just... lonely. [Press Space]');
+    // After dialogue, could trigger combat
+    // For now just mark encountered
+  } else {
+    showDialogue('', 'Nothing happens.');
+  }
+}
+
+function showDialogue(speaker, text) {
+  state.dialogue = { speaker, text };
+  const box = document.getElementById('dialogueBox');
+  document.getElementById('dialogueSpeaker').textContent = speaker;
+  document.getElementById('dialogueText').textContent = text;
+  box.style.display = 'block';
+}
+
+function closeDialogue() {
+  state.dialogue = null;
+  document.getElementById('dialogueBox').style.display = 'none';
+}
+
+// ══════════════════════════════════
+// RENDERING
+// ══════════════════════════════════
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  const camX = state.camera.x;
+  const camY = state.camera.y;
+  
+  // Interpolate camera during movement
+  let drawOffX = 0, drawOffY = 0;
+  if (state.moving) {
+    const t = Math.min(1, state.moveTimer / MOVE_DURATION);
+    const ease = t * t * (3 - 2 * t); // smoothstep
+    const fromCamX = state.moveFrom.x - Math.floor(CANVAS_TILES / 2);
+    const fromCamY = state.moveFrom.y - Math.floor(CANVAS_TILES / 2);
+    const toCamX = state.player.x - Math.floor(CANVAS_TILES / 2);
+    const toCamY = state.player.y - Math.floor(CANVAS_TILES / 2);
+    drawOffX = (fromCamX + (toCamX - fromCamX) * ease - camX) * TILE * SCALE;
+    drawOffY = (fromCamY + (toCamY - fromCamY) * ease - camY) * TILE * SCALE;
+  }
+  
+  ctx.save();
+  ctx.translate(drawOffX, drawOffY);
+  
+  // Draw IntGrid (floor/walls) as fallback
+  for (let y = camY - 1; y < camY + CANVAS_TILES + 1; y++) {
+    for (let x = camX - 1; x < camX + CANVAS_TILES + 1; x++) {
+      if (x < 0 || x >= state.mapW || y < 0 || y >= state.mapH) continue;
+      const val = state.collision[y][x];
+      const sx = (x - camX) * TILE * SCALE;
+      const sy = (y - camY) * TILE * SCALE;
+      ctx.fillStyle = INTGRID_COLORS[val] || '#1a1520';
+      ctx.fillRect(sx, sy, TILE * SCALE, TILE * SCALE);
+    }
+  }
+  
+  // Draw tile layer (from LDtk)
+  if (tilesetLoaded && tilesetImg) {
+    for (const tile of state.tiles) {
+      const gx = Math.floor(tile.px[0] / TILE);
+      const gy = Math.floor(tile.px[1] / TILE);
+      if (gx < camX - 1 || gx > camX + CANVAS_TILES || gy < camY - 1 || gy > camY + CANVAS_TILES) continue;
+      const sx = (gx - camX) * TILE * SCALE;
+      const sy = (gy - camY) * TILE * SCALE;
+      ctx.drawImage(tilesetImg,
+        tile.src[0], tile.src[1], TILE, TILE,
+        sx, sy, TILE * SCALE, TILE * SCALE
+      );
+    }
+  }
+  
+  // Draw entities
+  for (const e of state.entities) {
+    if (state.defeatedEnemies[e.id]) continue;
+    if (e.x < camX - 1 || e.x > camX + CANVAS_TILES || e.y < camY - 1 || e.y > camY + CANVAS_TILES) continue;
+    const sx = (e.x - camX) * TILE * SCALE;
+    const sy = (e.y - camY) * TILE * SCALE;
+    drawEntity(ctx, e, sx, sy);
+  }
+  
+  // Draw player
+  const px = (state.player.x - camX) * TILE * SCALE;
+  const py = (state.player.y - camY) * TILE * SCALE;
+  // Interpolate position during movement
+  let playerDrawX = px, playerDrawY = py;
+  if (state.moving) {
+    const t = Math.min(1, state.moveTimer / MOVE_DURATION);
+    const ease = t * t * (3 - 2 * t);
+    const fromPx = (state.moveFrom.x - camX) * TILE * SCALE;
+    const fromPy = (state.moveFrom.y - camY) * TILE * SCALE;
+    playerDrawX = fromPx + (px - fromPx) * ease;
+    playerDrawY = fromPy + (py - fromPy) * ease;
+  }
+  drawPlayer(ctx, playerDrawX, playerDrawY);
+  
+  ctx.restore();
+}
+
+function drawPlayer(ctx, x, y) {
+  const s = TILE * SCALE;
+  // Body
+  ctx.fillStyle = '#6a8aca';
+  ctx.fillRect(x + s*0.2, y + s*0.15, s*0.6, s*0.7);
+  // Head
+  ctx.fillStyle = '#c8b8a0';
+  ctx.fillRect(x + s*0.3, y + s*0.05, s*0.4, s*0.3);
+  // Eyes based on facing
+  ctx.fillStyle = '#1a1520';
+  if (state.facing === 'down') {
+    ctx.fillRect(x + s*0.35, y + s*0.18, s*0.08, s*0.08);
+    ctx.fillRect(x + s*0.57, y + s*0.18, s*0.08, s*0.08);
+  } else if (state.facing === 'up') {
+    // back of head, no eyes
+  } else if (state.facing === 'left') {
+    ctx.fillRect(x + s*0.3, y + s*0.18, s*0.08, s*0.08);
+  } else {
+    ctx.fillRect(x + s*0.62, y + s*0.18, s*0.08, s*0.08);
+  }
+  // Direction indicator (small triangle)
+  ctx.fillStyle = 'rgba(184, 156, 255, 0.4)';
+  const cx = x + s/2, cy = y + s/2;
+  const dx = state.facing === 'left' ? -1 : state.facing === 'right' ? 1 : 0;
+  const dy = state.facing === 'up' ? -1 : state.facing === 'down' ? 1 : 0;
+  ctx.beginPath();
+  ctx.moveTo(cx + dx * s*0.5, cy + dy * s*0.5);
+  ctx.lineTo(cx + dx * s*0.3 - dy * s*0.1, cy + dy * s*0.3 + dx * s*0.1);
+  ctx.lineTo(cx + dx * s*0.3 + dy * s*0.1, cy + dy * s*0.3 - dx * s*0.1);
+  ctx.fill();
+}
+
+function drawEntity(ctx, entity, x, y) {
+  const s = TILE * SCALE;
+  if (entity.type === 'Enemy1') {
+    // Slime-like blob
+    ctx.fillStyle = '#5a8a5a';
+    ctx.beginPath();
+    ctx.ellipse(x + s/2, y + s*0.6, s*0.4, s*0.35, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Eyes
+    ctx.fillStyle = '#1a1520';
+    ctx.fillRect(x + s*0.3, y + s*0.45, s*0.1, s*0.1);
+    ctx.fillRect(x + s*0.55, y + s*0.45, s*0.1, s*0.1);
+    // Highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(x + s*0.35, y + s*0.38, s*0.08, s*0.06);
+  } else {
+    // Generic NPC
+    ctx.fillStyle = '#ca9a5a';
+    ctx.fillRect(x + s*0.2, y + s*0.1, s*0.6, s*0.8);
+    ctx.fillStyle = '#1a1520';
+    ctx.fillRect(x + s*0.35, y + s*0.25, s*0.08, s*0.08);
+    ctx.fillRect(x + s*0.57, y + s*0.25, s*0.08, s*0.08);
+  }
+}
+
+// ══════════════════════════════════
+// GAME LOOP
+// ══════════════════════════════════
+let lastTime = 0;
+
+function gameLoop(time) {
+  handleMovement(time);
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+// ══════════════════════════════════
+// INIT
+// ══════════════════════════════════
+loadLevel().then(() => {
+  requestAnimationFrame(gameLoop);
+});
+
+</script>
+</body>
+</html>
