@@ -1215,7 +1215,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.41', canvas.width - 8, 14);
+  ctx.fillText('v0.42', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1506,7 +1506,7 @@ function draw() {
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
     ctx.fillText('32px direct — varying threshold (killing more AA):', 20, y); y += 16;
     
-    const thresholds = [64, 96, 112, 120, 128, 140, 160, 200];
+    const thresholds = [180, 190, 200, 210, 220, 230, 240];
     for (const thresh of thresholds) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText('thresh ' + thresh + ':', 20, y + 12);
