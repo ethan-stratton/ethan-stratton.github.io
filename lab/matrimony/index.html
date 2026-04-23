@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><defs><radialGradient id='g' cx='44%' cy='38%' r='44%'><stop offset='0%' stop-color='%23e8b0ff'/><stop offset='30%' stop-color='%23c070ff'/><stop offset='70%' stop-color='%238030d0'/><stop offset='100%' stop-color='%234a1080'/></radialGradient><radialGradient id='s' cx='35%' cy='32%' r='25%'><stop offset='0%' stop-color='white' stop-opacity='0.8'/><stop offset='100%' stop-color='white' stop-opacity='0'/></radialGradient></defs><circle cx='16' cy='16' r='14' fill='url(%23g)'/><circle cx='16' cy='16' r='14' fill='url(%23s)'/></svg>">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Matrimony Beyond Space and Time</title>
@@ -691,10 +692,11 @@ canvas.addEventListener('click', (e) => {
 // CRISP TEXT RENDERING
 // ══════════════════════════════════
 const CRISP_THRESHOLD = 220;
-const CRISP_FONT = 'RM2000Alt';
+const CRISP_FONT = 'RM2000';
+const CRISP_FONT_ALT = 'RM2000Alt';
 const CRISP_SIZE = 12;
 
-function crispText(text, x, y, size, color, spacing) {
+function crispText(text, x, y, size, color, spacing, fontOverride) {
   if (!crispText._c) {
     crispText._c = document.createElement('canvas');
     crispText._ctx = crispText._c.getContext('2d', { willReadFrequently: true });
@@ -703,11 +705,12 @@ function crispText(text, x, y, size, color, spacing) {
   }
   const fs = size || CRISP_SIZE;
   const sp = spacing != null ? spacing : 1;
+  const ff = fontOverride || CRISP_FONT;
   const oc = crispText._c, octx = crispText._ctx;
   const w = 700, h = fs + 8;
   oc.width = w; oc.height = h;
   octx.clearRect(0, 0, w, h);
-  octx.font = fs + 'px "' + CRISP_FONT + '"';
+  octx.font = fs + 'px "' + ff + '"';
   octx.textAlign = 'left'; octx.textBaseline = 'top';
   octx.fillStyle = '#ffffff';
   let tx = 2;
@@ -722,7 +725,7 @@ function crispText(text, x, y, size, color, spacing) {
   const sc = crispText._c2, sctx = crispText._ctx2;
   sc.width = w; sc.height = h;
   sctx.clearRect(0, 0, w, h);
-  sctx.font = fs + 'px "' + CRISP_FONT + '"';
+  sctx.font = fs + 'px "' + ff + '"';
   sctx.textAlign = 'left'; sctx.textBaseline = 'top';
   sctx.fillStyle = '#ffffff';
   let stx = 2;
@@ -736,7 +739,7 @@ function crispText(text, x, y, size, color, spacing) {
   return tx;
 }
 
-function crispGradientText(text, x, y, size, stops, spacing) {
+function crispGradientText(text, x, y, size, stops, spacing, fontOverride) {
   if (!crispGradientText._c) {
     crispGradientText._c = document.createElement('canvas');
     crispGradientText._ctx = crispGradientText._c.getContext('2d', { willReadFrequently: true });
@@ -745,11 +748,12 @@ function crispGradientText(text, x, y, size, stops, spacing) {
   }
   const fs = size || CRISP_SIZE;
   const sp = spacing != null ? spacing : 1;
+  const ff = fontOverride || CRISP_FONT;
   const oc = crispGradientText._c, octx = crispGradientText._ctx;
   const w = 700, h = fs + 8;
   oc.width = w; oc.height = h;
   octx.clearRect(0, 0, w, h);
-  octx.font = fs + 'px "' + CRISP_FONT + '"';
+  octx.font = fs + 'px "' + ff + '"';
   octx.textAlign = 'left'; octx.textBaseline = 'top';
   octx.fillStyle = '#ffffff';
   let tx = 2;
@@ -766,7 +770,7 @@ function crispGradientText(text, x, y, size, stops, spacing) {
   const sc = crispGradientText._c2, sctx = crispGradientText._ctx2;
   sc.width = w; sc.height = h;
   sctx.clearRect(0, 0, w, h);
-  sctx.font = fs + 'px "' + CRISP_FONT + '"';
+  sctx.font = fs + 'px "' + ff + '"';
   sctx.textAlign = 'left'; sctx.textBaseline = 'top';
   sctx.fillStyle = '#ffffff';
   let stx = 2;
@@ -810,8 +814,8 @@ function drawCombat() {
   const eased = 1 - (1 - slideT) * (1 - slideT);
   
   // Layout
-  const topH = Math.round(H * 0.10);
-  const arenaH = Math.round(H * 0.42);
+  const topH = Math.round(H * 0.12);
+  const arenaH = Math.round(H * 0.40);
   const arenaY = topH;
   const botContentY = arenaY + arenaH;
   const botH = H - botContentY;
@@ -857,7 +861,7 @@ function drawCombat() {
   const hpRatio = c.enemyHp / c.enemyMaxHp;
   ctx.fillStyle = hpRatio > 0.5 ? '#3a8a3a' : hpRatio > 0.25 ? '#b89030' : '#a03030';
   ctx.fillRect(infoX, barY, Math.round(barW * hpRatio), barH);
-  drawGoldOutline(infoX - 1, barY - 1, barW + 2, barH + 2, 3);
+  drawGoldOutline(infoX - 2, barY - 2, barW + 4, barH + 4, 4);
   
   // Enemy action display — name right of HP bar, stats below
   if (c.enemyAction) {
@@ -866,12 +870,12 @@ function drawCombat() {
     const statY = barY + barH + 4;
     let sx = infoX;
     const waitVal = c.enemyWaitCountdown >= 0 ? c.enemyWaitCountdown : (act.wait || 0);
-    sx += crispGradientText('Eff:', sx, statY, 32, GOLD_GRADIENT) + 2;
-    sx += crispText('' + (act.eff || 0), sx, statY, 32, '#e8e0d0') + 8;
-    sx += crispGradientText('Def:', sx, statY, 32, GOLD_GRADIENT) + 2;
-    sx += crispText('' + (act.def || 0), sx, statY, 32, '#e8e0d0') + 8;
-    sx += crispGradientText('Wait:', sx, statY, 32, GOLD_GRADIENT) + 2;
-    crispText('' + waitVal, sx, statY, 32, '#e8e0d0');
+    sx += crispGradientText('Eff:', sx, statY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 2;
+    sx += crispText('' + (act.eff || 0), sx, statY, 32, '#e8e0d0', 1, CRISP_FONT_ALT) + 8;
+    sx += crispGradientText('Def:', sx, statY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 2;
+    sx += crispText('' + (act.def || 0), sx, statY, 32, '#e8e0d0', 1, CRISP_FONT_ALT) + 8;
+    sx += crispGradientText('Wait:', sx, statY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 2;
+    crispText('' + waitVal, sx, statY, 32, '#e8e0d0', 1, CRISP_FONT_ALT);
   }
   
   // ── ARENA ──
@@ -1042,7 +1046,7 @@ function drawCombat() {
   if (elapsed > 5000) {
     const alpha = 0.3 + 0.3 * Math.sin(now / 800);
     ctx.globalAlpha = alpha;
-    crispText('Esc = Run Away', W - 280, arenaY + 4, 32, '#8c828c');
+    crispText('Esc = Run Away', W - 220, arenaY + 4, 32, '#8c828c');
     ctx.globalAlpha = 1;
   }
   
@@ -1077,7 +1081,7 @@ function drawCombat() {
   }
   
   // HP below portrait
-  crispText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 4, 32, '#e8e0d0');
+  crispText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 4, 32, '#e8e0d0', 1, CRISP_FONT_ALT);
   
   // ── ACTION GRID: 2 columns × 4 rows, fill left-to-right then down ──
   const gridX = pPortraitX + portraitW + 32;
@@ -1115,9 +1119,6 @@ function drawCombat() {
     if (isSelected && !dimmed) {
       ctx.fillStyle = 'rgba(255, 232, 192, 0.15)';
       ctx.fillRect(ax, ay, colW, gridRowH);
-      ctx.strokeStyle = 'rgba(255, 232, 192, 0.3)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(ax + 0.5, ay + 0.5, colW - 1, gridRowH - 1);
     }
     
     const color = isSelected && !dimmed ? '#ffe8c0' : dimmed ? '#4a4440' : '#a09888';
@@ -1131,12 +1132,12 @@ function drawCombat() {
     const statsY = H - pad - 18;
     let sx = gridX + 4;
     const waitVal = c.waiting ? c.waitCountdown : (act.wait || 0);
-    sx += crispGradientText('Eff:', sx, statsY, 32, GOLD_GRADIENT) + 4;
-    sx += crispText('' + (act.eff || 0), sx, statsY, 32, '#e8e0d0') + 24;
-    sx += crispGradientText('Def:', sx, statsY, 32, GOLD_GRADIENT) + 4;
-    sx += crispText('' + (act.def || 0), sx, statsY, 32, '#e8e0d0') + 24;
-    sx += crispGradientText('Wait:', sx, statsY, 32, GOLD_GRADIENT) + 4;
-    crispText('' + waitVal, sx, statsY, 32, '#e8e0d0');
+    sx += crispGradientText('Eff:', sx, statsY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 4;
+    sx += crispText('' + (act.eff || 0), sx, statsY, 32, '#e8e0d0', 1, CRISP_FONT_ALT) + 24;
+    sx += crispGradientText('Def:', sx, statsY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 4;
+    sx += crispText('' + (act.def || 0), sx, statsY, 32, '#e8e0d0', 1, CRISP_FONT_ALT) + 24;
+    sx += crispGradientText('Wait:', sx, statsY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 4;
+    crispText('' + waitVal, sx, statsY, 32, '#e8e0d0', 1, CRISP_FONT_ALT);
   }
   
   // Hints
@@ -1277,7 +1278,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.46', canvas.width - 8, 14);
+  ctx.fillText('v0.47', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
