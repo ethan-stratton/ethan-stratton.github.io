@@ -744,6 +744,11 @@ function drawCombat() {
   ctx.fillRect(infoX, barY, Math.round(barW * hpRatio), barH);
   ctx.strokeStyle = '#6a6070'; ctx.lineWidth = 1;
   ctx.strokeRect(infoX, barY, barW, barH);
+  // Enemy HP number
+  ctx.font = 'bold 11px ' + FONT;
+  ctx.fillStyle = '#e8e0d0';
+  ctx.textAlign = 'left';
+  ctx.fillText('HP ' + c.enemyHp + '/' + c.enemyMaxHp, infoX, barY - 2);
   
   // Enemy action display — name right of HP bar, stats below
   if (c.enemyAction) {
@@ -1206,13 +1211,25 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.28', canvas.width - 8, 14);
+  ctx.fillText('v0.29', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
     const panelX = 10, panelY = 10, panelW = canvas.width - 20, panelH = canvas.height - 20;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
     ctx.fillRect(panelX, panelY, panelW, panelH);
+    // Subtle background pattern so shadows/outlines are visible
+    ctx.fillStyle = 'rgba(30, 25, 40, 1)';
+    ctx.fillRect(panelX + 1, panelY + 1, panelW - 2, panelH - 2);
+    // Checkerboard pattern
+    for (let cy = panelY; cy < panelY + panelH; cy += 8) {
+      for (let cx = panelX; cx < panelX + panelW; cx += 8) {
+        if ((cx + cy) % 16 === 0) {
+          ctx.fillStyle = 'rgba(40, 35, 55, 1)';
+          ctx.fillRect(cx, cy, 8, 8);
+        }
+      }
+    }
     ctx.strokeStyle = '#5a5060'; ctx.lineWidth = 1;
     ctx.strokeRect(panelX, panelY, panelW, panelH);
     
@@ -1467,22 +1484,15 @@ function gameLoop(time) {
       const t = time - c.enemyReactAnim.startTime;
       if (t >= c.enemyReactAnim.duration) {
         c.enemyReactAnim = null;
-        // Enemy picks a new action after executing
-        const enemyActions = ['Stand Still', 'Do Nothing'];
-        c.enemyAction = enemyActions[c.enemyActionIndex % 2];
-        c.enemyActionIndex++;
-        const enemyAct = COMBAT_ACTIONS[c.enemyAction] || {};
-        c.enemyWaitCountdown = enemyAct.wait || 0;
-        c.enemyWaiting = true;
-        // Reset accumulator so new countdown starts fresh
-        c.waitAccumulator = 0;
-        c.lastWaitTick = time;
+        // Enemy's action resolved — clear it. New action picked when player next attacks.
+        c.enemyAction = null;
+        c.enemyWaiting = false;
       }
     }
     
     // Tick system — use accumulator for precise 1-at-a-time decrements
-    const anyTicking = (c.waiting && c.waitCountdown > 0) || (c.enemyWaiting && c.enemyWaitCountdown > 0);
-    if (anyTicking && !c.playerAttackAnim && !c.enemyReactAnim) {
+    // ONLY tick when player is actively waiting (both countdowns are driven by player's action)
+    if (c.waiting && c.waitCountdown > 0 && !c.playerAttackAnim && !c.enemyReactAnim) {
       const dt = time - c.lastWaitTick;
       c.lastWaitTick = time;
       c.waitAccumulator += dt;
@@ -1522,12 +1532,6 @@ function gameLoop(time) {
           c.enemyReactAnim = { startTime: time, duration: 800 };
         }
       }
-    }
-    
-    // If enemy countdown finishes while player is picking (not waiting), trigger react
-    if (c.enemyWaiting && c.enemyWaitCountdown <= 0 && !c.waiting && !c.playerAttackAnim && !c.enemyReactAnim) {
-      c.enemyWaiting = false;
-      c.enemyReactAnim = { startTime: time, duration: 800 };
     }
   }
   draw(); // Always draw overworld
