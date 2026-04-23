@@ -387,10 +387,9 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (state.combat) {
       const c = state.combat;
-      // Win state — Z starts fade out
-      if (c.winState && !c.winState.fading) {
-        c.winState.fading = true;
-        c.winState.fadeStart = performance.now();
+      // Win state — Z exits immediately
+      if (c.winState) {
+        exitCombat();
         return;
       }
       if (c.phase === 'target') {
@@ -1199,17 +1198,6 @@ function drawCombat() {
     const ws = c.winState;
     const wt = (now - ws.startTime) / 1000;
     
-    // Fade out when Z pressed
-    if (ws.fading) {
-      const fadeT = Math.min(1, (now - ws.fadeStart) / 500);
-      ctx.globalAlpha = 1 - fadeT;
-      if (fadeT >= 1) {
-        exitCombat();
-        ctx.globalAlpha = 1;
-        return;
-      }
-    }
-    
     // Darken
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.fillRect(0, 0, W, H);
@@ -1222,19 +1210,8 @@ function drawCombat() {
       [gradShift, '#fffce0'],
       [Math.min(1, gradShift + 0.3), '#f0d060'],
     ];
-    // Clamp stops
     const clampedStops = winStops.map(([s, c]) => [Math.max(0, Math.min(1, s)), c]);
     crispGradientText('You Win!', Math.round(W / 2) - 60, textY, 32, clampedStops, 0, 'Pixelify Sans');
-    
-    // "Press Z" hint (fade in after 1s)
-    if (wt > 1) {
-      const hint = Math.min(1, (wt - 1) / 0.5);
-      ctx.globalAlpha = hint * (0.5 + 0.3 * Math.sin(now / 600));
-      crispText('Press Z', Math.round(W / 2) - 40, textY + 36, 32, '#c8c0b8');
-      ctx.globalAlpha = 1;
-    }
-    
-    if (ws.fading) ctx.globalAlpha = 1;
   }
 }
 
@@ -1370,7 +1347,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.52', canvas.width - 8, 14);
+  ctx.fillText('v0.53', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1937,7 +1914,7 @@ function gameLoop(time) {
           c.enemyWaitCountdown--;
         }
         
-        // Player hit zero — start attack animation, pause everything
+        // Player hit zero — start attack animation, pause everything (player always goes first on tie)
         if (c.waiting && c.waitCountdown <= 0) {
           c.waiting = false;
           c.waitAccumulator = 0;
@@ -1950,8 +1927,8 @@ function gameLoop(time) {
           };
         }
         
-        // Enemy hit zero — trigger react animation
-        if (c.enemyWaiting && c.enemyWaitCountdown <= 0) {
+        // Enemy hit zero — trigger react animation (only if player isn't also attacking this tick)
+        else if (c.enemyWaiting && c.enemyWaitCountdown <= 0) {
           c.enemyWaiting = false;
           c.waitAccumulator = 0;
           c.enemyReactAnim = { startTime: time, duration: 800 };
