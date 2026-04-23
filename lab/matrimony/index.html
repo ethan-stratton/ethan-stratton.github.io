@@ -1206,7 +1206,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.35', canvas.width - 8, 14);
+  ctx.fillText('v0.36', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1403,45 +1403,101 @@ function draw() {
       return dw;
     }
     
+    // Like drawCrispText but with adjustable threshold
+    function drawCrispTextThresh(text, x, y, fontSize, color, spacing, threshold) {
+      if (!drawCrispTextThresh._c) {
+        drawCrispTextThresh._c = document.createElement('canvas');
+        drawCrispTextThresh._ctx = drawCrispTextThresh._c.getContext('2d', { willReadFrequently: true });
+        drawCrispTextThresh._c2 = document.createElement('canvas');
+        drawCrispTextThresh._ctx2 = drawCrispTextThresh._c2.getContext('2d', { willReadFrequently: true });
+      }
+      const oc = drawCrispTextThresh._c;
+      const octx = drawCrispTextThresh._ctx;
+      const w = 500, h = fontSize + 8;
+      oc.width = w; oc.height = h;
+      octx.clearRect(0, 0, w, h);
+      octx.font = fontSize + 'px "RM2000"';
+      octx.textAlign = 'left';
+      octx.textBaseline = 'top';
+      octx.fillStyle = '#ffffff';
+      const sp = spacing || 2;
+      let tx = 2;
+      for (let i = 0; i < text.length; i++) {
+        octx.fillText(text[i], tx, 2);
+        tx += octx.measureText(text[i]).width + sp;
+      }
+      const imgData = octx.getImageData(0, 0, tx + 2, h);
+      const d = imgData.data;
+      for (let i = 3; i < d.length; i += 4) {
+        d[i] = d[i] >= threshold ? 255 : 0;
+      }
+      octx.putImageData(imgData, 0, 0);
+      octx.globalCompositeOperation = 'source-atop';
+      octx.fillStyle = color || '#e8e0d0';
+      octx.fillRect(0, 0, tx + 2, h);
+      octx.globalCompositeOperation = 'source-over';
+      
+      // Shadow
+      const sc = drawCrispTextThresh._c2;
+      const sctx = drawCrispTextThresh._ctx2;
+      sc.width = w; sc.height = h;
+      sctx.clearRect(0, 0, w, h);
+      sctx.font = fontSize + 'px "RM2000"';
+      sctx.textAlign = 'left';
+      sctx.textBaseline = 'top';
+      sctx.fillStyle = '#ffffff';
+      let stx = 2;
+      for (let i = 0; i < text.length; i++) {
+        sctx.fillText(text[i], stx, 2);
+        stx += sctx.measureText(text[i]).width + sp;
+      }
+      const sData = sctx.getImageData(0, 0, stx + 2, h);
+      const sd = sData.data;
+      for (let i = 3; i < sd.length; i += 4) {
+        sd[i] = sd[i] >= threshold ? 255 : 0;
+      }
+      for (let i = 0; i < sd.length; i += 4) {
+        sd[i] = 0; sd[i+1] = 0; sd[i+2] = 0;
+      }
+      sctx.putImageData(sData, 0, 0);
+      
+      ctx.drawImage(sc, 0, 0, stx + 2, h, x + 2, y + 2, stx + 2, h);
+      ctx.drawImage(oc, 0, 0, tx + 2, h, x, y, tx + 2, h);
+      return tx + 2;
+    }
+    
     const sample = 'Punch  Kick  Eff: 12  Def: 5  Wait: 8  HP 30/30';
     const scrollY = -(state.fontTestScroll || 0);
     ctx.textAlign = 'left';
     let y = 30 + scrollY;
     
-    // RM2000 threshold + scale: trying many base sizes
+    // RM2000 32px threshold + scale
     const sampleText = 'Punch  Kick  Eff: 12  HP 30/30';
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('RM2000 threshold+scale — finding the native size:', 20, y); y += 16;
+    ctx.fillText('RM2000 32px threshold+scale (nearest-neighbor):', 20, y); y += 16;
     
     const scaledCombos = [
-      { sz: 12, sc: 2, label: '12px × 2 (24)' },
-      { sz: 13, sc: 2, label: '13px × 2 (26)' },
-      { sz: 14, sc: 2, label: '14px × 2 (28)' },
-      { sz: 15, sc: 2, label: '15px × 2 (30)' },
-      { sz: 16, sc: 2, label: '16px × 2 (32)' },
-      { sz: 17, sc: 2, label: '17px × 2 (34)' },
-      { sz: 18, sc: 2, label: '18px × 2 (36)' },
-      { sz: 20, sc: 2, label: '20px × 2 (40)' },
-      { sz: 24, sc: 2, label: '24px × 2 (48)' },
+      { sc: 1, label: '32px × 1 (32)' },
+      { sc: 2, label: '32px × 2 (64)' },
     ];
     for (const c2 of scaledCombos) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
-      const labelY = y + Math.round(c2.sz * c2.sc * 0.5);
-      ctx.fillText(c2.label + ':', 20, labelY);
-      drawCrispScaled(sampleText, 130, y, c2.sz, c2.sc, '#e8e0d0', 1);
-      y += c2.sz * c2.sc + 10;
+      ctx.fillText(c2.label + ':', 20, y + 16);
+      drawCrispScaled(sampleText, 130, y, 32, c2.sc, '#e8e0d0', 2);
+      y += 32 * c2.sc + 12;
     }
     y += 10;
     
-    // Direct crisp (no scaling) at popular sizes for comparison
+    // Try lowering threshold to be more aggressive at killing AA
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('Direct crisp (thresholded, no scale) for comparison:', 20, y); y += 16;
-    const directSizes = [24, 28, 32];
-    for (const sz of directSizes) {
+    ctx.fillText('32px direct — varying threshold (killing more AA):', 20, y); y += 16;
+    
+    const thresholds = [64, 96, 128, 160, 200];
+    for (const thresh of thresholds) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
-      ctx.fillText(sz + 'px:', 20, y + Math.round(sz * 0.4));
-      drawCrispText(sampleText, 60, y, sz, '#e8e0d0', 2);
-      y += sz + 10;
+      ctx.fillText('thresh ' + thresh + ':', 20, y + 12);
+      drawCrispTextThresh(sampleText, 110, y, 32, '#e8e0d0', 2, thresh);
+      y += 40;
     }
     
     // Other fonts at 24px with shadow
