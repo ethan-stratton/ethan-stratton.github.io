@@ -376,8 +376,8 @@ document.addEventListener('keydown', (e) => {
           c.lastWaitTick = performance.now();
           c.waiting = true;
           c.attackText = action;
-          // Enemy also picks an action and starts counting down simultaneously
-          if (!c.enemyWaiting) {
+          // Enemy picks a new action if it doesn't have one active
+          if (!c.enemyWaiting || c.enemyWaitCountdown <= 0) {
             const enemyActions = ['Stand Still', 'Do Nothing'];
             c.enemyAction = enemyActions[c.enemyActionIndex % 2];
             c.enemyActionIndex++;
@@ -385,6 +385,7 @@ document.addEventListener('keydown', (e) => {
             c.enemyWaitCountdown = enemyAct.wait || 0;
             c.enemyWaiting = true;
           }
+          // If enemy was paused mid-countdown, it resumes when ticking starts
         }
       }
     } else if (state.dialogue) {
@@ -448,10 +449,13 @@ function tryMove(dx, dy) {
   state.moveFrom.y = state.player.y;
   state.player.x = nx;
   state.player.y = ny;
-  playFootstep();
+  // Only play footstep if a direction key is currently held
+  if (keys['ArrowLeft'] || keys['ArrowRight'] || keys['ArrowUp'] || keys['ArrowDown']) {
+    playFootstep();
+  }
 }
 
-const MOVE_DURATION = 250; // ms for grid movement
+const MOVE_DURATION = 230; // ms for grid movement
 let lastFrameTime = 0;
 
 function handleMovement(now) {
@@ -1088,7 +1092,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.23', canvas.width - 8, 14);
+  ctx.fillText('v0.24', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
@@ -1190,30 +1194,28 @@ function gameLoop(time) {
   if (!state.combat) {
     handleMovement(time);
   }
-  // Update combat wait countdowns — both player and enemy tick together
+  // Update combat wait countdowns — both tick together, pause when player hits 0
   if (state.combat) {
     const c = state.combat;
-    const bothActive = c.waiting || c.enemyWaiting;
-    if (bothActive && time - c.lastWaitTick >= c.waitTickSpeed) {
+    // Only tick if player is actively waiting (countdown > 0)
+    if (c.waiting && c.waitCountdown > 0 && time - c.lastWaitTick >= c.waitTickSpeed) {
       c.lastWaitTick = time;
       // Tick player
-      if (c.waiting && c.waitCountdown > 0) {
-        c.waitCountdown--;
-      }
-      // Tick enemy
+      c.waitCountdown--;
+      // Tick enemy (only if player still counting — they pause together)
       if (c.enemyWaiting && c.enemyWaitCountdown > 0) {
         c.enemyWaitCountdown--;
       }
-      // Check if player's wait hit zero — they can pick a new action
-      if (c.waiting && c.waitCountdown <= 0) {
+      // Player hit zero — pause everything, let player pick again
+      if (c.waitCountdown <= 0) {
         c.waiting = false;
+        // Enemy stays frozen at whatever count it's at
         // TODO: apply player's attack damage here
       }
-      // Check if enemy's wait hit zero — enemy executes
+      // Enemy hit zero while player still going (enemy was faster)
       if (c.enemyWaiting && c.enemyWaitCountdown <= 0) {
         c.enemyWaiting = false;
         // TODO: apply enemy's attack damage here
-        c.enemyAction = null;
       }
     }
   }
