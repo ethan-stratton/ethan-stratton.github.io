@@ -1215,7 +1215,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.42', canvas.width - 8, 14);
+  ctx.fillText('v0.43', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1289,11 +1289,11 @@ function draw() {
         tx += octx.measureText(text[i]).width + sp;
       }
       
-      // Threshold alpha: anything < 128 becomes 0, anything >= 128 becomes 255
+      // Threshold alpha: anything < 220 becomes 0, anything >= 220 becomes 255
       const imgData = octx.getImageData(0, 0, tx + 2, h);
       const d = imgData.data;
       for (let i = 3; i < d.length; i += 4) {
-        d[i] = d[i] >= 128 ? 255 : 0;
+        d[i] = d[i] >= 220 ? 255 : 0;
       }
       octx.putImageData(imgData, 0, 0);
       
@@ -1324,7 +1324,7 @@ function draw() {
       const sData = sctx.getImageData(0, 0, stx + 2, h);
       const sd = sData.data;
       for (let i = 3; i < sd.length; i += 4) {
-        sd[i] = sd[i] >= 128 ? 255 : 0;
+        sd[i] = sd[i] >= 220 ? 255 : 0;
       }
       // Make shadow black
       for (let i = 0; i < sd.length; i += 4) {
@@ -1369,7 +1369,7 @@ function draw() {
       const imgData = octx.getImageData(0, 0, tx + 2, h);
       const d = imgData.data;
       for (let i = 3; i < d.length; i += 4) {
-        d[i] = d[i] >= 128 ? 255 : 0;
+        d[i] = d[i] >= 220 ? 255 : 0;
       }
       octx.putImageData(imgData, 0, 0);
       
@@ -1396,7 +1396,7 @@ function draw() {
       const sData = sctx.getImageData(0, 0, stx + 2, h);
       const sd = sData.data;
       for (let i = 3; i < sd.length; i += 4) {
-        sd[i] = sd[i] >= 128 ? 255 : 0;
+        sd[i] = sd[i] >= 220 ? 255 : 0;
       }
       for (let i = 0; i < sd.length; i += 4) {
         sd[i] = 0; sd[i+1] = 0; sd[i+2] = 0;
