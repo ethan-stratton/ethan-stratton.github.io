@@ -261,73 +261,101 @@
 
   /* ── Sandbox Loadout Library ── */
   .sandbox-loadout {
-    display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+    display: flex; gap: 16px; margin-bottom: 20px;
   }
   .sandbox-library {
-    flex: 1; min-width: 250px;
-    background: rgba(20, 18, 25, 0.85);
-    border: 1px solid #2a2530; border-radius: 8px; padding: 12px;
-    max-height: 320px; overflow-y: auto;
+    flex: 1; min-width: 0;
+    background: rgba(15, 13, 20, 0.9);
+    border: 1px solid #2a2530; border-radius: 6px; padding: 12px;
+    max-height: 340px; overflow-y: auto;
   }
   .sandbox-library h4 {
     font-family: 'Cinzel', serif; font-weight: 400;
-    font-size: 0.8rem; color: #908880; margin-bottom: 8px;
+    font-size: 0.75rem; color: #686060; margin-bottom: 8px;
+    letter-spacing: 0.05em;
+  }
+  .lib-section { margin-bottom: 10px; }
+  .lib-section-title {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.58rem;
+    color: #484040; text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 2px 8px; margin-bottom: 2px;
   }
   .lib-item {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
-    color: #c8c0b8; padding: 4px 8px; cursor: pointer;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+    color: #908880; padding: 3px 8px; cursor: pointer;
     border-radius: 3px; transition: all 0.15s;
     display: flex; justify-content: space-between; align-items: center;
   }
-  .lib-item:hover { background: rgba(184, 156, 255, 0.15); color: #e8e0d8; }
-  .lib-item .lib-name { font-family: 'Cinzel', serif; font-size: 0.75rem; }
-  .lib-item .lib-stats { font-size: 0.58rem; color: #686060; }
+  .lib-item:hover { background: rgba(184, 156, 255, 0.12); color: #c8c0b8; }
+  .lib-item.in-loadout { color: #484040; }
+  .lib-item .lib-name { font-family: 'Cinzel', serif; font-size: 0.7rem; }
+  .lib-item .lib-stats { font-size: 0.55rem; color: #585050; }
+  .lib-item .lib-plus { color: #b89cff; }
 
   .sandbox-slots {
-    width: 260px; min-width: 200px;
-    background: rgba(20, 18, 25, 0.85);
-    border: 1px solid #3a3540; border-radius: 8px; padding: 12px;
+    width: 230px; flex-shrink: 0;
+    background: rgba(15, 13, 20, 0.9);
+    border: 1px solid #3a3540; border-radius: 6px; padding: 12px;
   }
   .sandbox-slots h4 {
     font-family: 'Cinzel', serif; font-weight: 400;
-    font-size: 0.8rem; color: #c8c0b8; margin-bottom: 8px;
+    font-size: 0.75rem; color: #c8c0b8; margin-bottom: 8px;
+    letter-spacing: 0.05em;
   }
-  .slot-list { display: flex; flex-direction: column; gap: 3px; }
-  .slot-entry {
-    font-family: 'JetBrains Mono', monospace; font-size: 0.68rem;
-    color: #908880; padding: 5px 8px;
-    background: rgba(15, 13, 20, 0.6);
-    border: 1px dashed #2a2530; border-radius: 3px;
-    display: flex; justify-content: space-between; align-items: center;
-    min-height: 28px;
-  }
-  .slot-entry.filled { border-style: solid; border-color: #3a3540; color: #c8c0b8; }
-  .slot-entry .slot-name { font-family: 'Cinzel', serif; font-size: 0.72rem; }
-  .slot-entry .slot-stats { font-size: 0.58rem; color: #686060; }
-  .slot-entry .slot-remove {
-    color: #6a4a4a; cursor: pointer; font-size: 0.7rem; margin-left: 6px;
-  }
-  .slot-entry .slot-remove:hover { color: #ca6a6a; }
-  .slot-clear {
+  .slot-count {
     font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
-    color: #585050; cursor: pointer; margin-top: 6px; text-align: right;
+    color: #585050; margin-bottom: 8px;
+  }
+  .slot-count .full { color: #ca6a6a; }
+  .slot-list { display: flex; flex-direction: column; gap: 2px; }
+  .slot-entry {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+    color: #484040; padding: 4px 8px;
+    background: rgba(10, 8, 15, 0.5);
+    border: 1px dashed #1a1520; border-radius: 3px;
+    display: flex; justify-content: space-between; align-items: center;
+    min-height: 26px;
+  }
+  .slot-entry.filled { border: 1px solid #2a2530; color: #c8c0b8; background: rgba(20, 18, 25, 0.7); }
+  .slot-entry .slot-name { font-family: 'Cinzel', serif; font-size: 0.68rem; }
+  .slot-entry .slot-stats { font-size: 0.55rem; color: #585050; }
+  .slot-entry .slot-remove {
+    color: #4a3a3a; cursor: pointer; font-size: 0.6rem; margin-left: 4px;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .slot-entry:hover .slot-remove { opacity: 1; }
+  .slot-entry .slot-remove:hover { color: #ca6a6a; }
+  .sandbox-slot-actions {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 8px;
+  }
+  .slot-clear {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.55rem;
+    color: #484040; cursor: pointer;
   }
   .slot-clear:hover { color: #ca6a6a; }
+  .slot-fight-btn {
+    font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
+    padding: 5px 14px; background: rgba(60, 50, 80, 0.5);
+    border: 1px solid #b89cff; border-radius: 4px;
+    color: #e8e0d8; cursor: pointer; transition: all 0.2s;
+  }
+  .slot-fight-btn:hover { background: rgba(80, 65, 110, 0.6); }
+  .slot-fight-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
   /* ── Enemy select ── */
-  .enemy-select { margin-bottom: 24px; }
+  .enemy-select { margin-bottom: 16px; }
   .enemy-select h3 {
     font-family: 'Cinzel', serif; font-weight: 400;
-    font-size: 0.9rem; color: #c8c0b8; margin-bottom: 10px;
+    font-size: 0.8rem; color: #686060; margin-bottom: 8px;
   }
   .enemy-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 8px;
+    display: flex; gap: 6px; flex-wrap: wrap;
   }
   .enemy-btn {
-    background: rgba(30, 28, 35, 0.9);
-    border: 1px solid #2a2530; border-radius: 6px;
-    padding: 10px; cursor: pointer; transition: all 0.2s;
+    background: rgba(15, 13, 20, 0.9);
+    border: 1px solid #2a2530; border-radius: 4px;
+    padding: 6px 12px; cursor: pointer; transition: all 0.2s;
     text-align: center;
   }
   .enemy-btn:hover { border-color: #ca6a6a; }
@@ -558,13 +586,17 @@
         <div id="sandboxLibrary"></div>
       </div>
       <div class="sandbox-slots">
-        <h4>Loadout (8 slots)</h4>
+        <h4>Loadout</h4>
+        <div class="slot-count" id="sandboxSlotCount">0 / 8</div>
         <div class="slot-list" id="sandboxSlots"></div>
-        <div class="slot-clear" id="sandboxClear">clear all</div>
+        <div class="sandbox-slot-actions">
+          <div class="slot-clear" id="sandboxClear">clear all</div>
+          <button class="slot-fight-btn" id="sandboxFightBtn">Fight ⚔</button>
+        </div>
       </div>
     </div>
 
-    <div class="combat-screen">
+    <div class="combat-screen hidden" id="sandboxCombat">
       <!-- Top: HP bars -->
       <div class="combat-top">
         <div class="combat-top-side enemy-side">
@@ -1940,29 +1972,43 @@ function getSandboxItems() {
 function buildSandboxLibrary() {
   const lib = document.getElementById('sandboxLibrary');
   lib.innerHTML = '';
-  ITEM_LIBRARY.forEach(item => {
-    const div = document.createElement('div');
-    div.className = 'lib-item';
-    let specials = '';
-    if (item.type === 'pierce') specials = ' ⟁';
-    if (item.type === 'heal') specials = ' ♥';
-    if (item.stun) specials = ' ◉';
-    if (item.absorb) specials = ' ◎';
-    if (item.seal) specials = ' ⊘';
-    if (item.buff) specials = ' ↑';
-    div.innerHTML = `<span class="lib-name">${item.name}</span><span class="lib-stats"><span class="stat-eff">${item.eff}</span>/<span class="stat-def">${item.def}</span>/<span class="stat-wait">${item.wait}</span>${specials}</span>`;
-    div.onclick = () => {
-      if (sandboxLoadout.length >= MAX_SANDBOX_SLOTS) return;
-      sandboxLoadout.push(item.name);
-      buildSandboxSlots();
-    };
-    lib.appendChild(div);
+  // Group by base item
+  ITEMS.forEach(baseItem => {
+    const variants = ITEM_LIBRARY.filter(it => it.name === baseItem.name || it.baseName === baseItem.name);
+    const section = document.createElement('div');
+    section.className = 'lib-section';
+    variants.forEach(item => {
+      const div = document.createElement('div');
+      const inLoadout = sandboxLoadout.includes(item.name);
+      div.className = 'lib-item' + (inLoadout ? ' in-loadout' : '');
+      let specials = '';
+      if (item.type === 'pierce') specials = ' ⟁';
+      if (item.type === 'heal') specials = ' ♥';
+      if (item.stun) specials = ' ◉';
+      if (item.absorb) specials = ' ◎';
+      if (item.seal) specials = ' ⊘';
+      if (item.buff) specials = ' ↑';
+      const plusTag = item.plus ? `<span class="lib-plus">+${item.plus}</span>` : '';
+      div.innerHTML = `<span class="lib-name">${baseItem.name} ${plusTag}</span><span class="lib-stats"><span class="stat-eff">${item.eff}</span>/<span class="stat-def">${item.def}</span>/<span class="stat-wait">${item.wait}</span>${specials}</span>`;
+      div.onclick = () => {
+        if (sandboxLoadout.length >= MAX_SANDBOX_SLOTS) return;
+        sandboxLoadout.push(item.name);
+        buildSandboxLibrary();
+        buildSandboxSlots();
+      };
+      section.appendChild(div);
+    });
+    lib.appendChild(section);
   });
 }
 
 function buildSandboxSlots() {
   const container = document.getElementById('sandboxSlots');
   container.innerHTML = '';
+  const countEl = document.getElementById('sandboxSlotCount');
+  const isFull = sandboxLoadout.length >= MAX_SANDBOX_SLOTS;
+  countEl.innerHTML = `<span class="${isFull ? 'full' : ''}">${sandboxLoadout.length}</span> / ${MAX_SANDBOX_SLOTS}`;
+
   for (let i = 0; i < MAX_SANDBOX_SLOTS; i++) {
     const div = document.createElement('div');
     if (i < sandboxLoadout.length) {
@@ -1973,23 +2019,33 @@ function buildSandboxSlots() {
       }
     } else {
       div.className = 'slot-entry';
-      div.innerHTML = `<span style="color:#383030">— empty —</span>`;
+      div.innerHTML = `<span style="color:#282020; font-size:0.6rem">—</span>`;
     }
     container.appendChild(div);
   }
-  // Remove button handlers
   container.querySelectorAll('.slot-remove').forEach(btn => {
     btn.onclick = (e) => {
       e.stopPropagation();
       sandboxLoadout.splice(parseInt(btn.dataset.idx), 1);
+      buildSandboxLibrary();
       buildSandboxSlots();
     };
   });
+  // Update fight button
+  document.getElementById('sandboxFightBtn').disabled = sandboxLoadout.length === 0;
 }
 
 document.getElementById('sandboxClear').onclick = () => {
   sandboxLoadout = [];
+  buildSandboxLibrary();
   buildSandboxSlots();
+};
+
+document.getElementById('sandboxFightBtn').onclick = () => {
+  if (sandboxLoadout.length === 0) return;
+  document.querySelector('#sandboxContainer .sandbox-loadout').classList.add('hidden');
+  document.getElementById('sandboxCombat').classList.remove('hidden');
+  sandboxEngine.startFight(currentEnemyIdx);
 };
 
 let currentEnemyIdx = 0;
@@ -2029,7 +2085,12 @@ document.querySelectorAll('.speed-sel:not(.run-speed-sel) .speed-btn:not(.run-sp
 });
 
 document.getElementById('restartBtn').onclick = () => sandboxEngine.startFight(currentEnemyIdx);
-document.getElementById('resetBtn').onclick = () => sandboxEngine.startFight(currentEnemyIdx);
+document.getElementById('resetBtn').onclick = () => {
+  document.getElementById('sandboxCombat').classList.add('hidden');
+  document.querySelector('#sandboxContainer .sandbox-loadout').classList.remove('hidden');
+  buildSandboxLibrary();
+  buildSandboxSlots();
+};
 
 // ═══════════════════════════════════
 // RUN MODE
@@ -2391,7 +2452,6 @@ document.querySelectorAll('.speed-btn:not(.run-speed)').forEach(btn => {
 buildEnemyGrid();
 buildSandboxLibrary();
 buildSandboxSlots();
-sandboxEngine.startFight(0);
 buildLoadoutGrid('loadoutGrid', 'loadoutCount');
 
 })();
