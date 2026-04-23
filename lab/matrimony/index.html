@@ -206,6 +206,7 @@ const state = {
   dialogue: null,
   flags: {},
   showFontTest: false,
+  fontTestScroll: 0,
   defeatedEnemies: {},
   openedChests: {},
   inventory: [],
@@ -378,6 +379,7 @@ document.addEventListener('keydown', (e) => {
           const act = COMBAT_ACTIONS[action] || {};
           c.waitCountdown = act.wait || 0;
           c.lastWaitTick = performance.now();
+          c.waitAccumulator = 0;
           c.waiting = true;
           c.attackText = action;
           // Enemy picks a new action if it doesn't have one active
@@ -537,7 +539,7 @@ const ENEMY_DATA = {
   'Enemy1': {
     name: 'Fire Elemental',
     sprite: 'Enemy1',
-    maxHp: 20, eff: 8, def: 3, wait: 5,
+    maxHp: 200, eff: 8, def: 3, wait: 5,
   },
 };
 
@@ -567,6 +569,7 @@ function startCombat(entity, enemyStats) {
     waitCountdown: -1, // player wait: -1 = not counting, >=0 = ticking down
     waitTickSpeed: 500, // ms per tick
     lastWaitTick: 0,
+    waitAccumulator: 0, // accumulator for precise ticking
     waiting: false, // true while player wait is counting down
     // Enemy action state
     enemyAction: null, // name of enemy's chosen action
@@ -597,6 +600,9 @@ const COMBAT_ACTIONS = {
 
 // Mouse state for combat menu
 const mouse = { x: 0, y: 0 };
+canvas.addEventListener('wheel', (e) => {
+  if (state.showFontTest) { e.preventDefault(); state.fontTestScroll += e.deltaY > 0 ? 30 : -30; state.fontTestScroll = Math.max(0, state.fontTestScroll); }
+}, { passive: false });
 canvas.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
   mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
@@ -1173,23 +1179,30 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.26', canvas.width - 8, 14);
+  ctx.fillText('v0.27', canvas.width - 8, 14);
   
-  // Font comparison overlay (press F to toggle)
+  // Font comparison overlay (press F to toggle, scroll with mousewheel)
   if (state.showFontTest) {
+    const panelX = 10, panelY = 10, panelW = canvas.width - 20, panelH = canvas.height - 20;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-    ctx.fillRect(10, 10, canvas.width - 20, canvas.height - 20);
+    ctx.fillRect(panelX, panelY, panelW, panelH);
     ctx.strokeStyle = '#5a5060'; ctx.lineWidth = 1;
-    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+    ctx.strokeRect(panelX, panelY, panelW, panelH);
+    
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(panelX + 1, panelY + 1, panelW - 2, panelH - 2);
+    ctx.clip();
     
     const sample = 'Punch  Kick  EFF: 12  DEF: 5  WAIT: 8  HP 30/30';
+    const scrollY = -(state.fontTestScroll || 0);
     ctx.textAlign = 'left';
-    let y = 30;
+    let y = 30 + scrollY;
     
-    // RM2000 at different sizes — pixel fonts need exact sizes to snap crisp
+    // RM2000 at different sizes
     const rm2kSizes = [8, 10, 12, 14, 16, 18, 20, 24];
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('RM2000 at different sizes (pixel fonts need exact multiples to be sharp):', 20, y); y += 14;
+    ctx.fillText('RM2000 at different sizes:', 20, y); y += 14;
     for (const sz of rm2kSizes) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText(sz + 'px:', 20, y + 10);
@@ -1197,41 +1210,85 @@ function draw() {
       ctx.fillText(sample, 52, y + 10);
       y += Math.max(sz + 4, 14);
     }
-    y += 6;
+    y += 10;
     
-    // Other fonts for comparison
+    // Other fonts
     const others = [
       { name: 'RM2000Alt 12px', font: '12px "RM2000Alt"' },
       { name: 'RM2000Alt 16px', font: '16px "RM2000Alt"' },
+      { name: 'RM2000Alt 24px', font: '24px "RM2000Alt"' },
       { name: 'RMG2000 12px', font: '12px "RMG2000"' },
       { name: 'RMG2000 16px', font: '16px "RMG2000"' },
+      { name: 'RMG2000 24px', font: '24px "RMG2000"' },
       { name: 'Pixelify 14px', font: '14px "Pixelify Sans"' },
       { name: 'Pixelify 16px', font: '16px "Pixelify Sans"' },
+      { name: 'Pixelify 24px', font: '24px "Pixelify Sans"' },
     ];
     for (const o of others) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText(o.name + ':', 20, y + 10);
       ctx.fillStyle = '#e8e0d0'; ctx.font = o.font;
-      ctx.fillText(sample, 100, y + 10);
-      y += 18;
+      ctx.fillText(sample, 110, y + 10);
+      y += 22;
     }
-    y += 8;
+    y += 16;
     
-    // Gradient demo with Pixelify Sans (Ethan's pick for special text)
-    const gradText = '★ CRITICAL HIT ★';
-    ctx.font = 'bold 20px "Pixelify Sans"';
-    const gradW = ctx.measureText(gradText).width;
-    const grad = ctx.createLinearGradient(20, 0, 20 + gradW, 0);
-    grad.addColorStop(0, '#ff6060');
-    grad.addColorStop(0.3, '#ffcc00');
-    grad.addColorStop(0.6, '#60ff90');
-    grad.addColorStop(1, '#6090ff');
-    ctx.fillStyle = grad;
-    ctx.fillText(gradText, 20, y + 10);
+    // ═══ RM2000 24px GRADIENT SECTION ═══
+    ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
+    ctx.fillText('── RM2000 24px with Color Gradients ──', 20, y); y += 20;
     
+    const gradSamples = [
+      { text: '★ CRITICAL HIT ★', stops: [[0,'#ff4040'],[0.5,'#ffcc00'],[1,'#ff4040']] },
+      { text: '♦ LEVEL UP ♦', stops: [[0,'#60c0ff'],[0.4,'#ffffff'],[0.6,'#ffffff'],[1,'#60c0ff']] },
+      { text: '◆ FIRE STORM ◆', stops: [[0,'#ff2200'],[0.3,'#ff8800'],[0.6,'#ffdd00'],[1,'#ff2200']] },
+      { text: '✦ HOLY LIGHT ✦', stops: [[0,'#ffffa0'],[0.3,'#ffffff'],[0.7,'#ffffff'],[1,'#ffffa0']] },
+      { text: '☠ POISON FANG ☠', stops: [[0,'#40ff40'],[0.3,'#a0ff60'],[0.7,'#40ff40'],[1,'#208020']] },
+      { text: '❄ ICE SHARD ❄', stops: [[0,'#80c0ff'],[0.3,'#c0e8ff'],[0.7,'#ffffff'],[1,'#80c0ff']] },
+      { text: '⚡ THUNDER ⚡', stops: [[0,'#ffff40'],[0.3,'#ffffff'],[0.5,'#ffff40'],[0.8,'#ffffff'],[1,'#ffff40']] },
+      { text: 'RAINBOW BLADE', stops: [[0,'#ff4040'],[0.17,'#ff8800'],[0.33,'#ffff00'],[0.5,'#40ff40'],[0.67,'#4080ff'],[0.83,'#8040ff'],[1,'#ff40ff']] },
+    ];
+    for (const gs of gradSamples) {
+      ctx.font = '24px "RM2000"';
+      const tw = ctx.measureText(gs.text).width;
+      const grad = ctx.createLinearGradient(20, 0, 20 + tw, 0);
+      for (const [pos, color] of gs.stops) grad.addColorStop(pos, color);
+      ctx.fillStyle = grad;
+      ctx.fillText(gs.text, 20, y + 20);
+      y += 32;
+    }
+    y += 16;
+    
+    // Pixelify Sans gradient for comparison
+    ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
+    ctx.fillText('── Pixelify Sans 20px with Gradients ──', 20, y); y += 20;
+    for (const gs of gradSamples.slice(0, 3)) {
+      ctx.font = 'bold 20px "Pixelify Sans"';
+      const tw = ctx.measureText(gs.text).width;
+      const grad = ctx.createLinearGradient(20, 0, 20 + tw, 0);
+      for (const [pos, color] of gs.stops) grad.addColorStop(pos, color);
+      ctx.fillStyle = grad;
+      ctx.fillText(gs.text, 20, y + 16);
+      y += 28;
+    }
+    
+    ctx.restore();
+    
+    // Scroll hint
     ctx.fillStyle = 'rgba(140, 130, 140, 0.6)';
     ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('Press F to close', 20, canvas.height - 18);
+    ctx.textAlign = 'left';
+    ctx.fillText('Scroll: mousewheel  |  Press F to close', panelX + 8, panelY + panelH - 6);
+    
+    // Scrollbar
+    const contentH = y - scrollY - 30;
+    const viewH = panelH - 4;
+    if (contentH > viewH) {
+      const scrollRatio = (state.fontTestScroll || 0) / (contentH - viewH);
+      const barH = Math.max(20, Math.round(viewH * viewH / contentH));
+      const barY = panelY + 2 + Math.round(scrollRatio * (viewH - barH));
+      ctx.fillStyle = 'rgba(160, 140, 160, 0.4)';
+      ctx.fillRect(panelX + panelW - 6, barY, 4, barH);
+    }
   }
   ctx.textAlign = 'left';
 }
@@ -1344,7 +1401,12 @@ function gameLoop(time) {
       const t = time - a.startTime;
       if (t >= a.totalDuration) {
         c.playerAttackAnim = null;
-        // Reset — player's attack executed, clear waiting state, stats show base values
+        // Apply damage to enemy
+        if (c.attackText) {
+          const act = COMBAT_ACTIONS[c.attackText] || {};
+          c.enemyHp = Math.max(0, c.enemyHp - (act.eff || 0));
+        }
+        // Reset — player's attack executed, clear waiting state
         c.waiting = false;
         c.waitCountdown = -1;
         c.attackText = null;
@@ -1356,37 +1418,65 @@ function gameLoop(time) {
       const t = time - c.enemyReactAnim.startTime;
       if (t >= c.enemyReactAnim.duration) {
         c.enemyReactAnim = null;
-        c.enemyAction = null;
+        // Enemy picks a new action after executing
+        const enemyActions = ['Stand Still', 'Do Nothing'];
+        c.enemyAction = enemyActions[c.enemyActionIndex % 2];
+        c.enemyActionIndex++;
+        const enemyAct = COMBAT_ACTIONS[c.enemyAction] || {};
+        c.enemyWaitCountdown = enemyAct.wait || 0;
+        c.enemyWaiting = true;
+        // Reset accumulator so new countdown starts fresh
+        c.waitAccumulator = 0;
+        c.lastWaitTick = time;
       }
     }
     
-    // Only tick if player is actively waiting and no animation playing
-    if (c.waiting && c.waitCountdown > 0 && !c.playerAttackAnim && time - c.lastWaitTick >= c.waitTickSpeed) {
+    // Tick system — use accumulator for precise 1-at-a-time decrements
+    const anyTicking = (c.waiting && c.waitCountdown > 0) || (c.enemyWaiting && c.enemyWaitCountdown > 0);
+    if (anyTicking && !c.playerAttackAnim && !c.enemyReactAnim) {
+      const dt = time - c.lastWaitTick;
       c.lastWaitTick = time;
-      c.waitCountdown--;
-      if (c.enemyWaiting && c.enemyWaitCountdown > 0) {
-        c.enemyWaitCountdown--;
-      }
-      // Player hit zero — start attack animation
-      if (c.waitCountdown <= 0) {
-        c.waiting = false;
-        c.playerAttackAnim = {
-          startTime: time,
-          rushDuration: 200,
-          hitPause: 100,
-          returnDuration: 200,
-          totalDuration: 500,
-        };
-      }
-      // Enemy hit zero while player still going
-      if (c.enemyWaiting && c.enemyWaitCountdown <= 0) {
-        c.enemyWaiting = false;
-        c.enemyReactAnim = { startTime: time, duration: 800 };
+      c.waitAccumulator += dt;
+      
+      // Process exactly one tick per tickSpeed interval
+      if (c.waitAccumulator >= c.waitTickSpeed) {
+        c.waitAccumulator -= c.waitTickSpeed;
+        // Cap accumulator to prevent catching up (no skipping)
+        if (c.waitAccumulator > c.waitTickSpeed) c.waitAccumulator = 0;
+        
+        // Tick player
+        if (c.waiting && c.waitCountdown > 0) {
+          c.waitCountdown--;
+        }
+        // Tick enemy
+        if (c.enemyWaiting && c.enemyWaitCountdown > 0) {
+          c.enemyWaitCountdown--;
+        }
+        
+        // Player hit zero — start attack animation, pause everything
+        if (c.waiting && c.waitCountdown <= 0) {
+          c.waiting = false;
+          c.waitAccumulator = 0;
+          c.playerAttackAnim = {
+            startTime: time,
+            rushDuration: 200,
+            hitPause: 100,
+            returnDuration: 200,
+            totalDuration: 500,
+          };
+        }
+        
+        // Enemy hit zero — trigger react animation
+        if (c.enemyWaiting && c.enemyWaitCountdown <= 0) {
+          c.enemyWaiting = false;
+          c.waitAccumulator = 0;
+          c.enemyReactAnim = { startTime: time, duration: 800 };
+        }
       }
     }
     
     // If enemy countdown finishes while player is picking (not waiting), trigger react
-    if (c.enemyWaiting && c.enemyWaitCountdown <= 0 && !c.waiting && !c.playerAttackAnim) {
+    if (c.enemyWaiting && c.enemyWaitCountdown <= 0 && !c.waiting && !c.playerAttackAnim && !c.enemyReactAnim) {
       c.enemyWaiting = false;
       c.enemyReactAnim = { startTime: time, duration: 800 };
     }
