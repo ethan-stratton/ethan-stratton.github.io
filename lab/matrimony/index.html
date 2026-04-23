@@ -268,8 +268,8 @@ function getCameraOffset() {
   const vis = getPlayerVisualPos();
   let camX = vis.x - Math.floor(CANVAS_TILES_X / 2);
   let camY = vis.y - Math.floor(CANVAS_TILES_Y / 2);
-  camX = Math.max(0, Math.min(state.mapW - CANVAS_TILES_X, camX));
-  camY = Math.max(0, Math.min(state.mapH - CANVAS_TILES_Y, camY));
+  camX = Math.max(0, Math.min(Math.max(0, state.mapW - CANVAS_TILES_X), camX));
+  camY = Math.max(0, Math.min(Math.max(0, state.mapH - CANVAS_TILES_Y), camY));
   return { x: camX, y: camY };
 }
 
@@ -471,13 +471,14 @@ canvas.addEventListener('click', (e) => {
   // Check if click is on a menu item
   const W = canvas.width;
   const H = canvas.height;
-  const botH = Math.round(H * 0.28);
-  const botContentY = H - botH;
-  const menuX = Math.round(W * 0.48);
-  const menuY = botContentY + 8;
+  const botH_click = Math.round(H * 0.48);
+  const botContentY = H - botH_click;
+  const menuX = Math.round(W * 0.42);
+  const menuY = botContentY + 4;
+  const rowH = Math.max(14, Math.floor((botH_click - 6) / 8));
   for (let i = 0; i < actions.length; i++) {
-    const ay = menuY + i * 24;
-    if (mouse.x >= menuX && mouse.x <= menuX + 160 && mouse.y >= ay && mouse.y <= ay + 22) {
+    const ay = menuY + i * rowH;
+    if (mouse.x >= menuX && mouse.x <= W - 6 && mouse.y >= ay && mouse.y <= ay + rowH) {
       c.selectedAction = i;
       c.firstAttackDone = true;
       c.attackText = actions[i];
@@ -495,15 +496,16 @@ function drawCombat() {
   const FONT = '"Pixelify Sans", sans-serif';
   const spr = sprites[c.enemySprite];
   
-  // Layout: top bar ~14%, arena ~56%, bottom bar ~30%
-  const topH = Math.round(H * 0.14);
-  const botH = Math.round(H * 0.30);
+  // Layout: top bar ~10%, arena ~42%, bottom bar ~48% (room for 8 attacks)
+  const topH = Math.round(H * 0.10);
+  const arenaH = Math.round(H * 0.42);
   const arenaY = topH;
-  const arenaH = H - topH - botH;
+  const botContentY = arenaY + arenaH;
+  const botH = H - botContentY;
   
-  // Portraits — wide rectangle (roughly 2:1 ratio)
-  const portraitH = Math.round(topH * 0.55);
-  const portraitW = Math.round(portraitH * 2.2);
+  // Portraits — wide rectangle ~2.5:1
+  const portraitH = Math.round(topH * 0.7);
+  const portraitW = Math.round(portraitH * 2.5);
   
   // ── TOP BAR: Enemy info ──
   ctx.fillStyle = 'rgba(8, 8, 14, 0.90)';
@@ -568,9 +570,9 @@ function drawCombat() {
     ctx.fillStyle = '#a098a0';
     ctx.font = '11px ' + FONT;
     ctx.textAlign = 'left';
-    ctx.fillText('Eff ' + c.enemyEff, infoX, barY + barH + 14);
-    ctx.fillText('Def ' + c.enemyDef, infoX + 56, barY + barH + 14);
-    ctx.fillText('Wait ' + c.enemyWait, infoX + 112, barY + barH + 14);
+    ctx.fillText('EFF ' + c.enemyEff, infoX, barY + barH + 14);
+    ctx.fillText('DEF ' + c.enemyDef, infoX + 60, barY + barH + 14);
+    ctx.fillText('WAIT ' + c.enemyWait, infoX + 120, barY + barH + 14);
   }
   
   // ── ARENA: fully darkened, edge to edge ──
@@ -667,64 +669,60 @@ function drawCombat() {
     ctx.restore();
   }
   
-  // Player HP bar
-  const pInfoX = pPortraitX + portraitW + 8;
-  const pBarY = pPortraitY + 4;
-  ctx.fillStyle = '#1a1a2a';
-  ctx.fillRect(pInfoX, pBarY, barW, barH);
-  const pHpRatio = c.playerHp / c.playerMaxHp;
-  ctx.fillStyle = pHpRatio > 0.5 ? '#3a6aba' : pHpRatio > 0.25 ? '#b89030' : '#a03030';
-  ctx.fillRect(pInfoX, pBarY, Math.round(barW * pHpRatio), barH);
-  ctx.strokeStyle = '#6a6070';
-  ctx.strokeRect(pInfoX, pBarY, barW, barH);
+  // Player HP counter (no bar)
+  ctx.fillStyle = '#e8e0d0';
+  ctx.font = '11px ' + FONT;
+  ctx.textAlign = 'left';
+  ctx.fillText(c.playerHp + '/' + c.playerMaxHp, pPortraitX + portraitW + 8, pPortraitY + Math.round(portraitH / 2) + 4);
   
   // Player stats — only after first attack
   if (c.firstAttackDone) {
     ctx.fillStyle = '#a098a0';
-    ctx.font = '11px ' + FONT;
-    ctx.textAlign = 'left';
-    ctx.fillText('Eff ' + c.playerEff, pInfoX, pBarY + barH + 14);
-    ctx.fillText('Def ' + c.playerDef, pInfoX + 56, pBarY + barH + 14);
-    ctx.fillText('Wait ' + c.playerWait, pInfoX + 112, pBarY + barH + 14);
+    ctx.font = '10px ' + FONT;
+    const psy = pPortraitY + portraitH + 4;
+    ctx.fillText('EFF ' + c.playerEff, pPortraitX, psy);
+    ctx.fillText('DEF ' + c.playerDef, pPortraitX + 60, psy);
+    ctx.fillText('WAIT ' + c.playerWait, pPortraitX + 120, psy);
   }
   
-  // ── ACTION MENU (right half of bottom bar) ──
-  const menuX = Math.round(W * 0.48);
-  const menuY = botContentY + 8;
+  // ── ACTION MENU — compact rows for up to 8 attacks ──
+  const menuX = Math.round(W * 0.42);
+  const menuStartY = botContentY + 4;
+  const rowH = Math.max(14, Math.floor((botH - 6) / 8));
   
   const actions = c.actions || ['Punch', 'Kick'];
   const selectedIdx = c.selectedAction || 0;
   
   // Check mouse hover
   for (let i = 0; i < actions.length; i++) {
-    const ay = menuY + i * 24;
-    if (mouse.x >= menuX && mouse.x <= menuX + 160 && mouse.y >= ay && mouse.y <= ay + 22) {
+    const ay = menuStartY + i * rowH;
+    if (mouse.x >= menuX && mouse.x <= W - 6 && mouse.y >= ay && mouse.y <= ay + rowH) {
       c.selectedAction = i;
     }
   }
   
   for (let i = 0; i < actions.length; i++) {
-    const ay = menuY + i * 24;
+    const ay = menuStartY + i * rowH;
     const act = COMBAT_ACTIONS[actions[i]] || {};
     const isSelected = i === (c.selectedAction || 0);
     
     // Action name
-    ctx.font = '14px ' + FONT;
+    ctx.font = '12px ' + FONT;
     if (isSelected) {
       ctx.fillStyle = '#ffe8c0';
     } else {
       ctx.fillStyle = '#706860';
     }
     ctx.textAlign = 'left';
-    ctx.fillText(actions[i], menuX, ay + 15);
+    ctx.fillText(actions[i], menuX, ay + rowH - 2);
     
-    // Eff/Def/Wait for this action
-    ctx.font = '10px ' + FONT;
+    // EFF DEF WAIT for this action
+    ctx.font = '9px ' + FONT;
     ctx.fillStyle = isSelected ? '#b0a898' : '#585050';
-    const statsX = menuX + 80;
-    ctx.fillText('E' + (act.eff || 0), statsX, ay + 14);
-    ctx.fillText('D' + (act.def || 0), statsX + 32, ay + 14);
-    ctx.fillText('W' + (act.wait || 0), statsX + 64, ay + 14);
+    const statsX = menuX + 70;
+    ctx.fillText('EFF ' + (act.eff || 0), statsX, ay + rowH - 2);
+    ctx.fillText('DEF ' + (act.def || 0), statsX + 40, ay + rowH - 2);
+    ctx.fillText('WAIT ' + (act.wait || 0), statsX + 84, ay + rowH - 2);
   }
 }
 
@@ -792,7 +790,9 @@ function drawDialogue() {
 // RENDERING
 // ══════════════════════════════════
 function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Fill with dark color to prevent black edges at map boundaries
+  ctx.fillStyle = '#1a1a20';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   
   // Don't render until tileset is loaded (prevents flash of IntGrid)
   if (!tilesetLoaded) return;
@@ -857,7 +857,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.13', canvas.width - 8, 14);
+  ctx.fillText('v0.14', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
