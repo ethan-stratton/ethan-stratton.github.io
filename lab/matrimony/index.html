@@ -207,6 +207,7 @@ const state = {
   flags: {},
   showFontTest: false,
   fontTestScroll: 0,
+  fontTestScrollX: 0,
   fontTestDragging: false,
   fontTestDragStartY: 0,
   fontTestDragStartScroll: 0,
@@ -430,6 +431,14 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keyup', (e) => {
   keys[e.key] = false;
   if (e.key === 'f' || e.key === 'F') state.showFontTest = !state.showFontTest;
+  if (state.showFontTest && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    e.preventDefault();
+    if (e.key === 'ArrowUp') state.fontTestScroll = Math.max(0, state.fontTestScroll - 20);
+    if (e.key === 'ArrowDown') state.fontTestScroll = Math.min(Math.max(0, state.fontTestContentH - (canvas.height - 24)), state.fontTestScroll + 20);
+    if (e.key === 'ArrowLeft') state.fontTestScrollX = Math.max(0, state.fontTestScrollX - 20);
+    if (e.key === 'ArrowRight') state.fontTestScrollX = Math.min(state.fontTestContentW || 0, state.fontTestScrollX + 20);
+    return;
+  }
 });
 
 function tryMove(dx, dy) {
@@ -605,7 +614,7 @@ const COMBAT_ACTIONS = {
 // Mouse state for combat menu
 const mouse = { x: 0, y: 0 };
 canvas.addEventListener('wheel', (e) => {
-  if (state.showFontTest) { e.preventDefault(); state.fontTestScroll += e.deltaY > 0 ? 10 : -10; state.fontTestScroll = Math.max(0, Math.min(state.fontTestScroll, Math.max(0, state.fontTestContentH - (canvas.height - 24)))); }
+  if (state.showFontTest) { e.preventDefault(); if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) { state.fontTestScrollX += (e.deltaX || e.deltaY) > 0 ? 10 : -10; state.fontTestScrollX = Math.max(0, Math.min(state.fontTestScrollX, state.fontTestContentW || 0)); } else { state.fontTestScroll += e.deltaY > 0 ? 10 : -10; state.fontTestScroll = Math.max(0, Math.min(state.fontTestScroll, Math.max(0, state.fontTestContentH - (canvas.height - 24)))); } }
 }, { passive: false });
 canvas.addEventListener('mousedown', (e) => {
   if (!state.showFontTest) return;
@@ -1206,7 +1215,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.36', canvas.width - 8, 14);
+  ctx.fillText('v0.37', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1468,11 +1477,13 @@ function draw() {
     
     const sample = 'Punch  Kick  Eff: 12  Def: 5  Wait: 8  HP 30/30';
     const scrollY = -(state.fontTestScroll || 0);
+    const scrollX = -(state.fontTestScrollX || 0);
     ctx.textAlign = 'left';
+    ctx.translate(scrollX, 0);
     let y = 30 + scrollY;
     
     // RM2000 32px threshold + scale
-    const sampleText = 'Punch  Kick  Eff: 12  HP 30/30';
+    const sampleText = 'Punch  Kick  Eff: 12  Def: 5  Wait: 8  HP 30/30  ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
     ctx.fillText('RM2000 32px threshold+scale (nearest-neighbor):', 20, y); y += 16;
     
@@ -1582,6 +1593,7 @@ function draw() {
     // Track content height for scrollbar
     const contentH = (y - scrollY) - 10;
     state.fontTestContentH = contentH;
+    state.fontTestContentW = Math.max(0, 800 - panelW); // estimated content width overflow
     
     ctx.restore();
     
@@ -1589,7 +1601,7 @@ function draw() {
     ctx.fillStyle = 'rgba(140, 130, 140, 0.6)';
     ctx.font = '10px "Pixelify Sans"';
     ctx.textAlign = 'left';
-    ctx.fillText('Scroll: mousewheel or drag scrollbar  |  Press F to close', panelX + 8, panelY + panelH - 6);
+    ctx.fillText('Scroll: wheel=vertical, shift+wheel=horizontal  |  Press F to close', panelX + 8, panelY + panelH - 6);
     
     // Scrollbar
     const viewH = panelH - 4;
