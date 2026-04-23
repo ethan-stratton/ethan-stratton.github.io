@@ -81,7 +81,7 @@ const TILE = 16;       // tile size in pixels
 const SCALE = 2;       // render scale (16px tiles → 32px on screen)
 const CANVAS_W = 527;  // native resolution width
 const CANVAS_H = 362;  // native resolution height
-const DISPLAY_SCALE = 2; // CSS scale for display
+const DISPLAY_SCALE = 1.4; // CSS scale for display
 const CANVAS_TILES_X = Math.ceil(CANVAS_W / (TILE * SCALE)) + 1;
 const CANVAS_TILES_Y = Math.ceil(CANVAS_H / (TILE * SCALE)) + 1;
 const canvas = document.getElementById('game');
@@ -285,9 +285,33 @@ document.addEventListener('keydown', (e) => {
     }
     return;
   }
+  // Combat menu navigation
+  if (state.combat) {
+    const c = state.combat;
+    const numActions = (c.actions || []).length;
+    if ((e.key === 'ArrowUp' || e.key === 'w') && numActions > 0) {
+      c.selectedAction = (c.selectedAction - 1 + numActions) % numActions;
+      e.preventDefault();
+      return;
+    }
+    if ((e.key === 'ArrowDown' || e.key === 's') && numActions > 0) {
+      c.selectedAction = (c.selectedAction + 1) % numActions;
+      e.preventDefault();
+      return;
+    }
+  }
   if (e.key === ' ') {
     e.preventDefault();
-    if (state.dialogue) {
+    if (state.combat) {
+      // Select action
+      const c = state.combat;
+      const action = (c.actions || [])[c.selectedAction || 0];
+      if (action) {
+        c.firstAttackDone = true;
+        c.attackText = action;
+        // TODO: wire actual combat logic
+      }
+    } else if (state.dialogue) {
       closeDialogue();
     } else if (!state.combat) {
       interact();
@@ -413,6 +437,9 @@ function startCombat(entity, enemyStats) {
     playerWait: 0,
     attackText: '',
     startTime: performance.now(),
+    actions: ['Punch', 'Kick'],
+    selectedAction: 0,
+    firstAttackDone: false,
   };
 }
 
@@ -429,50 +456,62 @@ function drawCombat() {
   const W = canvas.width;
   const H = canvas.height;
   const now = performance.now();
-  const combatStarted = c.firstAttackDone || false; // stats hidden until first attack
+  const combatStarted = c.firstAttackDone || false;
   
   const FONT = '"Pixelify Sans", sans-serif';
+  const spr = sprites[c.enemySprite];
   
-  // ── TOP: Enemy info bar (~15%) — semi-transparent ──
-  const topH = Math.round(H * 0.15);
-  ctx.fillStyle = 'rgba(12, 12, 20, 0.75)';
+  // Layout: thin top bar ~12%, arena ~60%, bottom bar ~28%
+  const topH = Math.round(H * 0.12);
+  const botH = Math.round(H * 0.28);
+  const arenaY = topH;
+  const arenaH = H - topH - botH;
+  
+  // Shared portrait dimensions — rectangular (wider than tall), same for both
+  const portraitH = Math.round(topH * 0.65);
+  const portraitW = Math.round(portraitH * 1.5);
+  
+  // ── TOP BAR: Enemy info ──
+  ctx.fillStyle = 'rgba(8, 8, 14, 0.88)';
   ctx.fillRect(0, 0, W, topH);
+  ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, topH - 0.5); ctx.lineTo(W, topH - 0.5); ctx.stroke();
   
-  // Enemy portrait — square, don't morph, clip if needed
-  const portraitSize = Math.round(topH * 0.65);
-  const portraitX = 8;
-  const portraitY = Math.round((topH - portraitSize) / 2);
+  // Enemy portrait
+  const ePortraitX = 6;
+  const ePortraitY = Math.round((topH - portraitH) / 2);
   
   ctx.strokeStyle = '#5a5060';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(portraitX, portraitY, portraitSize, portraitSize);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(ePortraitX, ePortraitY, portraitW, portraitH);
   ctx.fillStyle = '#0c0c14';
-  ctx.fillRect(portraitX + 1, portraitY + 1, portraitSize - 2, portraitSize - 2);
+  ctx.fillRect(ePortraitX + 1, ePortraitY + 1, portraitW - 2, portraitH - 2);
   
-  // Draw enemy sprite in portrait — maintain aspect ratio, clip overflow
-  const spr = sprites[c.enemySprite];
   if (spr && spr.loaded) {
-    const innerSize = portraitSize - 4;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(portraitX + 2, portraitY + 2, innerSize, innerSize);
+    ctx.rect(ePortraitX + 1, ePortraitY + 1, portraitW - 2, portraitH - 2);
     ctx.clip();
     ctx.imageSmoothingEnabled = false;
-    // Draw at correct aspect (16x16 source), centered, may overflow and clip
-    const drawSz = innerSize;
+    // Keep pixel ratio: scale to fit height, center horizontally
+    const innerH = portraitH - 2;
+    const sprScale = innerH / SPRITE_FRAME_SIZE;
+    const drawSz = SPRITE_FRAME_SIZE * sprScale;
+    const dx = ePortraitX + 1 + Math.round((portraitW - 2 - drawSz) / 2);
     ctx.drawImage(spr.img,
       0, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
-      portraitX + 2, portraitY + 2, drawSz, drawSz
+      dx, ePortraitY + 1, drawSz, drawSz
     );
     ctx.imageSmoothingEnabled = true;
     ctx.restore();
   }
   
-  // HP bar (right of portrait)
-  const infoX = portraitX + portraitSize + 8;
-  const barW = Math.round(W * 0.28);
-  const barH = 8;
-  const barY = portraitY + Math.round(portraitSize / 2) - Math.round(barH / 2);
+  // HP bar
+  const infoX = ePortraitX + portraitW + 6;
+  const barW = Math.round(W * 0.2);
+  const barH = 6;
+  const barY = ePortraitY + 3;
   
   ctx.fillStyle = '#2a1a1a';
   ctx.fillRect(infoX, barY, barW, barH);
@@ -483,56 +522,50 @@ function drawCombat() {
   ctx.lineWidth = 1;
   ctx.strokeRect(infoX, barY, barW, barH);
   
-  // Attack text area (right of HP bar)
-  const textX = infoX + barW + 10;
+  // Attack text
+  const textX = infoX + barW + 8;
   if (c.attackText) {
     ctx.fillStyle = '#d0c0a0';
-    ctx.font = '12px ' + FONT;
+    ctx.font = '11px ' + FONT;
     ctx.textAlign = 'left';
-    ctx.fillText(c.attackText, textX, barY + 7);
+    ctx.fillText(c.attackText, textX, barY + 6);
   }
   
   // EFF DEF WAIT — only after first attack
   if (combatStarted) {
-    const statY = topH - 10;
     ctx.fillStyle = '#a098a0';
     ctx.font = '10px ' + FONT;
     ctx.textAlign = 'left';
-    ctx.fillText('Eff ' + c.enemyEff, portraitX, statY);
-    ctx.fillText('Def ' + c.enemyDef, portraitX + 55, statY);
-    ctx.fillText('Wait ' + c.enemyWait, portraitX + 110, statY);
+    const esy = ePortraitY + portraitH + 2;
+    ctx.fillText('Eff ' + c.enemyEff, ePortraitX, esy);
+    ctx.fillText('Def ' + c.enemyDef, ePortraitX + 52, esy);
+    ctx.fillText('Wait ' + c.enemyWait, ePortraitX + 104, esy);
   }
   
-  // ── MIDDLE: Battle arena (~55%) — fully darkened, edge to edge ──
-  const arenaY = topH;
-  const arenaH = Math.round(H * 0.55);
-  
+  // ── ARENA: fully darkened ──
   ctx.fillStyle = 'rgba(4, 4, 10, 0.96)';
   ctx.fillRect(0, arenaY, W, arenaH);
   
-  // Player sprite size (same as overworld — 64px, the 32×32 at 2x)
-  const playerSize = 64;
-  // Enemy matched to player
-  const enemySize = 64;
+  // Both combatants at same visual size (48px)
+  const combatSize = 48;
+  const groundY = arenaY + Math.round(arenaH * 0.78);
   
-  const groundY = arenaY + Math.round(arenaH * 0.75);
-  
-  // Enemy on LEFT side
-  const enemyArenaX = Math.round(W * 0.25) - enemySize / 2;
-  const enemyArenaY = groundY - enemySize;
+  // Enemy LEFT
+  const enemyArenaX = Math.round(W * 0.28) - combatSize / 2;
+  const enemyArenaY = groundY - combatSize;
   if (spr && spr.loaded) {
     const frame = Math.floor(now / ANIM_SPEED) % SPRITE_FRAMES;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(spr.img,
       frame * SPRITE_FRAME_SIZE, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
-      enemyArenaX, enemyArenaY, enemySize, enemySize
+      enemyArenaX, enemyArenaY, combatSize, combatSize
     );
     ctx.imageSmoothingEnabled = true;
   }
   
-  // Player on RIGHT side, facing left (flip right idle)
-  const playerArenaX = Math.round(W * 0.75) - playerSize / 2;
-  const playerArenaY = groundY - playerSize;
+  // Player RIGHT, facing left
+  const playerArenaX = Math.round(W * 0.72) - combatSize / 2;
+  const playerArenaY = groundY - combatSize;
   if (PLAYER_SHEET.loaded) {
     const anim = PLAYER_SHEET.anims['idle_right'];
     const frame = Math.floor(now / 400) % anim.frames;
@@ -540,64 +573,67 @@ function drawCombat() {
     const srcY = anim.row * PLAYER_SHEET.frameH;
     ctx.imageSmoothingEnabled = false;
     ctx.save();
-    ctx.translate(playerArenaX + playerSize, playerArenaY);
+    ctx.translate(playerArenaX + combatSize, playerArenaY);
     ctx.scale(-1, 1);
     ctx.drawImage(PLAYER_SHEET.img,
       srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
-      0, 0, playerSize, playerSize
+      0, 0, combatSize, combatSize
     );
     ctx.restore();
     ctx.imageSmoothingEnabled = true;
   }
   
-  // ESC exit — only after 5 seconds, lazy flash in top right of arena
+  // ESC — after 5s, lazy flash top right of arena
   const elapsed = now - c.startTime;
   if (elapsed > 5000) {
     const alpha = 0.3 + 0.3 * Math.sin(now / 800);
     ctx.fillStyle = `rgba(120, 110, 120, ${alpha})`;
     ctx.font = '10px ' + FONT;
     ctx.textAlign = 'right';
-    ctx.fillText('[ESC]', W - 8, arenaY + 16);
+    ctx.fillText('[ESC]', W - 6, arenaY + 14);
     ctx.textAlign = 'left';
   }
   
-  // ── BOTTOM: Player info — semi-transparent, edge to edge ──
-  const botY = arenaY + arenaH;
-  const botH = H - botY;
-  ctx.fillStyle = 'rgba(12, 12, 20, 0.75)';
-  ctx.fillRect(0, botY, W, botH);
+  // ── BOTTOM BAR: Player info + action menu ──
+  const botContentY = arenaY + arenaH;
+  ctx.fillStyle = 'rgba(8, 8, 14, 0.88)';
+  ctx.fillRect(0, botContentY, W, botH);
+  ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, botContentY + 0.5); ctx.lineTo(W, botContentY + 0.5); ctx.stroke();
   
-  // Player portrait (bottom left)
-  const pPortraitSize = Math.round(botH * 0.55);
-  const pPortraitX = 8;
-  const pPortraitY = botY + Math.round((botH - pPortraitSize) / 2);
+  // Player portrait — same dimensions as enemy
+  const pPortraitX = 6;
+  const pPortraitY = botContentY + 6;
   
   ctx.strokeStyle = '#5a5060';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(pPortraitX, pPortraitY, pPortraitSize, pPortraitSize);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(pPortraitX, pPortraitY, portraitW, portraitH);
   ctx.fillStyle = '#0c0c14';
-  ctx.fillRect(pPortraitX + 1, pPortraitY + 1, pPortraitSize - 2, pPortraitSize - 2);
+  ctx.fillRect(pPortraitX + 1, pPortraitY + 1, portraitW - 2, portraitH - 2);
   
-  // Draw player sprite in portrait
   if (PLAYER_SHEET.loaded) {
     const anim = PLAYER_SHEET.anims['idle_down'];
-    const innerSz = pPortraitSize - 4;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(pPortraitX + 2, pPortraitY + 2, innerSz, innerSz);
+    ctx.rect(pPortraitX + 1, pPortraitY + 1, portraitW - 2, portraitH - 2);
     ctx.clip();
     ctx.imageSmoothingEnabled = false;
+    const pInnerH = portraitH - 2;
+    const pScale = pInnerH / PLAYER_SHEET.frameH;
+    const pDrawW = PLAYER_SHEET.frameW * pScale;
+    const pdx = pPortraitX + 1 + Math.round((portraitW - 2 - pDrawW) / 2);
     ctx.drawImage(PLAYER_SHEET.img,
       0, anim.row * PLAYER_SHEET.frameH, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
-      pPortraitX + 2, pPortraitY + 2, innerSz, innerSz
+      pdx, pPortraitY + 1, pDrawW, pInnerH
     );
     ctx.imageSmoothingEnabled = true;
     ctx.restore();
   }
   
-  // Player HP bar (right of portrait)
-  const pInfoX = pPortraitX + pPortraitSize + 8;
-  const pBarY = pPortraitY + Math.round(pPortraitSize / 2) - Math.round(barH / 2);
+  // Player HP bar
+  const pInfoX = pPortraitX + portraitW + 6;
+  const pBarY = pPortraitY + 3;
   ctx.fillStyle = '#1a1a2a';
   ctx.fillRect(pInfoX, pBarY, barW, barH);
   const pHpRatio = c.playerHp / c.playerMaxHp;
@@ -606,15 +642,39 @@ function drawCombat() {
   ctx.strokeStyle = '#6a6070';
   ctx.strokeRect(pInfoX, pBarY, barW, barH);
   
+  // HP text
+  ctx.fillStyle = '#e8e0d0';
+  ctx.font = '10px ' + FONT;
+  ctx.textAlign = 'left';
+  ctx.fillText('HP ' + c.playerHp + '/' + c.playerMaxHp, pInfoX, pBarY + barH + 11);
+  
   // Player stats — only after first attack
   if (combatStarted) {
     ctx.fillStyle = '#a098a0';
     ctx.font = '10px ' + FONT;
-    ctx.textAlign = 'left';
-    const pStatY = pPortraitY + pPortraitSize + 2;
-    ctx.fillText('Eff ' + c.playerEff, pPortraitX, pStatY);
-    ctx.fillText('Def ' + c.playerDef, pPortraitX + 55, pStatY);
-    ctx.fillText('Wait ' + c.playerWait, pPortraitX + 110, pStatY);
+    const psy = pPortraitY + portraitH + 2;
+    ctx.fillText('Eff ' + c.playerEff, pPortraitX, psy);
+    ctx.fillText('Def ' + c.playerDef, pPortraitX + 52, psy);
+    ctx.fillText('Wait ' + c.playerWait, pPortraitX + 104, psy);
+  }
+  
+  // ── ACTION MENU (right side of bottom bar) ──
+  const menuX = Math.round(W * 0.55);
+  const menuY = botContentY + 8;
+  
+  ctx.font = '13px ' + FONT;
+  const actions = c.actions || ['Punch', 'Kick'];
+  const selectedIdx = c.selectedAction || 0;
+  
+  for (let i = 0; i < actions.length; i++) {
+    const ay = menuY + i * 20;
+    if (i === selectedIdx) {
+      ctx.fillStyle = '#e8d8c0';
+      ctx.fillText('▶ ' + actions[i], menuX, ay + 13);
+    } else {
+      ctx.fillStyle = '#807870';
+      ctx.fillText('  ' + actions[i], menuX, ay + 13);
+    }
   }
 }
 
@@ -747,7 +807,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.11', canvas.width - 8, 14);
+  ctx.fillText('v0.12', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
