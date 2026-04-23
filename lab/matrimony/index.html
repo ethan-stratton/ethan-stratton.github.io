@@ -417,6 +417,13 @@ function draw() {
   const playerDrawX = (vis.x - camX) * TILE * SCALE;
   const playerDrawY = (vis.y - camY) * TILE * SCALE;
   drawPlayer(ctx, playerDrawX, playerDrawY);
+  
+  // Version number (top right)
+  ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
+  ctx.font = '10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText('v0.01', canvas.width - 8, 14);
+  ctx.textAlign = 'left';
 }
 
 function drawSprite(ctx, spriteName, x, y, time) {
