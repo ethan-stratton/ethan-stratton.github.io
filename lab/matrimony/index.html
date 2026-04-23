@@ -207,6 +207,10 @@ const state = {
   flags: {},
   showFontTest: false,
   fontTestScroll: 0,
+  fontTestDragging: false,
+  fontTestDragStartY: 0,
+  fontTestDragStartScroll: 0,
+  fontTestContentH: 600,
   defeatedEnemies: {},
   openedChests: {},
   inventory: [],
@@ -601,8 +605,31 @@ const COMBAT_ACTIONS = {
 // Mouse state for combat menu
 const mouse = { x: 0, y: 0 };
 canvas.addEventListener('wheel', (e) => {
-  if (state.showFontTest) { e.preventDefault(); state.fontTestScroll += e.deltaY > 0 ? 30 : -30; state.fontTestScroll = Math.max(0, state.fontTestScroll); }
+  if (state.showFontTest) { e.preventDefault(); state.fontTestScroll += e.deltaY > 0 ? 10 : -10; state.fontTestScroll = Math.max(0, Math.min(state.fontTestScroll, Math.max(0, state.fontTestContentH - (canvas.height - 24)))); }
 }, { passive: false });
+canvas.addEventListener('mousedown', (e) => {
+  if (!state.showFontTest) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+  // Check if click is near scrollbar area (right 12px of panel)
+  if (mx >= canvas.width - 22) {
+    state.fontTestDragging = true;
+    state.fontTestDragStartY = my;
+    state.fontTestDragStartScroll = state.fontTestScroll;
+  }
+});
+canvas.addEventListener('mousemove', (e) => {
+  if (!state.fontTestDragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+  const panelH = canvas.height - 24;
+  const contentH = state.fontTestContentH;
+  const maxScroll = Math.max(0, contentH - panelH);
+  const dragRatio = (my - state.fontTestDragStartY) / panelH;
+  state.fontTestScroll = Math.max(0, Math.min(maxScroll, state.fontTestDragStartScroll + dragRatio * contentH));
+});
+document.addEventListener('mouseup', () => { state.fontTestDragging = false; });
 canvas.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
   mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
@@ -1179,9 +1206,9 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.27', canvas.width - 8, 14);
+  ctx.fillText('v0.28', canvas.width - 8, 14);
   
-  // Font comparison overlay (press F to toggle, scroll with mousewheel)
+  // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
     const panelX = 10, panelY = 10, panelW = canvas.width - 20, panelH = canvas.height - 20;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
@@ -1194,48 +1221,51 @@ function draw() {
     ctx.rect(panelX + 1, panelY + 1, panelW - 2, panelH - 2);
     ctx.clip();
     
+    // Helper: draw text with extra letter spacing
+    function drawSpaced(text, x, y, spacing) {
+      for (let i = 0; i < text.length; i++) {
+        ctx.fillText(text[i], x, y);
+        x += ctx.measureText(text[i]).width + spacing;
+      }
+      return x;
+    }
+    
     const sample = 'Punch  Kick  EFF: 12  DEF: 5  WAIT: 8  HP 30/30';
     const scrollY = -(state.fontTestScroll || 0);
     ctx.textAlign = 'left';
     let y = 30 + scrollY;
     
-    // RM2000 at different sizes
+    // RM2000 at different sizes WITH letter spacing
     const rm2kSizes = [8, 10, 12, 14, 16, 18, 20, 24];
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('RM2000 at different sizes:', 20, y); y += 14;
+    ctx.fillText('RM2000 at different sizes (with 1px letter spacing):', 20, y); y += 14;
     for (const sz of rm2kSizes) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText(sz + 'px:', 20, y + 10);
       ctx.fillStyle = '#e8e0d0'; ctx.font = sz + 'px "RM2000"';
-      ctx.fillText(sample, 52, y + 10);
+      drawSpaced(sample, 52, y + 10, 1);
       y += Math.max(sz + 4, 14);
     }
     y += 10;
     
-    // Other fonts
+    // Other fonts at 24px
     const others = [
-      { name: 'RM2000Alt 12px', font: '12px "RM2000Alt"' },
-      { name: 'RM2000Alt 16px', font: '16px "RM2000Alt"' },
-      { name: 'RM2000Alt 24px', font: '24px "RM2000Alt"' },
-      { name: 'RMG2000 12px', font: '12px "RMG2000"' },
-      { name: 'RMG2000 16px', font: '16px "RMG2000"' },
-      { name: 'RMG2000 24px', font: '24px "RMG2000"' },
-      { name: 'Pixelify 14px', font: '14px "Pixelify Sans"' },
-      { name: 'Pixelify 16px', font: '16px "Pixelify Sans"' },
-      { name: 'Pixelify 24px', font: '24px "Pixelify Sans"' },
+      { name: 'RM2000Alt 24px', font: '24px "RM2000Alt"', sp: 1 },
+      { name: 'RMG2000 24px', font: '24px "RMG2000"', sp: 1 },
+      { name: 'Pixelify 24px', font: '24px "Pixelify Sans"', sp: 0 },
     ];
     for (const o of others) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText(o.name + ':', 20, y + 10);
       ctx.fillStyle = '#e8e0d0'; ctx.font = o.font;
-      ctx.fillText(sample, 110, y + 10);
-      y += 22;
+      drawSpaced(sample, 110, y + 10, o.sp);
+      y += 28;
     }
     y += 16;
     
-    // ═══ RM2000 24px GRADIENT SECTION ═══
+    // ═══ RM2000 24px HORIZONTAL GRADIENTS ═══
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('── RM2000 24px with Color Gradients ──', 20, y); y += 20;
+    ctx.fillText('── RM2000 24px — Horizontal Gradients (left→right) ──', 20, y); y += 20;
     
     const gradSamples = [
       { text: '★ CRITICAL HIT ★', stops: [[0,'#ff4040'],[0.5,'#ffcc00'],[1,'#ff4040']] },
@@ -1253,7 +1283,22 @@ function draw() {
       const grad = ctx.createLinearGradient(20, 0, 20 + tw, 0);
       for (const [pos, color] of gs.stops) grad.addColorStop(pos, color);
       ctx.fillStyle = grad;
-      ctx.fillText(gs.text, 20, y + 20);
+      drawSpaced(gs.text, 20, y + 20, 1);
+      y += 32;
+    }
+    y += 16;
+    
+    // ═══ RM2000 24px VERTICAL GRADIENTS (top→bottom) ═══
+    ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
+    ctx.fillText('── RM2000 24px — Vertical Gradients (top→bottom) ──', 20, y); y += 20;
+    
+    for (const gs of gradSamples) {
+      ctx.font = '24px "RM2000"';
+      const textY = y + 20;
+      const grad = ctx.createLinearGradient(0, textY - 20, 0, textY + 4);
+      for (const [pos, color] of gs.stops) grad.addColorStop(pos, color);
+      ctx.fillStyle = grad;
+      drawSpaced(gs.text, 20, textY, 1);
       y += 32;
     }
     y += 16;
@@ -1271,23 +1316,27 @@ function draw() {
       y += 28;
     }
     
+    // Track content height for scrollbar
+    const contentH = (y - scrollY) - 10;
+    state.fontTestContentH = contentH;
+    
     ctx.restore();
     
     // Scroll hint
     ctx.fillStyle = 'rgba(140, 130, 140, 0.6)';
     ctx.font = '10px "Pixelify Sans"';
     ctx.textAlign = 'left';
-    ctx.fillText('Scroll: mousewheel  |  Press F to close', panelX + 8, panelY + panelH - 6);
+    ctx.fillText('Scroll: mousewheel or drag scrollbar  |  Press F to close', panelX + 8, panelY + panelH - 6);
     
     // Scrollbar
-    const contentH = y - scrollY - 30;
     const viewH = panelH - 4;
     if (contentH > viewH) {
-      const scrollRatio = (state.fontTestScroll || 0) / (contentH - viewH);
+      const maxScroll = contentH - viewH;
+      const scrollRatio = Math.min(1, (state.fontTestScroll || 0) / maxScroll);
       const barH = Math.max(20, Math.round(viewH * viewH / contentH));
       const barY = panelY + 2 + Math.round(scrollRatio * (viewH - barH));
-      ctx.fillStyle = 'rgba(160, 140, 160, 0.4)';
-      ctx.fillRect(panelX + panelW - 6, barY, 4, barH);
+      ctx.fillStyle = state.fontTestDragging ? 'rgba(200, 180, 200, 0.7)' : 'rgba(160, 140, 160, 0.4)';
+      ctx.fillRect(panelX + panelW - 8, barY, 6, barH);
     }
   }
   ctx.textAlign = 'left';
