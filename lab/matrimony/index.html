@@ -126,12 +126,11 @@ loadSprite('Enemy1', 'sprites/FireElemental.png');
 // GAME STATE
 // ══════════════════════════════════
 const state = {
-  player: { x: 0, y: 0 },  // grid coords
+  player: { x: 0, y: 0 },  // grid coords (destination)
   entities: [],
   collision: [],  // 2D array: 0=walk, 1=wall
   mapW: 0, mapH: 0,
   tiles: [],  // from LDtk tile layer
-  camera: { x: 0, y: 0 },
   facing: 'down',
   moving: false,
   moveTimer: 0,
@@ -139,6 +138,9 @@ const state = {
   dialogue: null,
   flags: {},
   defeatedEnemies: {},
+  // Smooth camera position (in tile coords, fractional)
+  smoothX: 0,
+  smoothY: 0,
 };
 
 // ══════════════════════════════════
@@ -202,12 +204,30 @@ async function loadLevel() {
 // CAMERA
 // ══════════════════════════════════
 function updateCamera() {
-  // Center on player
-  state.camera.x = state.player.x - Math.floor(CANVAS_TILES / 2);
-  state.camera.y = state.player.y - Math.floor(CANVAS_TILES / 2);
+  state.smoothX = state.player.x;
+  state.smoothY = state.player.y;
+}
+
+function getPlayerVisualPos() {
+  // Returns the player's visual position in tile coords (fractional during movement)
+  if (!state.moving) return { x: state.player.x, y: state.player.y };
+  const t = Math.min(1, state.moveTimer / MOVE_DURATION);
+  const ease = t * t * (3 - 2 * t); // smoothstep
+  return {
+    x: state.moveFrom.x + (state.player.x - state.moveFrom.x) * ease,
+    y: state.moveFrom.y + (state.player.y - state.moveFrom.y) * ease,
+  };
+}
+
+function getCameraOffset() {
+  // Camera centers on the player's visual (interpolated) position
+  const vis = getPlayerVisualPos();
+  let camX = vis.x - Math.floor(CANVAS_TILES / 2);
+  let camY = vis.y - Math.floor(CANVAS_TILES / 2);
   // Clamp
-  state.camera.x = Math.max(0, Math.min(state.mapW - CANVAS_TILES, state.camera.x));
-  state.camera.y = Math.max(0, Math.min(state.mapH - CANVAS_TILES, state.camera.y));
+  camX = Math.max(0, Math.min(state.mapW - CANVAS_TILES, camX));
+  camY = Math.max(0, Math.min(state.mapH - CANVAS_TILES, camY));
+  return { x: camX, y: camY };
 }
 
 // ══════════════════════════════════
@@ -264,13 +284,16 @@ function tryMove(dx, dy) {
 const MOVE_DURATION = 120; // ms for grid movement
 let lastMoveTime = 0;
 const MOVE_COOLDOWN = 150;
+let lastFrameTime = 0;
 
 function handleMovement(now) {
+  const dt = lastFrameTime ? (now - lastFrameTime) : 16;
+  lastFrameTime = now;
+
   if (state.moving) {
-    state.moveTimer += 16;
+    state.moveTimer += dt;
     if (state.moveTimer >= MOVE_DURATION) {
       state.moving = false;
-      updateCamera();
     }
     return;
   }
@@ -329,43 +352,36 @@ function closeDialogue() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
-  const camX = state.camera.x;
-  const camY = state.camera.y;
-  
-  // Interpolate camera during movement
-  let drawOffX = 0, drawOffY = 0;
-  if (state.moving) {
-    const t = Math.min(1, state.moveTimer / MOVE_DURATION);
-    const ease = t * t * (3 - 2 * t); // smoothstep
-    const fromCamX = state.moveFrom.x - Math.floor(CANVAS_TILES / 2);
-    const fromCamY = state.moveFrom.y - Math.floor(CANVAS_TILES / 2);
-    const toCamX = state.player.x - Math.floor(CANVAS_TILES / 2);
-    const toCamY = state.player.y - Math.floor(CANVAS_TILES / 2);
-    drawOffX = (fromCamX + (toCamX - fromCamX) * ease - camX) * TILE * SCALE;
-    drawOffY = (fromCamY + (toCamY - fromCamY) * ease - camY) * TILE * SCALE;
-  }
-  
-  ctx.save();
-  ctx.translate(drawOffX, drawOffY);
+  const cam = getCameraOffset();
+  const camX = cam.x;
+  const camY = cam.y;
+  const vis = getPlayerVisualPos();
   
   // Draw IntGrid (floor/walls) as fallback
-  for (let y = camY - 1; y < camY + CANVAS_TILES + 1; y++) {
-    for (let x = camX - 1; x < camX + CANVAS_TILES + 1; x++) {
+  // We need to draw extra tiles to cover fractional camera offsets
+  const startX = Math.floor(camX) - 1;
+  const startY = Math.floor(camY) - 1;
+  const endX = Math.ceil(camX) + CANVAS_TILES + 1;
+  const endY = Math.ceil(camY) + CANVAS_TILES + 1;
+  
+  for (let y = startY; y < endY; y++) {
+    for (let x = startX; x < endX; x++) {
       if (x < 0 || x >= state.mapW || y < 0 || y >= state.mapH) continue;
       const val = state.collision[y][x];
       const sx = (x - camX) * TILE * SCALE;
       const sy = (y - camY) * TILE * SCALE;
       ctx.fillStyle = INTGRID_COLORS[val] || '#1a1520';
-      ctx.fillRect(sx, sy, TILE * SCALE, TILE * SCALE);
+      ctx.fillRect(sx, sy, TILE * SCALE + 1, TILE * SCALE + 1); // +1 to avoid seams
     }
   }
   
   // Draw tile layer (from LDtk)
   if (tilesetLoaded && tilesetImg) {
+    ctx.imageSmoothingEnabled = false;
     for (const tile of state.tiles) {
       const gx = Math.floor(tile.px[0] / TILE);
       const gy = Math.floor(tile.px[1] / TILE);
-      if (gx < camX - 1 || gx > camX + CANVAS_TILES || gy < camY - 1 || gy > camY + CANVAS_TILES) continue;
+      if (gx < startX || gx > endX || gy < startY || gy > endY) continue;
       const sx = (gx - camX) * TILE * SCALE;
       const sy = (gy - camY) * TILE * SCALE;
       ctx.drawImage(tilesetImg,
@@ -373,33 +389,22 @@ function draw() {
         sx, sy, TILE * SCALE, TILE * SCALE
       );
     }
+    ctx.imageSmoothingEnabled = true;
   }
   
   // Draw entities
   for (const e of state.entities) {
     if (state.defeatedEnemies[e.id]) continue;
-    if (e.x < camX - 1 || e.x > camX + CANVAS_TILES || e.y < camY - 1 || e.y > camY + CANVAS_TILES) continue;
+    if (e.x < startX || e.x > endX || e.y < startY || e.y > endY) continue;
     const sx = (e.x - camX) * TILE * SCALE;
     const sy = (e.y - camY) * TILE * SCALE;
     drawEntity(ctx, e, sx, sy);
   }
   
-  // Draw player
-  const px = (state.player.x - camX) * TILE * SCALE;
-  const py = (state.player.y - camY) * TILE * SCALE;
-  // Interpolate position during movement
-  let playerDrawX = px, playerDrawY = py;
-  if (state.moving) {
-    const t = Math.min(1, state.moveTimer / MOVE_DURATION);
-    const ease = t * t * (3 - 2 * t);
-    const fromPx = (state.moveFrom.x - camX) * TILE * SCALE;
-    const fromPy = (state.moveFrom.y - camY) * TILE * SCALE;
-    playerDrawX = fromPx + (px - fromPx) * ease;
-    playerDrawY = fromPy + (py - fromPy) * ease;
-  }
+  // Draw player at visual (interpolated) position
+  const playerDrawX = (vis.x - camX) * TILE * SCALE;
+  const playerDrawY = (vis.y - camY) * TILE * SCALE;
   drawPlayer(ctx, playerDrawX, playerDrawY);
-  
-  ctx.restore();
 }
 
 function drawSprite(ctx, spriteName, x, y, time) {
