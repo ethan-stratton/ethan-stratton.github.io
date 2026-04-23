@@ -1206,7 +1206,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.34', canvas.width - 8, 14);
+  ctx.fillText('v0.35', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1408,48 +1408,41 @@ function draw() {
     ctx.textAlign = 'left';
     let y = 30 + scrollY;
     
-    // RM2000 9px NATIVE → SCALED UP (threshold + nearest-neighbor)
+    // RM2000 threshold + scale: trying many base sizes
     const sampleText = 'Punch  Kick  Eff: 12  HP 30/30';
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('RM2000 9px native → threshold AA → scale up (nearest-neighbor):', 20, y); y += 16;
+    ctx.fillText('RM2000 threshold+scale — finding the native size:', 20, y); y += 16;
     
     const scaledCombos = [
-      { sz: 9, sc: 2, label: '9px × 2 (18px)' },
-      { sz: 9, sc: 3, label: '9px × 3 (27px)' },
-      { sz: 9, sc: 4, label: '9px × 4 (36px)' },
-      { sz: 9, sc: 5, label: '9px × 5 (45px)' },
+      { sz: 12, sc: 2, label: '12px × 2 (24)' },
+      { sz: 13, sc: 2, label: '13px × 2 (26)' },
+      { sz: 14, sc: 2, label: '14px × 2 (28)' },
+      { sz: 15, sc: 2, label: '15px × 2 (30)' },
+      { sz: 16, sc: 2, label: '16px × 2 (32)' },
+      { sz: 17, sc: 2, label: '17px × 2 (34)' },
+      { sz: 18, sc: 2, label: '18px × 2 (36)' },
+      { sz: 20, sc: 2, label: '20px × 2 (40)' },
+      { sz: 24, sc: 2, label: '24px × 2 (48)' },
     ];
     for (const c2 of scaledCombos) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       const labelY = y + Math.round(c2.sz * c2.sc * 0.5);
       ctx.fillText(c2.label + ':', 20, labelY);
-      drawCrispScaled(sampleText, 120, y, c2.sz, c2.sc, '#e8e0d0', 1);
+      drawCrispScaled(sampleText, 130, y, c2.sz, c2.sc, '#e8e0d0', 1);
       y += c2.sz * c2.sc + 10;
     }
     y += 10;
     
-    // Also try other base sizes scaled to ~32px display
+    // Direct crisp (no scaling) at popular sizes for comparison
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('Other base sizes scaled to ~32px display:', 20, y); y += 16;
-    const otherScaled = [
-      { sz: 8, sc: 4, label: '8px × 4 (32px)' },
-      { sz: 10, sc: 3, label: '10px × 3 (30px)' },
-      { sz: 11, sc: 3, label: '11px × 3 (33px)' },
-      { sz: 16, sc: 2, label: '16px × 2 (32px)' },
-    ];
-    for (const c2 of otherScaled) {
+    ctx.fillText('Direct crisp (thresholded, no scale) for comparison:', 20, y); y += 16;
+    const directSizes = [24, 28, 32];
+    for (const sz of directSizes) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
-      ctx.fillText(c2.label + ':', 20, y + Math.round(c2.sz * c2.sc * 0.5));
-      drawCrispScaled(sampleText, 120, y, c2.sz, c2.sc, '#e8e0d0', 1);
-      y += c2.sz * c2.sc + 10;
+      ctx.fillText(sz + 'px:', 20, y + Math.round(sz * 0.4));
+      drawCrispText(sampleText, 60, y, sz, '#e8e0d0', 2);
+      y += sz + 10;
     }
-    y += 10;
-    
-    // Direct 32px crisp (no scaling, just thresholded) for comparison
-    ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('32px direct crisp (thresholded, no scale) for comparison:', 20, y); y += 16;
-    drawCrispText(sampleText, 20, y, 32, '#e8e0d0', 2);
-    y += 40;
     
     // Other fonts at 24px with shadow
     const others = [
