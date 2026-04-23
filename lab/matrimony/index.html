@@ -688,6 +688,101 @@ canvas.addEventListener('click', (e) => {
   }
 });
 
+// ══════════════════════════════════
+// CRISP TEXT RENDERING
+// ══════════════════════════════════
+const CRISP_THRESHOLD = 220;
+const CRISP_FONT = 'RM2000Alt';
+const CRISP_SIZE = 12;
+
+function crispText(text, x, y, size, color, spacing) {
+  if (!crispText._c) {
+    crispText._c = document.createElement('canvas');
+    crispText._ctx = crispText._c.getContext('2d', { willReadFrequently: true });
+    crispText._c2 = document.createElement('canvas');
+    crispText._ctx2 = crispText._c2.getContext('2d', { willReadFrequently: true });
+  }
+  const fs = size || CRISP_SIZE;
+  const sp = spacing != null ? spacing : 1;
+  const oc = crispText._c, octx = crispText._ctx;
+  const w = 700, h = fs + 8;
+  oc.width = w; oc.height = h;
+  octx.clearRect(0, 0, w, h);
+  octx.font = fs + 'px "' + CRISP_FONT + '"';
+  octx.textAlign = 'left'; octx.textBaseline = 'top';
+  octx.fillStyle = '#ffffff';
+  let tx = 2;
+  for (let i = 0; i < text.length; i++) { octx.fillText(text[i], tx, 2); tx += octx.measureText(text[i]).width + sp; }
+  const imgData = octx.getImageData(0, 0, tx + 2, h);
+  for (let i = 3; i < imgData.data.length; i += 4) imgData.data[i] = imgData.data[i] >= CRISP_THRESHOLD ? 255 : 0;
+  octx.putImageData(imgData, 0, 0);
+  octx.globalCompositeOperation = 'source-atop';
+  octx.fillStyle = color || '#e8e0d0';
+  octx.fillRect(0, 0, tx + 2, h);
+  octx.globalCompositeOperation = 'source-over';
+  const sc = crispText._c2, sctx = crispText._ctx2;
+  sc.width = w; sc.height = h;
+  sctx.clearRect(0, 0, w, h);
+  sctx.font = fs + 'px "' + CRISP_FONT + '"';
+  sctx.textAlign = 'left'; sctx.textBaseline = 'top';
+  sctx.fillStyle = '#ffffff';
+  let stx = 2;
+  for (let i = 0; i < text.length; i++) { sctx.fillText(text[i], stx, 2); stx += sctx.measureText(text[i]).width + sp; }
+  const sData = sctx.getImageData(0, 0, stx + 2, h);
+  for (let i = 3; i < sData.data.length; i += 4) sData.data[i] = sData.data[i] >= CRISP_THRESHOLD ? 255 : 0;
+  for (let i = 0; i < sData.data.length; i += 4) { sData.data[i] = 0; sData.data[i+1] = 0; sData.data[i+2] = 0; }
+  sctx.putImageData(sData, 0, 0);
+  ctx.drawImage(sc, 0, 0, stx + 2, h, x + 1, y + 1, stx + 2, h);
+  ctx.drawImage(oc, 0, 0, tx + 2, h, x, y, tx + 2, h);
+  return tx;
+}
+
+function crispGradientText(text, x, y, size, stops, spacing) {
+  if (!crispGradientText._c) {
+    crispGradientText._c = document.createElement('canvas');
+    crispGradientText._ctx = crispGradientText._c.getContext('2d', { willReadFrequently: true });
+    crispGradientText._c2 = document.createElement('canvas');
+    crispGradientText._ctx2 = crispGradientText._c2.getContext('2d', { willReadFrequently: true });
+  }
+  const fs = size || CRISP_SIZE;
+  const sp = spacing != null ? spacing : 1;
+  const oc = crispGradientText._c, octx = crispGradientText._ctx;
+  const w = 700, h = fs + 8;
+  oc.width = w; oc.height = h;
+  octx.clearRect(0, 0, w, h);
+  octx.font = fs + 'px "' + CRISP_FONT + '"';
+  octx.textAlign = 'left'; octx.textBaseline = 'top';
+  octx.fillStyle = '#ffffff';
+  let tx = 2;
+  for (let i = 0; i < text.length; i++) { octx.fillText(text[i], tx, 2); tx += octx.measureText(text[i]).width + sp; }
+  const imgData = octx.getImageData(0, 0, tx + 2, h);
+  for (let i = 3; i < imgData.data.length; i += 4) imgData.data[i] = imgData.data[i] >= CRISP_THRESHOLD ? 255 : 0;
+  octx.putImageData(imgData, 0, 0);
+  octx.globalCompositeOperation = 'source-atop';
+  const grad = octx.createLinearGradient(0, 0, 0, h);
+  for (const [pos, col] of stops) grad.addColorStop(pos, col);
+  octx.fillStyle = grad;
+  octx.fillRect(0, 0, tx + 2, h);
+  octx.globalCompositeOperation = 'source-over';
+  const sc = crispGradientText._c2, sctx = crispGradientText._ctx2;
+  sc.width = w; sc.height = h;
+  sctx.clearRect(0, 0, w, h);
+  sctx.font = fs + 'px "' + CRISP_FONT + '"';
+  sctx.textAlign = 'left'; sctx.textBaseline = 'top';
+  sctx.fillStyle = '#ffffff';
+  let stx = 2;
+  for (let i = 0; i < text.length; i++) { sctx.fillText(text[i], stx, 2); stx += sctx.measureText(text[i]).width + sp; }
+  const sData = sctx.getImageData(0, 0, stx + 2, h);
+  for (let i = 3; i < sData.data.length; i += 4) sData.data[i] = sData.data[i] >= CRISP_THRESHOLD ? 255 : 0;
+  for (let i = 0; i < sData.data.length; i += 4) { sData.data[i] = 0; sData.data[i+1] = 0; sData.data[i+2] = 0; }
+  sctx.putImageData(sData, 0, 0);
+  ctx.drawImage(sc, 0, 0, stx + 2, h, x + 1, y + 1, stx + 2, h);
+  ctx.drawImage(oc, 0, 0, tx + 2, h, x, y, tx + 2, h);
+  return tx;
+}
+
+const GOLD_GRADIENT = [[0, '#f0d060'], [0.4, '#ffe8a0'], [0.6, '#ffe8a0'], [1, '#c89830']];
+
 function drawCombat() {
   const c = state.combat;
   const W = canvas.width;
@@ -757,27 +852,16 @@ function drawCombat() {
   // Enemy action display — name right of HP bar, stats below
   if (c.enemyAction) {
     const act = COMBAT_ACTIONS[c.enemyAction] || {};
-    // Action name to right of HP bar
-    ctx.font = '12px ' + FONT;
-    ctx.fillStyle = '#d0c0a0';
-    ctx.textAlign = 'left';
-    ctx.fillText(c.enemyAction, infoX + barW + 8, barY + barH - 1);
-    // EFF DEF WAIT on line below HP bar
-    const statY = barY + barH + 13;
-    ctx.font = 'bold 11px ' + FONT;
+    crispText(c.enemyAction, infoX + barW + 8, barY - 4, 12, '#d0c0a0');
+    const statY = barY + barH + 4;
     let sx = infoX;
-    ctx.fillStyle = '#d4a830'; ctx.fillText('Eff:', sx, statY);
-    ctx.font = '11px ' + FONT; ctx.fillStyle = '#e8e0d0';
-    sx += ctx.measureText('Eff:').width + 2; ctx.fillText(act.eff || 0, sx, statY);
-    sx += ctx.measureText('' + (act.eff || 0)).width + 10;
-    ctx.font = 'bold 11px ' + FONT; ctx.fillStyle = '#d4a830'; ctx.fillText('Def:', sx, statY);
-    ctx.font = '11px ' + FONT; ctx.fillStyle = '#e8e0d0';
-    sx += ctx.measureText('Def:').width + 2; ctx.fillText(act.def || 0, sx, statY);
-    sx += ctx.measureText('' + (act.def || 0)).width + 10;
-    ctx.font = 'bold 11px ' + FONT; ctx.fillStyle = '#d4a830'; ctx.fillText('Wait:', sx, statY);
-    ctx.font = '11px ' + FONT; ctx.fillStyle = '#e8e0d0';
-    sx += ctx.measureText('Wait:').width + 2;
-    ctx.fillText(c.enemyWaitCountdown >= 0 ? c.enemyWaitCountdown : (act.wait || 0), sx, statY);
+    const waitVal = c.enemyWaitCountdown >= 0 ? c.enemyWaitCountdown : (act.wait || 0);
+    sx += crispGradientText('Eff:', sx, statY, 12, GOLD_GRADIENT) + 2;
+    sx += crispText('' + (act.eff || 0), sx, statY, 12, '#e8e0d0') + 8;
+    sx += crispGradientText('Def:', sx, statY, 12, GOLD_GRADIENT) + 2;
+    sx += crispText('' + (act.def || 0), sx, statY, 12, '#e8e0d0') + 8;
+    sx += crispGradientText('Wait:', sx, statY, 12, GOLD_GRADIENT) + 2;
+    crispText('' + waitVal, sx, statY, 12, '#e8e0d0');
   }
   
   // ── ARENA ──
@@ -892,11 +976,9 @@ function drawCombat() {
       // Question mark above enemy
       const bobY = Math.sin(now / 200) * 3;
       const qAlpha = Math.min(1, rt < 0.1 ? rt / 0.1 : rt > 0.7 ? (1 - rt) / 0.3 : 1);
-      ctx.font = 'bold 20px ' + FONT;
-      ctx.fillStyle = `rgba(255, 220, 80, ${qAlpha})`;
-      ctx.textAlign = 'center';
-      ctx.fillText('?', enemyArenaX + enemyCombatSize / 2, enemyArenaY - 8 + bobY);
-      ctx.textAlign = 'left';
+      ctx.globalAlpha = qAlpha;
+      crispText('?', enemyArenaX + enemyCombatSize / 2 - 6, enemyArenaY - 16 + bobY, 16, '#ffdc50');
+      ctx.globalAlpha = 1;
     }
   }
   
@@ -949,11 +1031,9 @@ function drawCombat() {
   // ESC — after 5s idle
   if (elapsed > 5000) {
     const alpha = 0.3 + 0.3 * Math.sin(now / 800);
-    ctx.fillStyle = `rgba(140, 130, 140, ${alpha})`;
-    ctx.font = '12px ' + FONT;
-    ctx.textAlign = 'right';
-    ctx.fillText('Esc = Run Away', W - 8, arenaY + 15);
-    ctx.textAlign = 'left';
+    ctx.globalAlpha = alpha;
+    crispText('Esc = Run Away', W - 120, arenaY + 4, 10, '#8c828c');
+    ctx.globalAlpha = 1;
   }
   
   // ── BOTTOM BAR ──
@@ -987,11 +1067,8 @@ function drawCombat() {
     ctx.restore();
   }
   
-  // HP below portrait — bigger
-  ctx.fillStyle = '#e8e0d0';
-  ctx.font = 'bold 16px ' + FONT;
-  ctx.textAlign = 'left';
-  ctx.fillText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 16);
+  // HP below portrait
+  crispText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 4, 14, '#e8e0d0');
   
   // ── ACTION GRID: always visible, 2 columns × 4 rows ──
   const gridX = pPortraitX + portraitW + 16;
@@ -1025,62 +1102,31 @@ function drawCombat() {
     const isSelected = (c.phase === 'action') && i === (c.selectedAction || 0);
     const dimmed = c.phase === 'target' || c.waiting;
     
-    ctx.font = '16px ' + FONT;
-    if (isSelected && !dimmed) {
-      ctx.fillStyle = '#ffe8c0';
-    } else {
-      ctx.fillStyle = dimmed ? '#4a4440' : '#706860';
-    }
-    ctx.textAlign = 'left';
-    ctx.fillText(actions[i], ax + 4, ay + gridRowH - 5);
+    const color = isSelected && !dimmed ? '#ffe8c0' : dimmed ? '#4a4440' : '#a09888';
+    crispText(actions[i], ax + 4, ay + 2, 14, color);
   }
   
   // Selected action stats at bottom — gold labels, white numbers, bigger and spread out
   const sel = c.selectedAction || 0;
   if (c.phase === 'action' && sel < actions.length) {
     const act = COMBAT_ACTIONS[actions[sel]] || {};
-    const statsY = H - pad - 2;
-    const labelFont = 'bold 14px ' + FONT;
-    const numFont = '14px ' + FONT;
-    const goldColor = '#d4a830';
-    const whiteColor = '#e8e0d0';
+    const statsY = H - pad - 18;
     let sx = gridX + 4;
-    
-    ctx.textAlign = 'left';
-    ctx.font = labelFont; ctx.fillStyle = goldColor;
-    ctx.fillText('Eff:', sx, statsY);
-    ctx.font = numFont; ctx.fillStyle = whiteColor;
-    ctx.fillText(' ' + (act.eff || 0), sx + ctx.measureText('Eff:').width, statsY);
-    sx += 80;
-    
-    ctx.font = labelFont; ctx.fillStyle = goldColor;
-    ctx.fillText('Def:', sx, statsY);
-    ctx.font = numFont; ctx.fillStyle = whiteColor;
-    ctx.fillText(' ' + (act.def || 0), sx + ctx.measureText('Def:').width, statsY);
-    sx += 80;
-    
-    ctx.font = labelFont; ctx.fillStyle = goldColor;
-    ctx.fillText('Wait:', sx, statsY);
-    ctx.font = numFont; ctx.fillStyle = whiteColor;
-    // Show countdown if actively waiting, otherwise show base value
     const waitVal = c.waiting ? c.waitCountdown : (act.wait || 0);
-    ctx.fillText(' ' + waitVal, sx + ctx.measureText('Wait:').width, statsY);
+    sx += crispGradientText('Eff:', sx, statsY, 12, GOLD_GRADIENT) + 2;
+    sx += crispText('' + (act.eff || 0), sx, statsY, 12, '#e8e0d0') + 12;
+    sx += crispGradientText('Def:', sx, statsY, 12, GOLD_GRADIENT) + 2;
+    sx += crispText('' + (act.def || 0), sx, statsY, 12, '#e8e0d0') + 12;
+    sx += crispGradientText('Wait:', sx, statsY, 12, GOLD_GRADIENT) + 2;
+    crispText('' + waitVal, sx, statsY, 12, '#e8e0d0');
   }
   
   // Hints
   if (c.phase === 'action' && !c.waiting) {
-    ctx.font = '11px ' + FONT;
-    ctx.fillStyle = 'rgba(140, 130, 140, 0.5)';
-    ctx.textAlign = 'right';
-    ctx.fillText('X = Back', W - pad, H - pad);
-    ctx.textAlign = 'left';
+    crispText('X = Back', W - pad - 60, H - pad - 14, 10, '#8c828c');
   }
   if (c.waiting) {
-    ctx.font = '11px ' + FONT;
-    ctx.fillStyle = 'rgba(140, 130, 140, 0.5)';
-    ctx.textAlign = 'right';
-    ctx.fillText('X = Cancel', W - pad, H - pad);
-    ctx.textAlign = 'left';
+    crispText('X = Cancel', W - pad - 70, H - pad - 14, 10, '#8c828c');
   }
 }
 
@@ -1117,31 +1163,32 @@ function drawDialogue() {
   
   // Speaker name
   if (state.dialogue.speaker) {
-    ctx.fillStyle = '#b89cff';
-    ctx.font = '14px ' + FONT;
-    ctx.textAlign = 'left';
-    ctx.fillText(state.dialogue.speaker, boxX + 12, boxY + 22);
+    crispText(state.dialogue.speaker, boxX + 12, boxY + 6, 14, '#b89cff');
   }
   
-  // Text (word wrap)
-  ctx.fillStyle = '#c8b8a0';
-  ctx.font = '13px ' + FONT;
-  const textY = state.dialogue.speaker ? boxY + 42 : boxY + 22;
+  // Text (word wrap) — use crisp text
+  const textY = state.dialogue.speaker ? boxY + 26 : boxY + 6;
+  // We need to word-wrap with crisp text. Measure using an offscreen ctx.
+  if (!drawDialogue._mc) {
+    drawDialogue._mc = document.createElement('canvas').getContext('2d');
+  }
+  const mctx = drawDialogue._mc;
+  mctx.font = '12px "' + CRISP_FONT + '"';
   const maxW = boxW - 24;
   const words = state.dialogue.text.split(' ');
   let line = '';
   let lineY = textY;
   for (const word of words) {
     const test = line + word + ' ';
-    if (ctx.measureText(test).width > maxW && line) {
-      ctx.fillText(line.trim(), boxX + 12, lineY);
+    if (mctx.measureText(test).width > maxW && line) {
+      crispText(line.trim(), boxX + 12, lineY, 12, '#c8b8a0');
       line = word + ' ';
       lineY += 18;
     } else {
       line = test;
     }
   }
-  ctx.fillText(line.trim(), boxX + 12, lineY);
+  crispText(line.trim(), boxX + 12, lineY, 12, '#c8b8a0');
 }
 
 // ══════════════════════════════════
@@ -1215,7 +1262,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.43', canvas.width - 8, 14);
+  ctx.fillText('v0.44', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
