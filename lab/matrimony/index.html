@@ -290,46 +290,61 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   
-  // Combat menu navigation (2x4 grid: left col 0-3, right col 4-7)
+  // Combat input — depends on phase
   if (state.combat) {
     const c = state.combat;
-    const numActions = Math.min((c.actions || []).length, 8);
-    if (numActions > 0) {
-      const sel = c.selectedAction || 0;
-      const col = sel < 4 ? 0 : 1;
-      const row = sel < 4 ? sel : sel - 4;
-      if (e.key === 'ArrowUp') {
-        const newRow = (row - 1 + 4) % 4;
-        const newIdx = col * 4 + newRow;
-        c.selectedAction = newIdx < numActions ? newIdx : sel;
-        e.preventDefault(); return;
-      }
-      if (e.key === 'ArrowDown') {
-        const newRow = (row + 1) % 4;
-        const newIdx = col * 4 + newRow;
-        c.selectedAction = newIdx < numActions ? newIdx : sel;
-        e.preventDefault(); return;
-      }
-      if (e.key === 'ArrowLeft') {
-        if (col === 1) { const newIdx = row; c.selectedAction = newIdx < numActions ? newIdx : sel; }
-        e.preventDefault(); return;
-      }
-      if (e.key === 'ArrowRight') {
-        if (col === 0) { const newIdx = 4 + row; c.selectedAction = newIdx < numActions ? newIdx : sel; }
-        e.preventDefault(); return;
+    
+    if (c.phase === 'target') {
+      // Target selection phase — arrows would cycle enemies (only 1 for now)
+      // Z confirms target, moves to action phase
+      // No arrow handling needed yet (single enemy)
+    } else if (c.phase === 'action') {
+      // Action selection phase — 2x4 grid navigation
+      const numActions = Math.min((c.actions || []).length, 8);
+      if (numActions > 0) {
+        const sel = c.selectedAction || 0;
+        const col = sel < 4 ? 0 : 1;
+        const row = sel < 4 ? sel : sel - 4;
+        if (e.key === 'ArrowUp') {
+          const newRow = (row - 1 + 4) % 4;
+          const newIdx = col * 4 + newRow;
+          c.selectedAction = newIdx < numActions ? newIdx : sel;
+          e.preventDefault(); return;
+        }
+        if (e.key === 'ArrowDown') {
+          const newRow = (row + 1) % 4;
+          const newIdx = col * 4 + newRow;
+          c.selectedAction = newIdx < numActions ? newIdx : sel;
+          e.preventDefault(); return;
+        }
+        if (e.key === 'ArrowLeft') {
+          if (col === 1) { const newIdx = row; c.selectedAction = newIdx < numActions ? newIdx : sel; }
+          e.preventDefault(); return;
+        }
+        if (e.key === 'ArrowRight') {
+          if (col === 0) { const newIdx = 4 + row; c.selectedAction = newIdx < numActions ? newIdx : sel; }
+          e.preventDefault(); return;
+        }
       }
     }
   }
   
-  // Z = Confirm (interact, advance dialogue, select combat action)
+  // Z = Confirm
   if (e.key === 'z' || e.key === 'Z') {
     e.preventDefault();
     if (state.combat) {
       const c = state.combat;
-      const action = (c.actions || [])[c.selectedAction || 0];
-      if (action) {
-        c.firstAttackDone = true;
-        c.attackText = action;
+      if (c.phase === 'target') {
+        // Confirm enemy target → move to action selection
+        c.phase = 'action';
+        c.selectedAction = 0;
+      } else if (c.phase === 'action') {
+        const action = (c.actions || [])[c.selectedAction || 0];
+        if (action) {
+          c.firstAttackDone = true;
+          c.attackText = action;
+          // TODO: wire actual combat logic
+        }
       }
     } else if (state.dialogue) {
       closeDialogue();
@@ -339,13 +354,17 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   
-  // X = Cancel (close dialogue, exit combat if allowed)
+  // X = Cancel
   if (e.key === 'x' || e.key === 'X') {
     e.preventDefault();
-    if (state.dialogue) {
+    if (state.combat) {
+      const c = state.combat;
+      if (c.phase === 'action') {
+        // Cancel back to target selection
+        c.phase = 'target';
+      }
+    } else if (state.dialogue) {
       closeDialogue();
-    } else if (state.combat && performance.now() - state.combat.startTime > 5000) {
-      exitCombat();
     }
     return;
   }
@@ -480,13 +499,13 @@ function startCombat(entity, enemyStats) {
     playerWait: 0,
     attackText: '',
     startTime: performance.now(),
-    slideInDuration: 500, // ms for slide-in easing
-    enemyFlashEnd: 0, // set after slide-in completes
+    slideInDuration: 500,
+    phase: 'target', // 'target' = select enemy, 'action' = select attack
+    selectedEnemy: 0, // index into enemies list (for multi-enemy later)
     actions: ['Punch', 'Kick', ...(state.inventory.includes('Shortbow') ? ['Shortbow'] : [])],
     selectedAction: 0,
     firstAttackDone: false,
   };
-  state.combat.enemyFlashEnd = state.combat.startTime + state.combat.slideInDuration + 600;
 }
 
 function exitCombat() {
@@ -513,33 +532,43 @@ canvas.addEventListener('mousemove', (e) => {
 canvas.addEventListener('click', (e) => {
   if (!state.combat) return;
   const c = state.combat;
-  const actions = c.actions || [];
-  const W = canvas.width;
-  const H = canvas.height;
-  const topH = Math.round(H * 0.10);
-  const arenaH = Math.round(H * 0.42);
-  const botContentY = topH + arenaH;
-  const botH = H - botContentY;
-  const pad = 8;
-  const portraitH = Math.round(topH * 0.7);
-  const portraitW = Math.round(portraitH * 2.5);
-  const pPortraitY = botContentY + pad + 2;
-  const portraitCenterY = pPortraitY + Math.round(portraitH / 2);
-  const gridX = pad + 12 + portraitW + 16;
-  const gridRowH = 20;
-  const gridTotalH = 4 * gridRowH;
-  const gridY = portraitCenterY - Math.round(gridTotalH / 2);
-  const colW = Math.round((W - gridX - 16) / 2);
-  for (let i = 0; i < actions.length && i < 8; i++) {
-    const col = i < 4 ? 0 : 1;
-    const row = i < 4 ? i : i - 4;
-    const ax = gridX + col * colW;
-    const ay = gridY + row * gridRowH;
-    if (mouse.x >= ax && mouse.x <= ax + colW && mouse.y >= ay && mouse.y <= ay + gridRowH) {
-      c.selectedAction = i;
-      c.firstAttackDone = true;
-      c.attackText = actions[i];
-      break;
+  
+  if (c.phase === 'target') {
+    // Click on enemy in arena to confirm target
+    c.phase = 'action';
+    c.selectedAction = 0;
+    return;
+  }
+  
+  if (c.phase === 'action') {
+    const actions = c.actions || [];
+    const W = canvas.width;
+    const H = canvas.height;
+    const topH = Math.round(H * 0.10);
+    const arenaH = Math.round(H * 0.42);
+    const botContentY = topH + arenaH;
+    const botH = H - botContentY;
+    const pad = 8;
+    const portraitH = Math.round(topH * 0.7);
+    const portraitW = Math.round(portraitH * 2.5);
+    const pPortraitY = botContentY + pad + 2;
+    const portraitCenterY = pPortraitY + Math.round(portraitH / 2);
+    const gridX = pad + 12 + portraitW + 16;
+    const gridRowH = 20;
+    const gridTotalH = 4 * gridRowH;
+    const gridY = portraitCenterY - Math.round(gridTotalH / 2);
+    const colW = Math.round((W - gridX - 16) / 2);
+    for (let i = 0; i < actions.length && i < 8; i++) {
+      const col = i < 4 ? 0 : 1;
+      const row = i < 4 ? i : i - 4;
+      const ax = gridX + col * colW;
+      const ay = gridY + row * gridRowH;
+      if (mouse.x >= ax && mouse.x <= ax + colW && mouse.y >= ay && mouse.y <= ay + gridRowH) {
+        c.selectedAction = i;
+        c.firstAttackDone = true;
+        c.attackText = actions[i];
+        break;
+      }
     }
   }
 });
@@ -637,11 +666,34 @@ function drawCombat() {
     ctx.drawImage(spr.img, frame * SPRITE_FRAME_SIZE, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
       enemyArenaX, enemyArenaY, enemyCombatSize, enemyCombatSize);
     
-    // White flash — selected enemy pulses white
-    if (slideT >= 1) {
-      const flashAlpha = 0.15 + 0.2 * Math.sin(now / 300);
-      ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, flashAlpha)})`;
-      ctx.fillRect(enemyArenaX, enemyArenaY, enemyCombatSize, enemyCombatSize);
+    // White flash on enemy pixels only — during target phase after slide-in
+    if (slideT >= 1 && c.phase === 'target') {
+      const flashAlpha = 0.3 + 0.5 * Math.sin(now / 150); // fast pulse
+      if (flashAlpha > 0) {
+        // Use offscreen canvas to create white silhouette
+        if (!drawCombat._flashCanvas) {
+          drawCombat._flashCanvas = document.createElement('canvas');
+          drawCombat._flashCtx = drawCombat._flashCanvas.getContext('2d');
+        }
+        const fc = drawCombat._flashCanvas;
+        const fctx = drawCombat._flashCtx;
+        fc.width = enemyCombatSize;
+        fc.height = enemyCombatSize;
+        fctx.clearRect(0, 0, fc.width, fc.height);
+        fctx.imageSmoothingEnabled = false;
+        // Draw sprite
+        fctx.drawImage(spr.img, frame * SPRITE_FRAME_SIZE, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
+          0, 0, enemyCombatSize, enemyCombatSize);
+        // Fill white, only on existing pixels
+        fctx.globalCompositeOperation = 'source-atop';
+        fctx.fillStyle = 'white';
+        fctx.fillRect(0, 0, fc.width, fc.height);
+        fctx.globalCompositeOperation = 'source-over';
+        // Draw the white silhouette with alpha
+        ctx.globalAlpha = flashAlpha;
+        ctx.drawImage(fc, enemyArenaX, enemyArenaY);
+        ctx.globalAlpha = 1;
+      }
     }
     ctx.imageSmoothingEnabled = true;
   }
@@ -714,47 +766,62 @@ function drawCombat() {
   const portraitCenterY = pPortraitY + Math.round(portraitH / 2);
   const gridRowH = 20;
   const gridTotalH = 4 * gridRowH;
-  const gridY = portraitCenterY - Math.round(gridTotalH / 2); // center grid on portrait
+  const gridY = pPortraitY + 2; // start near top of portrait area
   const colW = Math.round((W - gridX - 16) / 2);
   
   const actions = c.actions || ['Punch', 'Kick'];
   
-  // Mouse hover
-  let hovered = -1;
-  for (let i = 0; i < actions.length && i < 8; i++) {
-    const col = i < 4 ? 0 : 1;
-    const row = i < 4 ? i : i - 4;
-    const ax = gridX + col * colW;
-    const ay = gridY + row * gridRowH;
-    if (mouse.x >= ax && mouse.x <= ax + colW && mouse.y >= ay && mouse.y <= ay + gridRowH) {
-      hovered = i;
-    }
-  }
-  if (hovered >= 0) c.selectedAction = hovered;
-  
-  // Draw grid items
-  for (let i = 0; i < actions.length && i < 8; i++) {
-    const col = i < 4 ? 0 : 1;
-    const row = i < 4 ? i : i - 4;
-    const ax = gridX + col * colW;
-    const ay = gridY + row * gridRowH;
-    const isSelected = i === (c.selectedAction || 0);
-    
-    ctx.font = '15px ' + FONT;
-    ctx.fillStyle = isSelected ? '#ffe8c0' : '#706860';
-    ctx.textAlign = 'left';
-    ctx.fillText(actions[i], ax + 4, ay + gridRowH - 4);
-  }
-  
-  // Selected action stats at bottom of screen
-  const sel = c.selectedAction || 0;
-  if (sel < actions.length) {
-    const act = COMBAT_ACTIONS[actions[sel]] || {};
-    ctx.font = '13px ' + FONT;
+  if (c.phase === 'target') {
+    // Show "Select Target" prompt
+    ctx.font = '14px ' + FONT;
     ctx.fillStyle = '#b0a898';
     ctx.textAlign = 'left';
-    const statsY = H - pad;
-    ctx.fillText('EFF: ' + (act.eff || 0) + '    DEF: ' + (act.def || 0) + '    WAIT: ' + (act.wait || 0), gridX + 4, statsY);
+    ctx.fillText('Z = Select Target', gridX + 4, portraitCenterY + 4);
+  } else if (c.phase === 'action') {
+    // Mouse hover
+    let hovered = -1;
+    for (let i = 0; i < actions.length && i < 8; i++) {
+      const col = i < 4 ? 0 : 1;
+      const row = i < 4 ? i : i - 4;
+      const ax = gridX + col * colW;
+      const ay = gridY + row * gridRowH;
+      if (mouse.x >= ax && mouse.x <= ax + colW && mouse.y >= ay && mouse.y <= ay + gridRowH) {
+        hovered = i;
+      }
+    }
+    if (hovered >= 0) c.selectedAction = hovered;
+    
+    // Draw grid items
+    for (let i = 0; i < actions.length && i < 8; i++) {
+      const col = i < 4 ? 0 : 1;
+      const row = i < 4 ? i : i - 4;
+      const ax = gridX + col * colW;
+      const ay = gridY + row * gridRowH;
+      const isSelected = i === (c.selectedAction || 0);
+      
+      ctx.font = '15px ' + FONT;
+      ctx.fillStyle = isSelected ? '#ffe8c0' : '#706860';
+      ctx.textAlign = 'left';
+      ctx.fillText(actions[i], ax + 4, ay + gridRowH - 4);
+    }
+    
+    // Selected action stats at bottom of screen
+    const sel = c.selectedAction || 0;
+    if (sel < actions.length) {
+      const act = COMBAT_ACTIONS[actions[sel]] || {};
+      ctx.font = '13px ' + FONT;
+      ctx.fillStyle = '#b0a898';
+      ctx.textAlign = 'left';
+      const statsY = H - pad;
+      ctx.fillText('EFF: ' + (act.eff || 0) + '    DEF: ' + (act.def || 0) + '    WAIT: ' + (act.wait || 0), gridX + 4, statsY);
+    }
+    
+    // X = Back hint
+    ctx.font = '11px ' + FONT;
+    ctx.fillStyle = 'rgba(140, 130, 140, 0.5)';
+    ctx.textAlign = 'right';
+    ctx.fillText('X = Back', W - pad, H - pad);
+    ctx.textAlign = 'left';
   }
 }
 
@@ -889,7 +956,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.20', canvas.width - 8, 14);
+  ctx.fillText('v0.21', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
