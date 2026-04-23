@@ -117,9 +117,37 @@ function loadSprite(name, src) {
   img.onload = () => { sprites[name].loaded = true; };
 }
 
-// Player sprite
-loadSprite('player', 'sprites/AdeptNecromancer.png');
-// Enemy sprites
+// Player sprite (Snoblin prototype character)
+// 128x384 sheet, 32x32 frames, 4 cols × 12 rows
+// Layout per direction (down=0, side=4, up=8):
+//   +0: Idle (2 frames), +1: Walk (4 frames), +2: Hurt (2 frames), +3: Death (3 frames)
+// Side faces right; flip for left
+const PLAYER_SHEET = {
+  img: null, loaded: false,
+  frameW: 32, frameH: 32, cols: 4,
+  anims: {
+    idle_down:  { row: 0, frames: 2 },
+    walk_down:  { row: 1, frames: 4 },
+    hurt_down:  { row: 2, frames: 2 },
+    death_down: { row: 3, frames: 3 },
+    idle_side:  { row: 4, frames: 2 },
+    walk_side:  { row: 5, frames: 4 },
+    hurt_side:  { row: 6, frames: 2 },
+    death_side: { row: 7, frames: 3 },
+    idle_up:    { row: 8, frames: 2 },
+    walk_up:    { row: 9, frames: 4 },
+    hurt_up:    { row: 10, frames: 2 },
+    death_up:   { row: 11, frames: 3 },
+  }
+};
+{
+  const img = new Image();
+  img.src = 'character sprite/Snoblin_Prototype_Character/Assets/Prototype_Character/prototype_character.png';
+  img.onload = () => { PLAYER_SHEET.loaded = true; };
+  PLAYER_SHEET.img = img;
+}
+
+// Enemy sprites (DeepDive 16x16, 4-frame strips)
 loadSprite('Enemy1', 'sprites/FireElemental.png');
 
 // ══════════════════════════════════
@@ -419,7 +447,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.02', canvas.width - 8, 14);
+  ctx.fillText('v0.03', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
@@ -443,30 +471,46 @@ function drawSprite(ctx, spriteName, x, y, time) {
 
 function drawPlayer(ctx, x, y) {
   const s = TILE * SCALE;
-  const spr = sprites['player'];
-  if (spr && spr.loaded) {
-    const frame = Math.floor(performance.now() / ANIM_SPEED) % SPRITE_FRAMES;
-    ctx.imageSmoothingEnabled = false;
-    if (state.facing === 'left') {
-      ctx.save();
-      ctx.translate(x + s, y);
-      ctx.scale(-1, 1);
-      ctx.drawImage(spr.img,
-        frame * SPRITE_FRAME_SIZE, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
-        0, 0, s, s
-      );
-      ctx.restore();
-    } else {
-      ctx.drawImage(spr.img,
-        frame * SPRITE_FRAME_SIZE, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
-        x, y, s, s
-      );
-    }
-    ctx.imageSmoothingEnabled = true;
-  } else {
+  if (!PLAYER_SHEET.loaded) {
     ctx.fillStyle = '#6a8aca';
     ctx.fillRect(x + s*0.2, y + s*0.15, s*0.6, s*0.7);
+    return;
   }
+  
+  // Pick animation based on state and facing
+  let dir;
+  if (state.facing === 'up') dir = 'up';
+  else if (state.facing === 'down') dir = 'down';
+  else dir = 'side';
+  
+  const animName = (state.moving ? 'walk_' : 'idle_') + dir;
+  const anim = PLAYER_SHEET.anims[animName];
+  const speed = state.moving ? 120 : 400; // walk faster, idle slower
+  const frame = Math.floor(performance.now() / speed) % anim.frames;
+  
+  const srcX = frame * PLAYER_SHEET.frameW;
+  const srcY = anim.row * PLAYER_SHEET.frameH;
+  
+  ctx.imageSmoothingEnabled = false;
+  
+  // Flip horizontally for left facing
+  if (state.facing === 'left') {
+    ctx.save();
+    ctx.translate(x + s, y);
+    ctx.scale(-1, 1);
+    ctx.drawImage(PLAYER_SHEET.img,
+      srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
+      0, 0, s, s
+    );
+    ctx.restore();
+  } else {
+    ctx.drawImage(PLAYER_SHEET.img,
+      srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
+      x, y, s, s
+    );
+  }
+  
+  ctx.imageSmoothingEnabled = true;
 }
 
 function drawEntity(ctx, entity, x, y) {
