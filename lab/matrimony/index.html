@@ -1215,7 +1215,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.38', canvas.width - 8, 14);
+  ctx.fillText('v0.39', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1503,7 +1503,7 @@ function draw() {
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
     ctx.fillText('32px direct — varying threshold (killing more AA):', 20, y); y += 16;
     
-    const thresholds = [64, 96, 128, 160, 200];
+    const thresholds = [64, 96, 112, 120, 128, 140, 160, 200];
     for (const thresh of thresholds) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText('thresh ' + thresh + ':', 20, y + 12);
@@ -1593,7 +1593,7 @@ function draw() {
     // Track content height for scrollbar
     const contentH = (y - scrollY) - 10;
     state.fontTestContentH = contentH;
-    state.fontTestContentW = Math.max(0, 800 - panelW); // estimated content width overflow
+    state.fontTestContentW = Math.max(0, 1200 - panelW); // estimated content width overflow
     
     ctx.restore();
     
