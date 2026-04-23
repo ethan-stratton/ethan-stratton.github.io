@@ -744,11 +744,6 @@ function drawCombat() {
   ctx.fillRect(infoX, barY, Math.round(barW * hpRatio), barH);
   ctx.strokeStyle = '#6a6070'; ctx.lineWidth = 1;
   ctx.strokeRect(infoX, barY, barW, barH);
-  // Enemy HP number
-  ctx.font = 'bold 11px ' + FONT;
-  ctx.fillStyle = '#e8e0d0';
-  ctx.textAlign = 'left';
-  ctx.fillText('HP ' + c.enemyHp + '/' + c.enemyMaxHp, infoX, barY - 2);
   
   // Enemy action display — name right of HP bar, stats below
   if (c.enemyAction) {
@@ -1211,7 +1206,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.29', canvas.width - 8, 14);
+  ctx.fillText('v0.30', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1279,6 +1274,50 @@ function draw() {
       y += 28;
     }
     y += 16;
+    
+    // ═══ RM2000 9px SCALED UP (pixel-perfect) ═══
+    ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
+    ctx.fillText('── RM2000 9px rendered then scaled 2× and 3× (pixel-perfect) ──', 20, y); y += 16;
+    
+    const scaleTexts = [
+      'Punch  Kick  Shortbow',
+      'EFF: 12  DEF: 5  WAIT: 8',
+      'HP 30/30  Fire Elemental',
+      '★ CRITICAL HIT ★',
+    ];
+    const scales = [2, 3];
+    for (const sc of scales) {
+      ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
+      ctx.fillText(sc + '× scale:', 20, y + 8); y += 12;
+      for (const txt of scaleTexts) {
+        // Render to offscreen canvas at 9px, then scale up
+        if (!drawSpaced._scaleCanvas) {
+          drawSpaced._scaleCanvas = document.createElement('canvas');
+          drawSpaced._scaleCtx = drawSpaced._scaleCanvas.getContext('2d');
+        }
+        const oc = drawSpaced._scaleCanvas;
+        const octx = drawSpaced._scaleCtx;
+        oc.width = 400; oc.height = 16;
+        octx.clearRect(0, 0, oc.width, oc.height);
+        octx.font = '9px "RM2000"';
+        octx.fillStyle = '#e8e0d0';
+        octx.textAlign = 'left';
+        octx.textBaseline = 'top';
+        // Draw with 1px spacing
+        let tx = 0;
+        for (let i = 0; i < txt.length; i++) {
+          octx.fillText(txt[i], tx, 2);
+          tx += octx.measureText(txt[i]).width + 1;
+        }
+        // Draw scaled up with no smoothing
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(oc, 0, 0, tx, 14, 30, y, tx * sc, 14 * sc);
+        ctx.imageSmoothingEnabled = true;
+        y += 14 * sc + 4;
+      }
+      y += 8;
+    }
+    y += 8;
     
     // ═══ RM2000 24px HORIZONTAL GRADIENTS ═══
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
