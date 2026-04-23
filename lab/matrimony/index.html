@@ -447,7 +447,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.03', canvas.width - 8, 14);
+  ctx.fillText('v0.04', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
@@ -485,28 +485,32 @@ function drawPlayer(ctx, x, y) {
   
   const animName = (state.moving ? 'walk_' : 'idle_') + dir;
   const anim = PLAYER_SHEET.anims[animName];
-  const speed = state.moving ? 120 : 400; // walk faster, idle slower
+  const speed = state.moving ? 120 : 400;
   const frame = Math.floor(performance.now() / speed) % anim.frames;
   
   const srcX = frame * PLAYER_SHEET.frameW;
   const srcY = anim.row * PLAYER_SHEET.frameH;
   
+  // Draw 32×32 frame at 2× scale (64×64), centered on the 32×32 tile
+  const drawSize = s * 2;
+  const drawX = Math.round(x - s / 2);
+  const drawY = Math.round(y - s / 2);
+  
   ctx.imageSmoothingEnabled = false;
   
-  // Flip horizontally for left facing
   if (state.facing === 'left') {
     ctx.save();
-    ctx.translate(x + s, y);
+    ctx.translate(drawX + drawSize, drawY);
     ctx.scale(-1, 1);
     ctx.drawImage(PLAYER_SHEET.img,
       srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
-      0, 0, s, s
+      0, 0, drawSize, drawSize
     );
     ctx.restore();
   } else {
     ctx.drawImage(PLAYER_SHEET.img,
       srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
-      x, y, s, s
+      drawX, drawY, drawSize, drawSize
     );
   }
   
