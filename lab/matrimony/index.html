@@ -1206,7 +1206,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.30', canvas.width - 8, 14);
+  ctx.fillText('v0.31', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1233,13 +1233,24 @@ function draw() {
     ctx.rect(panelX + 1, panelY + 1, panelW - 2, panelH - 2);
     ctx.clip();
     
-    // Helper: draw text with extra letter spacing
-    function drawSpaced(text, x, y, spacing) {
-      for (let i = 0; i < text.length; i++) {
-        ctx.fillText(text[i], x, y);
-        x += ctx.measureText(text[i]).width + spacing;
+    // Helper: draw text with extra letter spacing and optional drop shadow
+    function drawSpaced(text, x, y, spacing, shadow) {
+      if (shadow) {
+        const origFill = ctx.fillStyle;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        let sx = x + 1;
+        for (let i = 0; i < text.length; i++) {
+          ctx.fillText(text[i], sx, y + 1);
+          sx += ctx.measureText(text[i]).width + spacing;
+        }
+        ctx.fillStyle = origFill;
       }
-      return x;
+      let tx = x;
+      for (let i = 0; i < text.length; i++) {
+        ctx.fillText(text[i], tx, y);
+        tx += ctx.measureText(text[i]).width + spacing;
+      }
+      return tx;
     }
     
     const sample = 'Punch  Kick  EFF: 12  DEF: 5  WAIT: 8  HP 30/30';
@@ -1247,77 +1258,36 @@ function draw() {
     ctx.textAlign = 'left';
     let y = 30 + scrollY;
     
-    // RM2000 at different sizes WITH letter spacing
-    const rm2kSizes = [8, 10, 12, 14, 16, 18, 20, 24];
+    // RM2000 at different sizes WITH letter spacing AND drop shadow
+    const rm2kSizes = [10, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48];
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('RM2000 at different sizes (with 1px letter spacing):', 20, y); y += 14;
+    ctx.fillText('RM2000 at various sizes (1px spacing + drop shadow):', 20, y); y += 14;
     for (const sz of rm2kSizes) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
-      ctx.fillText(sz + 'px:', 20, y + 10);
+      ctx.fillText(sz + 'px:', 20, y + Math.round(sz * 0.7));
       ctx.fillStyle = '#e8e0d0'; ctx.font = sz + 'px "RM2000"';
-      drawSpaced(sample, 52, y + 10, 1);
-      y += Math.max(sz + 4, 14);
+      drawSpaced(sample, 52, y + Math.round(sz * 0.7), 1, true);
+      y += sz + 6;
     }
     y += 10;
     
-    // Other fonts at 24px
+    // Other fonts at 24px with shadow
     const others = [
       { name: 'RM2000Alt 24px', font: '24px "RM2000Alt"', sp: 1 },
+      { name: 'RM2000Alt 32px', font: '32px "RM2000Alt"', sp: 1 },
       { name: 'RMG2000 24px', font: '24px "RMG2000"', sp: 1 },
+      { name: 'RMG2000 32px', font: '32px "RMG2000"', sp: 1 },
       { name: 'Pixelify 24px', font: '24px "Pixelify Sans"', sp: 0 },
+      { name: 'Pixelify 32px', font: '32px "Pixelify Sans"', sp: 0 },
     ];
     for (const o of others) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText(o.name + ':', 20, y + 10);
       ctx.fillStyle = '#e8e0d0'; ctx.font = o.font;
-      drawSpaced(sample, 110, y + 10, o.sp);
+      drawSpaced(sample, 120, y + 10, o.sp, true);
       y += 28;
     }
     y += 16;
-    
-    // ═══ RM2000 9px SCALED UP (pixel-perfect) ═══
-    ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('── RM2000 9px rendered then scaled 2× and 3× (pixel-perfect) ──', 20, y); y += 16;
-    
-    const scaleTexts = [
-      'Punch  Kick  Shortbow',
-      'EFF: 12  DEF: 5  WAIT: 8',
-      'HP 30/30  Fire Elemental',
-      '★ CRITICAL HIT ★',
-    ];
-    const scales = [2, 3];
-    for (const sc of scales) {
-      ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
-      ctx.fillText(sc + '× scale:', 20, y + 8); y += 12;
-      for (const txt of scaleTexts) {
-        // Render to offscreen canvas at 9px, then scale up
-        if (!drawSpaced._scaleCanvas) {
-          drawSpaced._scaleCanvas = document.createElement('canvas');
-          drawSpaced._scaleCtx = drawSpaced._scaleCanvas.getContext('2d');
-        }
-        const oc = drawSpaced._scaleCanvas;
-        const octx = drawSpaced._scaleCtx;
-        oc.width = 400; oc.height = 16;
-        octx.clearRect(0, 0, oc.width, oc.height);
-        octx.font = '9px "RM2000"';
-        octx.fillStyle = '#e8e0d0';
-        octx.textAlign = 'left';
-        octx.textBaseline = 'top';
-        // Draw with 1px spacing
-        let tx = 0;
-        for (let i = 0; i < txt.length; i++) {
-          octx.fillText(txt[i], tx, 2);
-          tx += octx.measureText(txt[i]).width + 1;
-        }
-        // Draw scaled up with no smoothing
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(oc, 0, 0, tx, 14, 30, y, tx * sc, 14 * sc);
-        ctx.imageSmoothingEnabled = true;
-        y += 14 * sc + 4;
-      }
-      y += 8;
-    }
-    y += 8;
     
     // ═══ RM2000 24px HORIZONTAL GRADIENTS ═══
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
@@ -1335,11 +1305,15 @@ function draw() {
     ];
     for (const gs of gradSamples) {
       ctx.font = '24px "RM2000"';
-      const tw = ctx.measureText(gs.text).width;
+      // Shadow first
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      drawSpaced(gs.text, 21, y + 21, 1, false);
+      // Gradient on top
+      const tw = ctx.measureText(gs.text).width + gs.text.length;
       const grad = ctx.createLinearGradient(20, 0, 20 + tw, 0);
       for (const [pos, color] of gs.stops) grad.addColorStop(pos, color);
       ctx.fillStyle = grad;
-      drawSpaced(gs.text, 20, y + 20, 1);
+      drawSpaced(gs.text, 20, y + 20, 1, false);
       y += 32;
     }
     y += 16;
@@ -1348,13 +1322,17 @@ function draw() {
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
     ctx.fillText('── RM2000 24px — Vertical Gradients (top→bottom) ──', 20, y); y += 20;
     
-    for (const gs of gradSamples) {
+    for (const gs of [...gradSamples]) {
       ctx.font = '24px "RM2000"';
       const textY = y + 20;
+      // Shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      drawSpaced(gs.text, 21, textY + 1, 1, false);
+      // Vertical gradient
       const grad = ctx.createLinearGradient(0, textY - 20, 0, textY + 4);
       for (const [pos, color] of gs.stops) grad.addColorStop(pos, color);
       ctx.fillStyle = grad;
-      drawSpaced(gs.text, 20, textY, 1);
+      drawSpaced(gs.text, 20, textY, 1, false);
       y += 32;
     }
     y += 16;
