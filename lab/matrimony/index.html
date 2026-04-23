@@ -343,26 +343,25 @@ document.addEventListener('keydown', (e) => {
       const numActions = Math.min((c.actions || []).length, 8);
       if (numActions > 0) {
         const sel = c.selectedAction || 0;
-        const col = sel < 4 ? 0 : 1;
-        const row = sel < 4 ? sel : sel - 4;
+        const col = sel % 2;
+        const row = Math.floor(sel / 2);
         if (e.key === 'ArrowUp') {
-          const newRow = (row - 1 + 4) % 4;
-          const newIdx = col * 4 + newRow;
-          c.selectedAction = newIdx < numActions ? newIdx : sel;
+          const newRow = row - 1;
+          if (newRow >= 0) { const newIdx = newRow * 2 + col; c.selectedAction = newIdx < numActions ? newIdx : sel; }
           e.preventDefault(); return;
         }
         if (e.key === 'ArrowDown') {
-          const newRow = (row + 1) % 4;
-          const newIdx = col * 4 + newRow;
+          const newRow = row + 1;
+          const newIdx = newRow * 2 + col;
           c.selectedAction = newIdx < numActions ? newIdx : sel;
           e.preventDefault(); return;
         }
         if (e.key === 'ArrowLeft') {
-          if (col === 1) { const newIdx = row; c.selectedAction = newIdx < numActions ? newIdx : sel; }
+          if (col === 1) { const newIdx = row * 2; c.selectedAction = newIdx < numActions ? newIdx : sel; }
           e.preventDefault(); return;
         }
         if (e.key === 'ArrowRight') {
-          if (col === 0) { const newIdx = 4 + row; c.selectedAction = newIdx < numActions ? newIdx : sel; }
+          if (col === 0) { const newIdx = row * 2 + 1; c.selectedAction = newIdx < numActions ? newIdx : sel; }
           e.preventDefault(); return;
         }
       }
@@ -732,7 +731,7 @@ function crispText(text, x, y, size, color, spacing) {
   for (let i = 3; i < sData.data.length; i += 4) sData.data[i] = sData.data[i] >= CRISP_THRESHOLD ? 255 : 0;
   for (let i = 0; i < sData.data.length; i += 4) { sData.data[i] = 0; sData.data[i+1] = 0; sData.data[i+2] = 0; }
   sctx.putImageData(sData, 0, 0);
-  ctx.drawImage(sc, 0, 0, stx + 2, h, x + 1, y + 1, stx + 2, h);
+  ctx.drawImage(sc, 0, 0, stx + 2, h, x + 2, y + 2, stx + 2, h);
   ctx.drawImage(oc, 0, 0, tx + 2, h, x, y, tx + 2, h);
   return tx;
 }
@@ -776,12 +775,25 @@ function crispGradientText(text, x, y, size, stops, spacing) {
   for (let i = 3; i < sData.data.length; i += 4) sData.data[i] = sData.data[i] >= CRISP_THRESHOLD ? 255 : 0;
   for (let i = 0; i < sData.data.length; i += 4) { sData.data[i] = 0; sData.data[i+1] = 0; sData.data[i+2] = 0; }
   sctx.putImageData(sData, 0, 0);
-  ctx.drawImage(sc, 0, 0, stx + 2, h, x + 1, y + 1, stx + 2, h);
+  ctx.drawImage(sc, 0, 0, stx + 2, h, x + 2, y + 2, stx + 2, h);
   ctx.drawImage(oc, 0, 0, tx + 2, h, x, y, tx + 2, h);
   return tx;
 }
 
 const GOLD_GRADIENT = [[0, '#f0d060'], [0.4, '#ffe8a0'], [0.6, '#ffe8a0'], [1, '#c89830']];
+
+// Draw a gold gradient outline rect
+function drawGoldOutline(x, y, w, h, thickness) {
+  const t = thickness || 3;
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, '#f0d060');
+  grad.addColorStop(0.3, '#ffe8a0');
+  grad.addColorStop(0.7, '#ffe8a0');
+  grad.addColorStop(1, '#c89830');
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = t;
+  ctx.strokeRect(x, y, w, h);
+}
 
 function drawCombat() {
   const c = state.combat;
@@ -818,10 +830,9 @@ function drawCombat() {
   const pad = 8; // padding from edges
   const ePortraitX = pad + 12;
   const ePortraitY = Math.round((topH - portraitH) / 2);
-  ctx.strokeStyle = '#5a5060'; ctx.lineWidth = 1;
-  ctx.strokeRect(ePortraitX, ePortraitY, portraitW, portraitH);
   ctx.fillStyle = '#0c0c14';
-  ctx.fillRect(ePortraitX + 1, ePortraitY + 1, portraitW - 2, portraitH - 2);
+  ctx.fillRect(ePortraitX, ePortraitY, portraitW, portraitH);
+  drawGoldOutline(ePortraitX, ePortraitY, portraitW, portraitH, 3);
   if (spr && spr.loaded) {
     ctx.save();
     ctx.beginPath();
@@ -846,8 +857,7 @@ function drawCombat() {
   const hpRatio = c.enemyHp / c.enemyMaxHp;
   ctx.fillStyle = hpRatio > 0.5 ? '#3a8a3a' : hpRatio > 0.25 ? '#b89030' : '#a03030';
   ctx.fillRect(infoX, barY, Math.round(barW * hpRatio), barH);
-  ctx.strokeStyle = '#6a6070'; ctx.lineWidth = 1;
-  ctx.strokeRect(infoX, barY, barW, barH);
+  drawGoldOutline(infoX - 1, barY - 1, barW + 2, barH + 2, 3);
   
   // Enemy action display — name right of HP bar, stats below
   if (c.enemyAction) {
@@ -1032,7 +1042,7 @@ function drawCombat() {
   if (elapsed > 5000) {
     const alpha = 0.3 + 0.3 * Math.sin(now / 800);
     ctx.globalAlpha = alpha;
-    crispText('Esc = Run Away', W - 160, arenaY + 4, 32, '#8c828c');
+    crispText('Esc = Run Away', W - 280, arenaY + 4, 32, '#8c828c');
     ctx.globalAlpha = 1;
   }
   
@@ -1046,10 +1056,9 @@ function drawCombat() {
   // Player portrait
   const pPortraitX = pad + 12;
   const pPortraitY = botContentY + pad + 2;
-  ctx.strokeStyle = '#5a5060'; ctx.lineWidth = 1;
-  ctx.strokeRect(pPortraitX, pPortraitY, portraitW, portraitH);
   ctx.fillStyle = '#0c0c14';
-  ctx.fillRect(pPortraitX + 1, pPortraitY + 1, portraitW - 2, portraitH - 2);
+  ctx.fillRect(pPortraitX, pPortraitY, portraitW, portraitH);
+  drawGoldOutline(pPortraitX, pPortraitY, portraitW, portraitH, 3);
   if (PLAYER_SHEET.loaded) {
     const anim = PLAYER_SHEET.anims['idle_down'];
     ctx.save();
@@ -1070,11 +1079,11 @@ function drawCombat() {
   // HP below portrait
   crispText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 4, 32, '#e8e0d0');
   
-  // ── ACTION GRID: always visible, 2 columns × 4 rows ──
-  const gridX = pPortraitX + portraitW + 16;
-  const gridRowH = 22;
-  const gridY = pPortraitY + 2;
-  const colW = Math.round((W - gridX - 16) / 2);
+  // ── ACTION GRID: 2 columns × 4 rows, fill left-to-right then down ──
+  const gridX = pPortraitX + portraitW + 32;
+  const gridRowH = 34;
+  const gridY = pPortraitY;
+  const colW = Math.round((W - gridX - 24) / 2);
   
   const actions = c.actions || ['Punch', 'Kick'];
   
@@ -1082,8 +1091,8 @@ function drawCombat() {
   let hovered = -1;
   if (c.phase === 'action' && !c.waiting) {
     for (let i = 0; i < actions.length && i < 8; i++) {
-      const col = i < 4 ? 0 : 1;
-      const row = i < 4 ? i : i - 4;
+      const col = i % 2;
+      const row = Math.floor(i / 2);
       const ax = gridX + col * colW;
       const ay = gridY + row * gridRowH;
       if (mouse.x >= ax && mouse.x <= ax + colW && mouse.y >= ay && mouse.y <= ay + gridRowH) {
@@ -1095,12 +1104,21 @@ function drawCombat() {
   
   // Draw grid items
   for (let i = 0; i < actions.length && i < 8; i++) {
-    const col = i < 4 ? 0 : 1;
-    const row = i < 4 ? i : i - 4;
+    const col = i % 2;
+    const row = Math.floor(i / 2);
     const ax = gridX + col * colW;
     const ay = gridY + row * gridRowH;
     const isSelected = (c.phase === 'action') && i === (c.selectedAction || 0);
     const dimmed = c.phase === 'target' || c.waiting;
+    
+    // Highlight background for selected action
+    if (isSelected && !dimmed) {
+      ctx.fillStyle = 'rgba(255, 232, 192, 0.15)';
+      ctx.fillRect(ax, ay, colW, gridRowH);
+      ctx.strokeStyle = 'rgba(255, 232, 192, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(ax + 0.5, ay + 0.5, colW - 1, gridRowH - 1);
+    }
     
     const color = isSelected && !dimmed ? '#ffe8c0' : dimmed ? '#4a4440' : '#a09888';
     crispText(actions[i], ax + 4, ay + 2, 32, color);
@@ -1113,18 +1131,15 @@ function drawCombat() {
     const statsY = H - pad - 18;
     let sx = gridX + 4;
     const waitVal = c.waiting ? c.waitCountdown : (act.wait || 0);
-    sx += crispGradientText('Eff:', sx, statsY, 32, GOLD_GRADIENT) + 2;
-    sx += crispText('' + (act.eff || 0), sx, statsY, 32, '#e8e0d0') + 12;
-    sx += crispGradientText('Def:', sx, statsY, 32, GOLD_GRADIENT) + 2;
-    sx += crispText('' + (act.def || 0), sx, statsY, 32, '#e8e0d0') + 12;
-    sx += crispGradientText('Wait:', sx, statsY, 32, GOLD_GRADIENT) + 2;
+    sx += crispGradientText('Eff:', sx, statsY, 32, GOLD_GRADIENT) + 4;
+    sx += crispText('' + (act.eff || 0), sx, statsY, 32, '#e8e0d0') + 24;
+    sx += crispGradientText('Def:', sx, statsY, 32, GOLD_GRADIENT) + 4;
+    sx += crispText('' + (act.def || 0), sx, statsY, 32, '#e8e0d0') + 24;
+    sx += crispGradientText('Wait:', sx, statsY, 32, GOLD_GRADIENT) + 4;
     crispText('' + waitVal, sx, statsY, 32, '#e8e0d0');
   }
   
   // Hints
-  if (c.phase === 'action' && !c.waiting) {
-    crispText('X = Back', W - pad - 100, H - pad - 14, 32, '#8c828c');
-  }
   if (c.waiting) {
     crispText('X = Cancel', W - pad - 110, H - pad - 14, 32, '#8c828c');
   }
@@ -1262,7 +1277,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.45', canvas.width - 8, 14);
+  ctx.fillText('v0.46', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
