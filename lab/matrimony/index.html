@@ -147,7 +147,7 @@ const state = {
 // LOAD LEVEL
 // ══════════════════════════════════
 async function loadLevel() {
-  const resp = await fetch('LDtK_Matrimony/Matrimony.ldtk');
+  const resp = await fetch('LDtK_Matrimony/Matrimony.ldtk?v=' + Date.now());
   const data = await resp.json();
   const level = data.levels[0];
   
