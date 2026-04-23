@@ -65,7 +65,7 @@
 <body>
 
 <h1>Matrimony Beyond Space and Time</h1>
-<canvas id="game" width="512" height="512"></canvas>
+<canvas id="game"></canvas>
 <div class="info">Arrow keys to move · Space to interact</div>
 
 <script>
@@ -451,36 +451,70 @@ function exitCombat() {
   state.combat = null;
 }
 
+// Combat action data
+const COMBAT_ACTIONS = {
+  'Punch': { eff: 8, def: 0, wait: 2 },
+  'Kick':  { eff: 12, def: 0, wait: 5 },
+};
+
+// Mouse state for combat menu
+const mouse = { x: 0, y: 0 };
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  mouse.y = (e.clientY - rect.top) * (canvas.height / rect.height);
+});
+canvas.addEventListener('click', (e) => {
+  if (!state.combat) return;
+  const c = state.combat;
+  const actions = c.actions || [];
+  // Check if click is on a menu item
+  const W = canvas.width;
+  const H = canvas.height;
+  const botH = Math.round(H * 0.28);
+  const botContentY = H - botH;
+  const menuX = Math.round(W * 0.48);
+  const menuY = botContentY + 8;
+  for (let i = 0; i < actions.length; i++) {
+    const ay = menuY + i * 24;
+    if (mouse.x >= menuX && mouse.x <= menuX + 160 && mouse.y >= ay && mouse.y <= ay + 22) {
+      c.selectedAction = i;
+      c.firstAttackDone = true;
+      c.attackText = actions[i];
+      break;
+    }
+  }
+});
+
 function drawCombat() {
   const c = state.combat;
   const W = canvas.width;
   const H = canvas.height;
   const now = performance.now();
-  const combatStarted = c.firstAttackDone || false;
   
   const FONT = '"Pixelify Sans", sans-serif';
   const spr = sprites[c.enemySprite];
   
-  // Layout: thin top bar ~12%, arena ~60%, bottom bar ~28%
-  const topH = Math.round(H * 0.12);
-  const botH = Math.round(H * 0.28);
+  // Layout: top bar ~14%, arena ~56%, bottom bar ~30%
+  const topH = Math.round(H * 0.14);
+  const botH = Math.round(H * 0.30);
   const arenaY = topH;
   const arenaH = H - topH - botH;
   
-  // Shared portrait dimensions — rectangular (wider than tall), same for both
-  const portraitH = Math.round(topH * 0.65);
-  const portraitW = Math.round(portraitH * 1.5);
+  // Portraits — wide rectangle (roughly 2:1 ratio)
+  const portraitH = Math.round(topH * 0.55);
+  const portraitW = Math.round(portraitH * 2.2);
   
   // ── TOP BAR: Enemy info ──
-  ctx.fillStyle = 'rgba(8, 8, 14, 0.88)';
+  ctx.fillStyle = 'rgba(8, 8, 14, 0.90)';
   ctx.fillRect(0, 0, W, topH);
-  ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+  ctx.strokeStyle = 'rgba(200, 200, 200, 0.45)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, topH - 0.5); ctx.lineTo(W, topH - 0.5); ctx.stroke();
   
   // Enemy portrait
   const ePortraitX = 6;
-  const ePortraitY = Math.round((topH - portraitH) / 2);
+  const ePortraitY = Math.round((topH - portraitH) / 2) - 2;
   
   ctx.strokeStyle = '#5a5060';
   ctx.lineWidth = 1;
@@ -494,10 +528,9 @@ function drawCombat() {
     ctx.rect(ePortraitX + 1, ePortraitY + 1, portraitW - 2, portraitH - 2);
     ctx.clip();
     ctx.imageSmoothingEnabled = false;
-    // Keep pixel ratio: scale to fit height, center horizontally
     const innerH = portraitH - 2;
     const sprScale = innerH / SPRITE_FRAME_SIZE;
-    const drawSz = SPRITE_FRAME_SIZE * sprScale;
+    const drawSz = Math.round(SPRITE_FRAME_SIZE * sprScale);
     const dx = ePortraitX + 1 + Math.round((portraitW - 2 - drawSz) / 2);
     ctx.drawImage(spr.img,
       0, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
@@ -507,11 +540,11 @@ function drawCombat() {
     ctx.restore();
   }
   
-  // HP bar
-  const infoX = ePortraitX + portraitW + 6;
-  const barW = Math.round(W * 0.2);
-  const barH = 6;
-  const barY = ePortraitY + 3;
+  // Enemy HP bar
+  const infoX = ePortraitX + portraitW + 8;
+  const barW = Math.round(W * 0.22);
+  const barH = 7;
+  const barY = ePortraitY + 4;
   
   ctx.fillStyle = '#2a1a1a';
   ctx.fillRect(infoX, barY, barW, barH);
@@ -523,49 +556,52 @@ function drawCombat() {
   ctx.strokeRect(infoX, barY, barW, barH);
   
   // Attack text
-  const textX = infoX + barW + 8;
   if (c.attackText) {
     ctx.fillStyle = '#d0c0a0';
+    ctx.font = '12px ' + FONT;
+    ctx.textAlign = 'left';
+    ctx.fillText(c.attackText, infoX + barW + 10, barY + 7);
+  }
+  
+  // Enemy EFF DEF WAIT — only after first attack
+  if (c.firstAttackDone) {
+    ctx.fillStyle = '#a098a0';
     ctx.font = '11px ' + FONT;
     ctx.textAlign = 'left';
-    ctx.fillText(c.attackText, textX, barY + 6);
+    ctx.fillText('Eff ' + c.enemyEff, infoX, barY + barH + 14);
+    ctx.fillText('Def ' + c.enemyDef, infoX + 56, barY + barH + 14);
+    ctx.fillText('Wait ' + c.enemyWait, infoX + 112, barY + barH + 14);
   }
   
-  // EFF DEF WAIT — only after first attack
-  if (combatStarted) {
-    ctx.fillStyle = '#a098a0';
-    ctx.font = '10px ' + FONT;
-    ctx.textAlign = 'left';
-    const esy = ePortraitY + portraitH + 2;
-    ctx.fillText('Eff ' + c.enemyEff, ePortraitX, esy);
-    ctx.fillText('Def ' + c.enemyDef, ePortraitX + 52, esy);
-    ctx.fillText('Wait ' + c.enemyWait, ePortraitX + 104, esy);
-  }
-  
-  // ── ARENA: fully darkened ──
-  ctx.fillStyle = 'rgba(4, 4, 10, 0.96)';
+  // ── ARENA: fully darkened, edge to edge ──
+  ctx.fillStyle = 'rgba(2, 2, 8, 0.97)';
   ctx.fillRect(0, arenaY, W, arenaH);
   
-  // Both combatants at same visual size (48px)
-  const combatSize = 48;
+  // Player is 32×32 source, enemy is 16×16 source
+  // To match pixel density: player at 64px (2× source), enemy at 32px (2× source)
+  // They'll have same pixel density but enemy looks smaller — that's accurate for a 16×16 creature
+  // For visual balance in combat, draw both at integer multiples:
+  // Player 32→64 (×2), Enemy 16→48 (×3) — close enough in size, both crisp
+  const playerCombatSize = 64;
+  const enemyCombatSize = 48;
   const groundY = arenaY + Math.round(arenaH * 0.78);
   
   // Enemy LEFT
-  const enemyArenaX = Math.round(W * 0.28) - combatSize / 2;
-  const enemyArenaY = groundY - combatSize;
+  const enemyArenaX = Math.round(W * 0.28) - enemyCombatSize / 2;
+  const enemyArenaY = groundY - enemyCombatSize;
   if (spr && spr.loaded) {
     const frame = Math.floor(now / ANIM_SPEED) % SPRITE_FRAMES;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(spr.img,
       frame * SPRITE_FRAME_SIZE, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
-      enemyArenaX, enemyArenaY, combatSize, combatSize
+      Math.round(enemyArenaX), Math.round(enemyArenaY), enemyCombatSize, enemyCombatSize
     );
     ctx.imageSmoothingEnabled = true;
   }
   
-  // Player RIGHT, facing left
-  const playerArenaX = Math.round(W * 0.72) - combatSize / 2;
-  const playerArenaY = groundY - combatSize;
+  // Player RIGHT, facing left — draw at 2× source (64px from 32px frames)
+  const playerArenaX = Math.round(W * 0.72) - playerCombatSize / 2;
+  const playerArenaY = groundY - playerCombatSize;
   if (PLAYER_SHEET.loaded) {
     const anim = PLAYER_SHEET.anims['idle_right'];
     const frame = Math.floor(now / 400) % anim.frames;
@@ -573,36 +609,36 @@ function drawCombat() {
     const srcY = anim.row * PLAYER_SHEET.frameH;
     ctx.imageSmoothingEnabled = false;
     ctx.save();
-    ctx.translate(playerArenaX + combatSize, playerArenaY);
+    ctx.translate(Math.round(playerArenaX) + playerCombatSize, Math.round(playerArenaY));
     ctx.scale(-1, 1);
     ctx.drawImage(PLAYER_SHEET.img,
       srcX, srcY, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
-      0, 0, combatSize, combatSize
+      0, 0, playerCombatSize, playerCombatSize
     );
     ctx.restore();
     ctx.imageSmoothingEnabled = true;
   }
   
-  // ESC — after 5s, lazy flash top right of arena
+  // ESC — after 5s
   const elapsed = now - c.startTime;
   if (elapsed > 5000) {
     const alpha = 0.3 + 0.3 * Math.sin(now / 800);
     ctx.fillStyle = `rgba(120, 110, 120, ${alpha})`;
-    ctx.font = '10px ' + FONT;
+    ctx.font = '11px ' + FONT;
     ctx.textAlign = 'right';
-    ctx.fillText('[ESC]', W - 6, arenaY + 14);
+    ctx.fillText('[ESC]', W - 6, arenaY + 15);
     ctx.textAlign = 'left';
   }
   
   // ── BOTTOM BAR: Player info + action menu ──
   const botContentY = arenaY + arenaH;
-  ctx.fillStyle = 'rgba(8, 8, 14, 0.88)';
+  ctx.fillStyle = 'rgba(8, 8, 14, 0.90)';
   ctx.fillRect(0, botContentY, W, botH);
-  ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+  ctx.strokeStyle = 'rgba(200, 200, 200, 0.45)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, botContentY + 0.5); ctx.lineTo(W, botContentY + 0.5); ctx.stroke();
   
-  // Player portrait — same dimensions as enemy
+  // Player portrait — same dimensions as enemy portrait
   const pPortraitX = 6;
   const pPortraitY = botContentY + 6;
   
@@ -621,7 +657,7 @@ function drawCombat() {
     ctx.imageSmoothingEnabled = false;
     const pInnerH = portraitH - 2;
     const pScale = pInnerH / PLAYER_SHEET.frameH;
-    const pDrawW = PLAYER_SHEET.frameW * pScale;
+    const pDrawW = Math.round(PLAYER_SHEET.frameW * pScale);
     const pdx = pPortraitX + 1 + Math.round((portraitW - 2 - pDrawW) / 2);
     ctx.drawImage(PLAYER_SHEET.img,
       0, anim.row * PLAYER_SHEET.frameH, PLAYER_SHEET.frameW, PLAYER_SHEET.frameH,
@@ -632,8 +668,8 @@ function drawCombat() {
   }
   
   // Player HP bar
-  const pInfoX = pPortraitX + portraitW + 6;
-  const pBarY = pPortraitY + 3;
+  const pInfoX = pPortraitX + portraitW + 8;
+  const pBarY = pPortraitY + 4;
   ctx.fillStyle = '#1a1a2a';
   ctx.fillRect(pInfoX, pBarY, barW, barH);
   const pHpRatio = c.playerHp / c.playerMaxHp;
@@ -642,39 +678,53 @@ function drawCombat() {
   ctx.strokeStyle = '#6a6070';
   ctx.strokeRect(pInfoX, pBarY, barW, barH);
   
-  // HP text
-  ctx.fillStyle = '#e8e0d0';
-  ctx.font = '10px ' + FONT;
-  ctx.textAlign = 'left';
-  ctx.fillText('HP ' + c.playerHp + '/' + c.playerMaxHp, pInfoX, pBarY + barH + 11);
-  
   // Player stats — only after first attack
-  if (combatStarted) {
+  if (c.firstAttackDone) {
     ctx.fillStyle = '#a098a0';
-    ctx.font = '10px ' + FONT;
-    const psy = pPortraitY + portraitH + 2;
-    ctx.fillText('Eff ' + c.playerEff, pPortraitX, psy);
-    ctx.fillText('Def ' + c.playerDef, pPortraitX + 52, psy);
-    ctx.fillText('Wait ' + c.playerWait, pPortraitX + 104, psy);
+    ctx.font = '11px ' + FONT;
+    ctx.textAlign = 'left';
+    ctx.fillText('Eff ' + c.playerEff, pInfoX, pBarY + barH + 14);
+    ctx.fillText('Def ' + c.playerDef, pInfoX + 56, pBarY + barH + 14);
+    ctx.fillText('Wait ' + c.playerWait, pInfoX + 112, pBarY + barH + 14);
   }
   
-  // ── ACTION MENU (right side of bottom bar) ──
-  const menuX = Math.round(W * 0.55);
+  // ── ACTION MENU (right half of bottom bar) ──
+  const menuX = Math.round(W * 0.48);
   const menuY = botContentY + 8;
   
-  ctx.font = '13px ' + FONT;
   const actions = c.actions || ['Punch', 'Kick'];
   const selectedIdx = c.selectedAction || 0;
   
+  // Check mouse hover
   for (let i = 0; i < actions.length; i++) {
-    const ay = menuY + i * 20;
-    if (i === selectedIdx) {
-      ctx.fillStyle = '#e8d8c0';
-      ctx.fillText('▶ ' + actions[i], menuX, ay + 13);
-    } else {
-      ctx.fillStyle = '#807870';
-      ctx.fillText('  ' + actions[i], menuX, ay + 13);
+    const ay = menuY + i * 24;
+    if (mouse.x >= menuX && mouse.x <= menuX + 160 && mouse.y >= ay && mouse.y <= ay + 22) {
+      c.selectedAction = i;
     }
+  }
+  
+  for (let i = 0; i < actions.length; i++) {
+    const ay = menuY + i * 24;
+    const act = COMBAT_ACTIONS[actions[i]] || {};
+    const isSelected = i === (c.selectedAction || 0);
+    
+    // Action name
+    ctx.font = '14px ' + FONT;
+    if (isSelected) {
+      ctx.fillStyle = '#ffe8c0';
+    } else {
+      ctx.fillStyle = '#706860';
+    }
+    ctx.textAlign = 'left';
+    ctx.fillText(actions[i], menuX, ay + 15);
+    
+    // Eff/Def/Wait for this action
+    ctx.font = '10px ' + FONT;
+    ctx.fillStyle = isSelected ? '#b0a898' : '#585050';
+    const statsX = menuX + 80;
+    ctx.fillText('E' + (act.eff || 0), statsX, ay + 14);
+    ctx.fillText('D' + (act.def || 0), statsX + 32, ay + 14);
+    ctx.fillText('W' + (act.wait || 0), statsX + 64, ay + 14);
   }
 }
 
@@ -807,7 +857,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.12', canvas.width - 8, 14);
+  ctx.fillText('v0.13', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
