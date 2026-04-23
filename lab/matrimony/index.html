@@ -757,17 +757,17 @@ function drawCombat() {
     const statY = barY + barH + 13;
     ctx.font = 'bold 11px ' + FONT;
     let sx = infoX;
-    ctx.fillStyle = '#d4a830'; ctx.fillText('EFF:', sx, statY);
+    ctx.fillStyle = '#d4a830'; ctx.fillText('Eff:', sx, statY);
     ctx.font = '11px ' + FONT; ctx.fillStyle = '#e8e0d0';
-    sx += ctx.measureText('EFF:').width + 2; ctx.fillText(act.eff || 0, sx, statY);
+    sx += ctx.measureText('Eff:').width + 2; ctx.fillText(act.eff || 0, sx, statY);
     sx += ctx.measureText('' + (act.eff || 0)).width + 10;
-    ctx.font = 'bold 11px ' + FONT; ctx.fillStyle = '#d4a830'; ctx.fillText('DEF:', sx, statY);
+    ctx.font = 'bold 11px ' + FONT; ctx.fillStyle = '#d4a830'; ctx.fillText('Def:', sx, statY);
     ctx.font = '11px ' + FONT; ctx.fillStyle = '#e8e0d0';
-    sx += ctx.measureText('DEF:').width + 2; ctx.fillText(act.def || 0, sx, statY);
+    sx += ctx.measureText('Def:').width + 2; ctx.fillText(act.def || 0, sx, statY);
     sx += ctx.measureText('' + (act.def || 0)).width + 10;
-    ctx.font = 'bold 11px ' + FONT; ctx.fillStyle = '#d4a830'; ctx.fillText('WAIT:', sx, statY);
+    ctx.font = 'bold 11px ' + FONT; ctx.fillStyle = '#d4a830'; ctx.fillText('Wait:', sx, statY);
     ctx.font = '11px ' + FONT; ctx.fillStyle = '#e8e0d0';
-    sx += ctx.measureText('WAIT:').width + 2;
+    sx += ctx.measureText('Wait:').width + 2;
     ctx.fillText(c.enemyWaitCountdown >= 0 ? c.enemyWaitCountdown : (act.wait || 0), sx, statY);
   }
   
@@ -1039,23 +1039,23 @@ function drawCombat() {
     
     ctx.textAlign = 'left';
     ctx.font = labelFont; ctx.fillStyle = goldColor;
-    ctx.fillText('EFF:', sx, statsY);
+    ctx.fillText('Eff:', sx, statsY);
     ctx.font = numFont; ctx.fillStyle = whiteColor;
-    ctx.fillText(' ' + (act.eff || 0), sx + ctx.measureText('EFF:').width, statsY);
+    ctx.fillText(' ' + (act.eff || 0), sx + ctx.measureText('Eff:').width, statsY);
     sx += 80;
     
     ctx.font = labelFont; ctx.fillStyle = goldColor;
-    ctx.fillText('DEF:', sx, statsY);
+    ctx.fillText('Def:', sx, statsY);
     ctx.font = numFont; ctx.fillStyle = whiteColor;
-    ctx.fillText(' ' + (act.def || 0), sx + ctx.measureText('DEF:').width, statsY);
+    ctx.fillText(' ' + (act.def || 0), sx + ctx.measureText('Def:').width, statsY);
     sx += 80;
     
     ctx.font = labelFont; ctx.fillStyle = goldColor;
-    ctx.fillText('WAIT:', sx, statsY);
+    ctx.fillText('Wait:', sx, statsY);
     ctx.font = numFont; ctx.fillStyle = whiteColor;
     // Show countdown if actively waiting, otherwise show base value
     const waitVal = c.waiting ? c.waitCountdown : (act.wait || 0);
-    ctx.fillText(' ' + waitVal, sx + ctx.measureText('WAIT:').width, statsY);
+    ctx.fillText(' ' + waitVal, sx + ctx.measureText('Wait:').width, statsY);
   }
   
   // Hints
@@ -1206,7 +1206,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.32b', canvas.width - 8, 14);
+  ctx.fillText('v0.33', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1253,94 +1253,110 @@ function draw() {
       return tx;
     }
     
-    // Helper: render text to offscreen canvas at small size, scale up pixel-perfect
-    function drawPixelText(text, x, y, fontSize, scale, color, shadowColor) {
-      if (!drawPixelText._c) {
-        drawPixelText._c = document.createElement('canvas');
-        drawPixelText._ctx = drawPixelText._c.getContext('2d');
+    // Helper: render crisp pixel text — no anti-aliasing outlines
+    // Renders to offscreen canvas, thresholds alpha to kill grey AA fringe,
+    // then stamps result with drop shadow
+    function drawCrispText(text, x, y, fontSize, color, spacing) {
+      if (!drawCrispText._c) {
+        drawCrispText._c = document.createElement('canvas');
+        drawCrispText._ctx = drawCrispText._c.getContext('2d', { willReadFrequently: true });
       }
-      const oc = drawPixelText._c;
-      const octx = drawPixelText._ctx;
-      oc.width = 500; oc.height = fontSize + 6;
-      octx.clearRect(0, 0, oc.width, oc.height);
+      const oc = drawCrispText._c;
+      const octx = drawCrispText._ctx;
+      const w = 500, h = fontSize + 8;
+      oc.width = w; oc.height = h;
+      octx.clearRect(0, 0, w, h);
       octx.font = fontSize + 'px "RM2000"';
       octx.textAlign = 'left';
       octx.textBaseline = 'top';
+      octx.fillStyle = '#ffffff';
       
-      // Measure total width with spacing
-      let totalW = 0;
+      // Draw each character with spacing
+      let tx = 2;
+      const sp = spacing || 2;
       for (let i = 0; i < text.length; i++) {
-        totalW += octx.measureText(text[i]).width + 1;
+        octx.fillText(text[i], tx, 2);
+        tx += octx.measureText(text[i]).width + sp;
       }
       
-      // Draw shadow
-      if (shadowColor) {
-        octx.fillStyle = shadowColor;
-        let sx = 1;
-        for (let i = 0; i < text.length; i++) {
-          octx.fillText(text[i], sx, 2);
-          sx += octx.measureText(text[i]).width + 1;
-        }
+      // Threshold alpha: anything < 128 becomes 0, anything >= 128 becomes 255
+      const imgData = octx.getImageData(0, 0, tx + 2, h);
+      const d = imgData.data;
+      for (let i = 3; i < d.length; i += 4) {
+        d[i] = d[i] >= 128 ? 255 : 0;
       }
+      octx.putImageData(imgData, 0, 0);
       
-      // Draw text
+      // Now colorize: draw a color rect with source-atop to recolor white→target
+      octx.globalCompositeOperation = 'source-atop';
       octx.fillStyle = color || '#e8e0d0';
-      let tx = 0;
-      for (let i = 0; i < text.length; i++) {
-        octx.fillText(text[i], tx, 1);
-        tx += octx.measureText(text[i]).width + 1;
-      }
+      octx.fillRect(0, 0, tx + 2, h);
+      octx.globalCompositeOperation = 'source-over';
       
-      // Scale up with nearest-neighbor
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(oc, 0, 0, totalW + 2, fontSize + 4, x, y, (totalW + 2) * scale, (fontSize + 4) * scale);
-      ctx.imageSmoothingEnabled = true;
-      return (totalW + 2) * scale;
+      // Draw shadow first (offset version in black)
+      if (!drawCrispText._c2) {
+        drawCrispText._c2 = document.createElement('canvas');
+        drawCrispText._ctx2 = drawCrispText._c2.getContext('2d', { willReadFrequently: true });
+      }
+      const sc = drawCrispText._c2;
+      const sctx = drawCrispText._ctx2;
+      sc.width = w; sc.height = h;
+      sctx.clearRect(0, 0, w, h);
+      sctx.font = fontSize + 'px "RM2000"';
+      sctx.textAlign = 'left';
+      sctx.textBaseline = 'top';
+      sctx.fillStyle = '#ffffff';
+      let stx = 2;
+      for (let i = 0; i < text.length; i++) {
+        sctx.fillText(text[i], stx, 2);
+        stx += sctx.measureText(text[i]).width + sp;
+      }
+      const sData = sctx.getImageData(0, 0, stx + 2, h);
+      const sd = sData.data;
+      for (let i = 3; i < sd.length; i += 4) {
+        sd[i] = sd[i] >= 128 ? 255 : 0;
+      }
+      // Make shadow black
+      for (let i = 0; i < sd.length; i += 4) {
+        sd[i] = 0; sd[i+1] = 0; sd[i+2] = 0;
+      }
+      sctx.putImageData(sData, 0, 0);
+      
+      // Stamp shadow then text
+      ctx.drawImage(sc, 0, 0, stx + 2, h, x + 2, y + 2, stx + 2, h);
+      ctx.drawImage(oc, 0, 0, tx + 2, h, x, y, tx + 2, h);
+      
+      return tx + 2;
     }
     
-    const sample = 'Punch  Kick  EFF: 12  DEF: 5  WAIT: 8  HP 30/30';
+    const sample = 'Punch  Kick  Eff: 12  Def: 5  Wait: 8  HP 30/30';
     const scrollY = -(state.fontTestScroll || 0);
     ctx.textAlign = 'left';
     let y = 30 + scrollY;
     
-    // RM2000 PIXEL-PERFECT: render small, scale up with nearest-neighbor
-    const sampleText = 'Punch  Kick  EFF: 12  HP 30/30';
+    // RM2000 CRISP (no AA outlines, thresholded alpha, drop shadow)
+    const sampleText = 'Punch  Kick  Eff: 12  HP 30/30';
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('RM2000 pixel-perfect (render small → scale up, no anti-alias):', 20, y); y += 16;
+    ctx.fillText('RM2000 crisp (anti-alias removed, 2px shadow, 2px spacing):', 20, y); y += 16;
     
-    const combos = [
-      { sz: 7, sc: 3, label: '7px × 3' },
-      { sz: 7, sc: 4, label: '7px × 4' },
-      { sz: 8, sc: 3, label: '8px × 3' },
-      { sz: 8, sc: 4, label: '8px × 4' },
-      { sz: 9, sc: 3, label: '9px × 3' },
-      { sz: 9, sc: 4, label: '9px × 4' },
-      { sz: 10, sc: 2, label: '10px × 2' },
-      { sz: 10, sc: 3, label: '10px × 3' },
-      { sz: 11, sc: 2, label: '11px × 2' },
-      { sz: 11, sc: 3, label: '11px × 3' },
-      { sz: 12, sc: 2, label: '12px × 2' },
-      { sz: 12, sc: 3, label: '12px × 3' },
-      { sz: 14, sc: 2, label: '14px × 2' },
-      { sz: 16, sc: 2, label: '16px × 2' },
-    ];
-    for (const c2 of combos) {
+    const crispSizes = [12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48];
+    for (const sz of crispSizes) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
-      ctx.fillText(c2.label + ':', 20, y + c2.sz * c2.sc * 0.6);
-      drawPixelText(sampleText, 80, y, c2.sz, c2.sc, '#e8e0d0', '#000000');
-      y += c2.sz * c2.sc + 8;
+      ctx.fillText(sz + 'px:', 20, y + Math.round(sz * 0.5));
+      drawCrispText(sampleText, 60, y, sz, '#e8e0d0', 2);
+      y += sz + 8;
     }
     y += 10;
     
-    // Also show native sizes with strong drop shadow for comparison
+    // Native AA for comparison
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('RM2000 native rendering (browser anti-aliased, 2px shadow):', 20, y); y += 16;
-    const nativeSizes = [24, 28, 32];
+    ctx.fillText('RM2000 native (browser AA, for comparison):', 20, y); y += 16;
+    const nativeSizes = [24, 32];
     for (const sz of nativeSizes) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText(sz + 'px:', 20, y + Math.round(sz * 0.7));
       ctx.fillStyle = '#e8e0d0'; ctx.font = sz + 'px "RM2000"';
-      drawSpaced(sampleText, 60, y + Math.round(sz * 0.7), 1, true);
+      drawSpaced(sampleText, 60, y + Math.round(sz * 0.7), 2, true);
       y += sz + 8;
     }
     y += 10;
