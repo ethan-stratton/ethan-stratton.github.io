@@ -1206,7 +1206,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.32', canvas.width - 8, 14);
+  ctx.fillText('v0.32b', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1304,7 +1304,7 @@ function draw() {
     let y = 30 + scrollY;
     
     // RM2000 PIXEL-PERFECT: render small, scale up with nearest-neighbor
-    const sample = 'Punch  Kick  EFF: 12  HP 30/30';
+    const sampleText = 'Punch  Kick  EFF: 12  HP 30/30';
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
     ctx.fillText('RM2000 pixel-perfect (render small → scale up, no anti-alias):', 20, y); y += 16;
     
@@ -1327,7 +1327,7 @@ function draw() {
     for (const c2 of combos) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText(c2.label + ':', 20, y + c2.sz * c2.sc * 0.6);
-      drawPixelText(sample, 80, y, c2.sz, c2.sc, '#e8e0d0', '#000000');
+      drawPixelText(sampleText, 80, y, c2.sz, c2.sc, '#e8e0d0', '#000000');
       y += c2.sz * c2.sc + 8;
     }
     y += 10;
@@ -1340,7 +1340,7 @@ function draw() {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText(sz + 'px:', 20, y + Math.round(sz * 0.7));
       ctx.fillStyle = '#e8e0d0'; ctx.font = sz + 'px "RM2000"';
-      drawSpaced(sample, 60, y + Math.round(sz * 0.7), 1, true);
+      drawSpaced(sampleText, 60, y + Math.round(sz * 0.7), 1, true);
       y += sz + 8;
     }
     y += 10;
@@ -1358,7 +1358,7 @@ function draw() {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
       ctx.fillText(o.name + ':', 20, y + 10);
       ctx.fillStyle = '#e8e0d0'; ctx.font = o.font;
-      drawSpaced(sample, 120, y + 10, o.sp, true);
+      drawSpaced(sampleText, 120, y + 10, o.sp, true);
       y += 28;
     }
     y += 16;
