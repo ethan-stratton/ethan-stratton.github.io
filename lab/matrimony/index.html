@@ -832,7 +832,7 @@ function drawCombat() {
   
   // Enemy portrait
   const pad = 8; // padding from edges
-  const ePortraitX = pad + 12;
+  const ePortraitX = pad + 20;
   const ePortraitY = Math.round((topH - portraitH) / 2);
   ctx.fillStyle = '#0c0c14';
   ctx.fillRect(ePortraitX, ePortraitY, portraitW, portraitH);
@@ -853,7 +853,7 @@ function drawCombat() {
   }
   
   // Enemy HP bar
-  const infoX = ePortraitX + portraitW + 12;
+  const infoX = ePortraitX + portraitW + 16;
   const barW = Math.round(W * 0.22);
   const barH = 10;
   const barY = ePortraitY + 4;
@@ -1046,7 +1046,7 @@ function drawCombat() {
   if (elapsed > 5000) {
     const alpha = 0.3 + 0.3 * Math.sin(now / 800);
     ctx.globalAlpha = alpha;
-    crispText('Esc = Run Away', W - 220, arenaY + 4, 32, '#8c828c');
+    crispText('Esc = Run Away', W - 180, arenaY + 4, 32, '#8c828c');
     ctx.globalAlpha = 1;
   }
   
@@ -1058,7 +1058,7 @@ function drawCombat() {
   ctx.beginPath(); ctx.moveTo(0, botContentY + 0.5); ctx.lineTo(W, botContentY + 0.5); ctx.stroke();
   
   // Player portrait
-  const pPortraitX = pad + 12;
+  const pPortraitX = pad + 20;
   const pPortraitY = botContentY + pad + 2;
   ctx.fillStyle = '#0c0c14';
   ctx.fillRect(pPortraitX, pPortraitY, portraitW, portraitH);
@@ -1084,7 +1084,7 @@ function drawCombat() {
   crispText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 4, 32, '#e8e0d0', 1, CRISP_FONT_ALT);
   
   // ── ACTION GRID: 2 columns × 4 rows, fill left-to-right then down ──
-  const gridX = pPortraitX + portraitW + 32;
+  const gridX = pPortraitX + portraitW + 48;
   const gridRowH = 34;
   const gridY = pPortraitY;
   const colW = Math.round((W - gridX - 24) / 2);
@@ -1115,29 +1115,43 @@ function drawCombat() {
     const isSelected = (c.phase === 'action') && i === (c.selectedAction || 0);
     const dimmed = c.phase === 'target' || c.waiting;
     
-    // Highlight background for selected action
+    // Highlight background — starts at text, rounded corners (clip corner pixels)
     if (isSelected && !dimmed) {
-      ctx.fillStyle = 'rgba(200, 240, 180, 0.12)';
-      ctx.fillRect(ax, ay, colW, gridRowH);
+      const hx = ax;
+      const hy = ay;
+      const hw = colW;
+      const hh = gridRowH;
+      ctx.fillStyle = 'rgba(140, 220, 100, 0.16)';
+      // Fill main rect then clear corner pixels
+      ctx.fillRect(hx + 1, hy, hw - 2, 1);
+      ctx.fillRect(hx, hy + 1, hw, hh - 2);
+      ctx.fillRect(hx + 1, hy + hh - 1, hw - 2, 1);
     }
     
-    const color = isSelected && !dimmed ? '#ffe8c0' : dimmed ? '#4a4440' : '#a09888';
+    const color = isSelected && !dimmed ? '#ffffff' : dimmed ? '#4a4440' : '#a09888';
     crispText(actions[i], ax + 4, ay + 2, 32, color);
   }
   
-  // Selected action stats at bottom — gold labels, white numbers, bigger and spread out
+  // Selected action stats — centered on screen, anchored positions for each stat
   const sel = c.selectedAction || 0;
   if (c.phase === 'action' && sel < actions.length) {
     const act = COMBAT_ACTIONS[actions[sel]] || {};
     const statsY = H - pad - 26;
-    let sx = gridX + 4;
     const waitVal = c.waiting ? c.waitCountdown : (act.wait || 0);
-    sx += crispGradientText('Eff:', sx, statsY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 4;
-    sx += crispText('' + (act.eff || 0), sx, statsY, 32, '#e8e0d0', 1, CRISP_FONT_ALT) + 24;
-    sx += crispGradientText('Def:', sx, statsY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 4;
-    sx += crispText('' + (act.def || 0), sx, statsY, 32, '#e8e0d0', 1, CRISP_FONT_ALT) + 24;
-    sx += crispGradientText('Wait:', sx, statsY, 32, GOLD_GRADIENT, 1, CRISP_FONT_ALT) + 4;
-    crispText('' + waitVal, sx, statsY, 32, '#e8e0d0', 1, CRISP_FONT_ALT);
+    // Fixed-width slots: label + 3-digit number space. Center the whole block.
+    const slotW = 120; // enough for "Wait:" + "100"
+    const totalW = slotW * 3;
+    const startX = Math.round((W - totalW) / 2);
+    
+    let sx = startX;
+    crispGradientText('Eff:', sx, statsY, 32, GOLD_GRADIENT, 0, CRISP_FONT_ALT);
+    crispText('' + (act.eff || 0), sx + 55, statsY, 32, '#e8e0d0', 0, CRISP_FONT_ALT);
+    sx += slotW;
+    crispGradientText('Def:', sx, statsY, 32, GOLD_GRADIENT, 0, CRISP_FONT_ALT);
+    crispText('' + (act.def || 0), sx + 55, statsY, 32, '#e8e0d0', 0, CRISP_FONT_ALT);
+    sx += slotW;
+    crispGradientText('Wait:', sx, statsY, 32, GOLD_GRADIENT, 0, CRISP_FONT_ALT);
+    crispText('' + waitVal, sx + 65, statsY, 32, '#e8e0d0', 0, CRISP_FONT_ALT);
   }
   
   // Hints
@@ -1278,7 +1292,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.48', canvas.width - 8, 14);
+  ctx.fillText('v0.49', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
