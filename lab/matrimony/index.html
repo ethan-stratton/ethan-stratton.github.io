@@ -290,19 +290,34 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   
-  // Combat menu navigation (arrows only)
+  // Combat menu navigation (2x4 grid: left col 0-3, right col 4-7)
   if (state.combat) {
     const c = state.combat;
-    const numActions = (c.actions || []).length;
-    if (e.key === 'ArrowUp' && numActions > 0) {
-      c.selectedAction = (c.selectedAction - 1 + numActions) % numActions;
-      e.preventDefault();
-      return;
-    }
-    if (e.key === 'ArrowDown' && numActions > 0) {
-      c.selectedAction = (c.selectedAction + 1) % numActions;
-      e.preventDefault();
-      return;
+    const numActions = Math.min((c.actions || []).length, 8);
+    if (numActions > 0) {
+      const sel = c.selectedAction || 0;
+      const col = sel < 4 ? 0 : 1;
+      const row = sel < 4 ? sel : sel - 4;
+      if (e.key === 'ArrowUp') {
+        const newRow = (row - 1 + 4) % 4;
+        const newIdx = col * 4 + newRow;
+        c.selectedAction = newIdx < numActions ? newIdx : sel;
+        e.preventDefault(); return;
+      }
+      if (e.key === 'ArrowDown') {
+        const newRow = (row + 1) % 4;
+        const newIdx = col * 4 + newRow;
+        c.selectedAction = newIdx < numActions ? newIdx : sel;
+        e.preventDefault(); return;
+      }
+      if (e.key === 'ArrowLeft') {
+        if (col === 1) { const newIdx = row; c.selectedAction = newIdx < numActions ? newIdx : sel; }
+        e.preventDefault(); return;
+      }
+      if (e.key === 'ArrowRight') {
+        if (col === 0) { const newIdx = 4 + row; c.selectedAction = newIdx < numActions ? newIdx : sel; }
+        e.preventDefault(); return;
+      }
     }
   }
   
@@ -505,10 +520,16 @@ canvas.addEventListener('click', (e) => {
   const arenaH = Math.round(H * 0.42);
   const botContentY = topH + arenaH;
   const botH = H - botContentY;
-  const gridX = Math.round(W * 0.35);
-  const gridY = botContentY + 6;
-  const colW = Math.round((W - gridX - 10) / 2);
-  const gridRowH = Math.floor((botH - 30) / 4);
+  const pad = 8;
+  const portraitH = Math.round(topH * 0.7);
+  const portraitW = Math.round(portraitH * 2.5);
+  const pPortraitY = botContentY + pad + 2;
+  const portraitCenterY = pPortraitY + Math.round(portraitH / 2);
+  const gridX = pad + 12 + portraitW + 16;
+  const gridRowH = 20;
+  const gridTotalH = 4 * gridRowH;
+  const gridY = portraitCenterY - Math.round(gridTotalH / 2);
+  const colW = Math.round((W - gridX - 16) / 2);
   for (let i = 0; i < actions.length && i < 8; i++) {
     const col = i < 4 ? 0 : 1;
     const row = i < 4 ? i : i - 4;
@@ -555,8 +576,9 @@ function drawCombat() {
   ctx.beginPath(); ctx.moveTo(0, topH - 0.5); ctx.lineTo(W, topH - 0.5); ctx.stroke();
   
   // Enemy portrait
-  const ePortraitX = 20;
-  const ePortraitY = Math.round((topH - portraitH) / 2) - 2;
+  const pad = 8; // padding from edges
+  const ePortraitX = pad + 12;
+  const ePortraitY = Math.round((topH - portraitH) / 2);
   ctx.strokeStyle = '#5a5060'; ctx.lineWidth = 1;
   ctx.strokeRect(ePortraitX, ePortraitY, portraitW, portraitH);
   ctx.fillStyle = '#0c0c14';
@@ -615,11 +637,10 @@ function drawCombat() {
     ctx.drawImage(spr.img, frame * SPRITE_FRAME_SIZE, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
       enemyArenaX, enemyArenaY, enemyCombatSize, enemyCombatSize);
     
-    // White flash after slide-in completes
-    if (slideT >= 1 && now < c.enemyFlashEnd) {
-      const flashT = (now - (c.startTime + c.slideInDuration)) / 600;
-      const flashAlpha = 0.4 + 0.4 * Math.sin(flashT * Math.PI * 4); // rapid pulse
-      ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+    // White flash — selected enemy pulses white
+    if (slideT >= 1) {
+      const flashAlpha = 0.15 + 0.2 * Math.sin(now / 300);
+      ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, flashAlpha)})`;
       ctx.fillRect(enemyArenaX, enemyArenaY, enemyCombatSize, enemyCombatSize);
     }
     ctx.imageSmoothingEnabled = true;
@@ -659,8 +680,8 @@ function drawCombat() {
   ctx.beginPath(); ctx.moveTo(0, botContentY + 0.5); ctx.lineTo(W, botContentY + 0.5); ctx.stroke();
   
   // Player portrait
-  const pPortraitX = 20;
-  const pPortraitY = botContentY + 6;
+  const pPortraitX = pad + 12;
+  const pPortraitY = botContentY + pad + 2;
   ctx.strokeStyle = '#5a5060'; ctx.lineWidth = 1;
   ctx.strokeRect(pPortraitX, pPortraitY, portraitW, portraitH);
   ctx.fillStyle = '#0c0c14';
@@ -688,11 +709,13 @@ function drawCombat() {
   ctx.textAlign = 'left';
   ctx.fillText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 14);
   
-  // ── ACTION GRID: 2 columns × 4 rows ──
-  const gridX = Math.round(W * 0.35);
-  const gridY = botContentY + 6;
-  const colW = Math.round((W - gridX - 10) / 2);
-  const gridRowH = Math.floor((botH - 30) / 4); // leave room for stats line at bottom
+  // ── ACTION GRID: 2 columns × 4 rows, aligned with portrait center ──
+  const gridX = pPortraitX + portraitW + 16;
+  const portraitCenterY = pPortraitY + Math.round(portraitH / 2);
+  const gridRowH = 20;
+  const gridTotalH = 4 * gridRowH;
+  const gridY = portraitCenterY - Math.round(gridTotalH / 2); // center grid on portrait
+  const colW = Math.round((W - gridX - 16) / 2);
   
   const actions = c.actions || ['Punch', 'Kick'];
   
@@ -717,7 +740,7 @@ function drawCombat() {
     const ay = gridY + row * gridRowH;
     const isSelected = i === (c.selectedAction || 0);
     
-    ctx.font = '13px ' + FONT;
+    ctx.font = '15px ' + FONT;
     ctx.fillStyle = isSelected ? '#ffe8c0' : '#706860';
     ctx.textAlign = 'left';
     ctx.fillText(actions[i], ax + 4, ay + gridRowH - 4);
@@ -727,10 +750,10 @@ function drawCombat() {
   const sel = c.selectedAction || 0;
   if (sel < actions.length) {
     const act = COMBAT_ACTIONS[actions[sel]] || {};
-    ctx.font = '12px ' + FONT;
+    ctx.font = '13px ' + FONT;
     ctx.fillStyle = '#b0a898';
     ctx.textAlign = 'left';
-    const statsY = H - 8;
+    const statsY = H - pad;
     ctx.fillText('EFF: ' + (act.eff || 0) + '    DEF: ' + (act.def || 0) + '    WAIT: ' + (act.wait || 0), gridX + 4, statsY);
   }
 }
@@ -866,7 +889,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.19', canvas.width - 8, 14);
+  ctx.fillText('v0.20', canvas.width - 8, 14);
   ctx.textAlign = 'left';
 }
 
