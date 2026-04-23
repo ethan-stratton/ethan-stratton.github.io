@@ -1206,7 +1206,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.33', canvas.width - 8, 14);
+  ctx.fillText('v0.34', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1329,37 +1329,127 @@ function draw() {
       return tx + 2;
     }
     
+    // Render at small native size, threshold AA, then scale up with nearest-neighbor
+    function drawCrispScaled(text, x, y, fontSize, scale, color, spacing) {
+      if (!drawCrispScaled._c) {
+        drawCrispScaled._c = document.createElement('canvas');
+        drawCrispScaled._ctx = drawCrispScaled._c.getContext('2d', { willReadFrequently: true });
+        drawCrispScaled._c2 = document.createElement('canvas');
+        drawCrispScaled._ctx2 = drawCrispScaled._c2.getContext('2d', { willReadFrequently: true });
+      }
+      const oc = drawCrispScaled._c;
+      const octx = drawCrispScaled._ctx;
+      const w = 500, h = fontSize + 6;
+      oc.width = w; oc.height = h;
+      octx.clearRect(0, 0, w, h);
+      octx.font = fontSize + 'px "RM2000"';
+      octx.textAlign = 'left';
+      octx.textBaseline = 'top';
+      octx.fillStyle = '#ffffff';
+      
+      const sp = spacing || 1;
+      let tx = 1;
+      for (let i = 0; i < text.length; i++) {
+        octx.fillText(text[i], tx, 1);
+        tx += octx.measureText(text[i]).width + sp;
+      }
+      
+      // Threshold alpha
+      const imgData = octx.getImageData(0, 0, tx + 2, h);
+      const d = imgData.data;
+      for (let i = 3; i < d.length; i += 4) {
+        d[i] = d[i] >= 128 ? 255 : 0;
+      }
+      octx.putImageData(imgData, 0, 0);
+      
+      // Colorize
+      octx.globalCompositeOperation = 'source-atop';
+      octx.fillStyle = color || '#e8e0d0';
+      octx.fillRect(0, 0, tx + 2, h);
+      octx.globalCompositeOperation = 'source-over';
+      
+      // Shadow version
+      const sc2 = drawCrispScaled._c2;
+      const sctx = drawCrispScaled._ctx2;
+      sc2.width = w; sc2.height = h;
+      sctx.clearRect(0, 0, w, h);
+      sctx.font = fontSize + 'px "RM2000"';
+      sctx.textAlign = 'left';
+      sctx.textBaseline = 'top';
+      sctx.fillStyle = '#ffffff';
+      let stx = 1;
+      for (let i = 0; i < text.length; i++) {
+        sctx.fillText(text[i], stx, 1);
+        stx += sctx.measureText(text[i]).width + sp;
+      }
+      const sData = sctx.getImageData(0, 0, stx + 2, h);
+      const sd = sData.data;
+      for (let i = 3; i < sd.length; i += 4) {
+        sd[i] = sd[i] >= 128 ? 255 : 0;
+      }
+      for (let i = 0; i < sd.length; i += 4) {
+        sd[i] = 0; sd[i+1] = 0; sd[i+2] = 0;
+      }
+      sctx.putImageData(sData, 0, 0);
+      
+      // Scale up with nearest-neighbor
+      const dw = (tx + 2) * scale, dh = h * scale;
+      ctx.imageSmoothingEnabled = false;
+      // Shadow offset = 1 source pixel = `scale` display pixels
+      ctx.drawImage(sc2, 0, 0, stx + 2, h, x + scale, y + scale, (stx + 2) * scale, h * scale);
+      ctx.drawImage(oc, 0, 0, tx + 2, h, x, y, dw, dh);
+      ctx.imageSmoothingEnabled = true;
+      
+      return dw;
+    }
+    
     const sample = 'Punch  Kick  Eff: 12  Def: 5  Wait: 8  HP 30/30';
     const scrollY = -(state.fontTestScroll || 0);
     ctx.textAlign = 'left';
     let y = 30 + scrollY;
     
-    // RM2000 CRISP (no AA outlines, thresholded alpha, drop shadow)
+    // RM2000 9px NATIVE → SCALED UP (threshold + nearest-neighbor)
     const sampleText = 'Punch  Kick  Eff: 12  HP 30/30';
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('RM2000 crisp (anti-alias removed, 2px shadow, 2px spacing):', 20, y); y += 16;
+    ctx.fillText('RM2000 9px native → threshold AA → scale up (nearest-neighbor):', 20, y); y += 16;
     
-    const crispSizes = [12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48];
-    for (const sz of crispSizes) {
+    const scaledCombos = [
+      { sz: 9, sc: 2, label: '9px × 2 (18px)' },
+      { sz: 9, sc: 3, label: '9px × 3 (27px)' },
+      { sz: 9, sc: 4, label: '9px × 4 (36px)' },
+      { sz: 9, sc: 5, label: '9px × 5 (45px)' },
+    ];
+    for (const c2 of scaledCombos) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
-      ctx.fillText(sz + 'px:', 20, y + Math.round(sz * 0.5));
-      drawCrispText(sampleText, 60, y, sz, '#e8e0d0', 2);
-      y += sz + 8;
+      const labelY = y + Math.round(c2.sz * c2.sc * 0.5);
+      ctx.fillText(c2.label + ':', 20, labelY);
+      drawCrispScaled(sampleText, 120, y, c2.sz, c2.sc, '#e8e0d0', 1);
+      y += c2.sz * c2.sc + 10;
     }
     y += 10;
     
-    // Native AA for comparison
+    // Also try other base sizes scaled to ~32px display
     ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
-    ctx.fillText('RM2000 native (browser AA, for comparison):', 20, y); y += 16;
-    const nativeSizes = [24, 32];
-    for (const sz of nativeSizes) {
+    ctx.fillText('Other base sizes scaled to ~32px display:', 20, y); y += 16;
+    const otherScaled = [
+      { sz: 8, sc: 4, label: '8px × 4 (32px)' },
+      { sz: 10, sc: 3, label: '10px × 3 (30px)' },
+      { sz: 11, sc: 3, label: '11px × 3 (33px)' },
+      { sz: 16, sc: 2, label: '16px × 2 (32px)' },
+    ];
+    for (const c2 of otherScaled) {
       ctx.fillStyle = '#706860'; ctx.font = '9px "Pixelify Sans"';
-      ctx.fillText(sz + 'px:', 20, y + Math.round(sz * 0.7));
-      ctx.fillStyle = '#e8e0d0'; ctx.font = sz + 'px "RM2000"';
-      drawSpaced(sampleText, 60, y + Math.round(sz * 0.7), 2, true);
-      y += sz + 8;
+      ctx.fillText(c2.label + ':', 20, y + Math.round(c2.sz * c2.sc * 0.5));
+      drawCrispScaled(sampleText, 120, y, c2.sz, c2.sc, '#e8e0d0', 1);
+      y += c2.sz * c2.sc + 10;
     }
     y += 10;
+    
+    // Direct 32px crisp (no scaling, just thresholded) for comparison
+    ctx.fillStyle = '#d4a830'; ctx.font = '10px "Pixelify Sans"';
+    ctx.fillText('32px direct crisp (thresholded, no scale) for comparison:', 20, y); y += 16;
+    drawCrispText(sampleText, 20, y, 32, '#e8e0d0', 2);
+    y += 40;
     
     // Other fonts at 24px with shadow
     const others = [
