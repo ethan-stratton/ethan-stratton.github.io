@@ -82,8 +82,8 @@ let levelData = null;
 // ══════════════════════════════════
 const TILE = 16;       // tile size in pixels
 const SCALE = 2;       // render scale (16px tiles → 32px on screen)
-const CANVAS_W = 527;  // native resolution width
-const CANVAS_H = 362;  // native resolution height
+const CANVAS_W = 638;  // native resolution width
+const CANVAS_H = 480;  // native resolution height
 const DISPLAY_SCALE = 1.4; // CSS scale for display
 const CANVAS_TILES_X = Math.ceil(CANVAS_W / (TILE * SCALE)) + 1;
 const CANVAS_TILES_Y = Math.ceil(CANVAS_H / (TILE * SCALE)) + 1;
@@ -1215,7 +1215,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.37', canvas.width - 8, 14);
+  ctx.fillText('v0.38', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
