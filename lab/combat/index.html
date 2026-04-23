@@ -282,7 +282,7 @@
   }
   .lib-item {
     font-family: 'JetBrains Mono', monospace; font-size: 0.65rem;
-    color: #908880; padding: 3px 8px; cursor: pointer;
+    color: #908880; padding: 4px 8px; cursor: pointer;
     border-radius: 3px; transition: all 0.15s;
     display: flex; justify-content: space-between; align-items: center;
   }
@@ -290,7 +290,6 @@
   .lib-item.in-loadout { color: #484040; }
   .lib-item .lib-name { font-family: 'Cinzel', serif; font-size: 0.7rem; }
   .lib-item .lib-stats { font-size: 0.55rem; color: #585050; }
-  .lib-item .lib-plus { color: #b89cff; }
 
   .sandbox-slots {
     width: 230px; flex-shrink: 0;
@@ -325,6 +324,17 @@
   }
   .slot-entry:hover .slot-remove { opacity: 1; }
   .slot-entry .slot-remove:hover { color: #ca6a6a; }
+  .slot-controls {
+    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+  }
+  .slot-upgrade {
+    color: #585050; cursor: pointer; font-size: 0.7rem;
+    width: 16px; height: 16px; display: inline-flex;
+    align-items: center; justify-content: center;
+    border-radius: 2px; transition: all 0.15s;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .slot-upgrade:hover { color: #b89cff; background: rgba(184, 156, 255, 0.15); }
   .sandbox-slot-actions {
     display: flex; justify-content: space-between; align-items: center;
     margin-top: 8px;
@@ -1963,7 +1973,7 @@ const ITEM_LIBRARY = ITEMS.flatMap(item => generateUpgrades(item));
 // ═══════════════════════════════════
 
 const MAX_SANDBOX_SLOTS = 8;
-let sandboxLoadout = ITEMS.slice(0, 8).map(it => it.name); // default: first 8 base items
+let sandboxLoadout = ITEMS.slice(0, 8).map(it => ({ base: it.name, plus: 0 }));
 
 function getSandboxItems() {
   return sandboxLoadout.map(name => ITEM_LIBRARY.find(it => it.name === name)).filter(Boolean);
@@ -1972,34 +1982,35 @@ function getSandboxItems() {
 function buildSandboxLibrary() {
   const lib = document.getElementById('sandboxLibrary');
   lib.innerHTML = '';
-  // Group by base item
   ITEMS.forEach(baseItem => {
-    const variants = ITEM_LIBRARY.filter(it => it.name === baseItem.name || it.baseName === baseItem.name);
-    const section = document.createElement('div');
-    section.className = 'lib-section';
-    variants.forEach(item => {
-      const div = document.createElement('div');
-      const inLoadout = sandboxLoadout.includes(item.name);
-      div.className = 'lib-item' + (inLoadout ? ' in-loadout' : '');
-      let specials = '';
-      if (item.type === 'pierce') specials = ' ⟁';
-      if (item.type === 'heal') specials = ' ♥';
-      if (item.stun) specials = ' ◉';
-      if (item.absorb) specials = ' ◎';
-      if (item.seal) specials = ' ⊘';
-      if (item.buff) specials = ' ↑';
-      const plusTag = item.plus ? `<span class="lib-plus">+${item.plus}</span>` : '';
-      div.innerHTML = `<span class="lib-name">${baseItem.name} ${plusTag}</span><span class="lib-stats"><span class="stat-eff">${item.eff}</span>/<span class="stat-def">${item.def}</span>/<span class="stat-wait">${item.wait}</span>${specials}</span>`;
-      div.onclick = () => {
-        if (sandboxLoadout.length >= MAX_SANDBOX_SLOTS) return;
-        sandboxLoadout.push(item.name);
-        buildSandboxLibrary();
-        buildSandboxSlots();
-      };
-      section.appendChild(div);
-    });
-    lib.appendChild(section);
+    const div = document.createElement('div');
+    const inLoadout = sandboxLoadout.some(s => s.base === baseItem.name);
+    div.className = 'lib-item' + (inLoadout ? ' in-loadout' : '');
+    let specials = '';
+    if (baseItem.type === 'pierce') specials = ' ⟁';
+    if (baseItem.type === 'heal') specials = ' ♥';
+    if (baseItem.stun) specials = ' ◉';
+    if (baseItem.absorb) specials = ' ◎';
+    if (baseItem.seal) specials = ' ⊘';
+    if (baseItem.buff) specials = ' ↑';
+    div.innerHTML = `<span class="lib-name">${baseItem.name}</span><span class="lib-stats"><span class="stat-eff">${baseItem.eff}</span>/<span class="stat-def">${baseItem.def}</span>/<span class="stat-wait">${baseItem.wait}</span>${specials}</span>`;
+    div.onclick = () => {
+      if (sandboxLoadout.length >= MAX_SANDBOX_SLOTS) return;
+      sandboxLoadout.push({ base: baseItem.name, plus: 0 });
+      buildSandboxLibrary();
+      buildSandboxSlots();
+    };
+    lib.appendChild(div);
   });
+}
+
+function getItemForSlot(slot) {
+  if (slot.plus === 0) return ITEM_LIBRARY.find(it => it.name === slot.base);
+  return ITEM_LIBRARY.find(it => it.name === `${slot.base} +${slot.plus}`);
+}
+
+function getSandboxItems() {
+  return sandboxLoadout.map(s => getItemForSlot(s)).filter(Boolean);
 }
 
 function buildSandboxSlots() {
@@ -2012,10 +2023,12 @@ function buildSandboxSlots() {
   for (let i = 0; i < MAX_SANDBOX_SLOTS; i++) {
     const div = document.createElement('div');
     if (i < sandboxLoadout.length) {
-      const item = ITEM_LIBRARY.find(it => it.name === sandboxLoadout[i]);
+      const slot = sandboxLoadout[i];
+      const item = getItemForSlot(slot);
       div.className = 'slot-entry filled';
       if (item) {
-        div.innerHTML = `<span class="slot-name">${item.name}</span><span><span class="slot-stats"><span class="stat-eff">${item.eff}</span>/<span class="stat-def">${item.def}</span>/<span class="stat-wait">${item.wait}</span></span><span class="slot-remove" data-idx="${i}">✕</span></span>`;
+        const plusLabel = slot.plus > 0 ? ` <span class="stat-special">+${slot.plus}</span>` : '';
+        div.innerHTML = `<span class="slot-name">${slot.base}${plusLabel}</span><span class="slot-controls"><span class="slot-stats"><span class="stat-eff">${item.eff}</span>/<span class="stat-def">${item.def}</span>/<span class="stat-wait">${item.wait}</span></span> <span class="slot-upgrade" data-idx="${i}" data-dir="-1">−</span><span class="slot-upgrade" data-idx="${i}" data-dir="1">+</span><span class="slot-remove" data-idx="${i}">✕</span></span>`;
       }
     } else {
       div.className = 'slot-entry';
@@ -2031,7 +2044,19 @@ function buildSandboxSlots() {
       buildSandboxSlots();
     };
   });
-  // Update fight button
+  container.querySelectorAll('.slot-upgrade').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx);
+      const dir = parseInt(btn.dataset.dir);
+      const slot = sandboxLoadout[idx];
+      const newPlus = slot.plus + dir;
+      if (newPlus >= 0 && newPlus <= 3) {
+        slot.plus = newPlus;
+        buildSandboxSlots();
+      }
+    };
+  });
   document.getElementById('sandboxFightBtn').disabled = sandboxLoadout.length === 0;
 }
 
@@ -2046,6 +2071,7 @@ document.getElementById('sandboxFightBtn').onclick = () => {
   document.querySelector('#sandboxContainer .sandbox-loadout').classList.add('hidden');
   document.getElementById('sandboxCombat').classList.remove('hidden');
   sandboxEngine.startFight(currentEnemyIdx);
+};
 };
 
 let currentEnemyIdx = 0;
