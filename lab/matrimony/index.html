@@ -120,6 +120,19 @@ function playFootstep() {
   osc.start(ac.currentTime);
   osc.stop(ac.currentTime + dur);
 }
+function playTick() {
+  const ac = getAudioCtx();
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = 'square';
+  osc.frequency.value = 600;
+  gain.gain.setValueAtTime(0.04, ac.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.04);
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.start(ac.currentTime);
+  osc.stop(ac.currentTime + 0.05);
+}
 canvas.style.width = (CANVAS_W * DISPLAY_SCALE) + 'px';
 canvas.style.height = (CANVAS_H * DISPLAY_SCALE) + 'px';
 
@@ -581,7 +594,7 @@ function startCombat(entity, enemyStats) {
     actions: ['Punch', 'Kick', ...(state.inventory.includes('Shortbow') ? ['Shortbow'] : [])],
     selectedAction: 0,
     waitCountdown: -1, // player wait: -1 = not counting, >=0 = ticking down
-    waitTickSpeed: 500, // ms per tick
+    waitTickSpeed: 300, // ms per tick
     lastWaitTick: 0,
     waitAccumulator: 0, // accumulator for precise ticking
     waiting: false, // true while player wait is counting down
@@ -598,9 +611,7 @@ function startCombat(entity, enemyStats) {
 
 function exitCombat() {
   const enemy = state.combat.enemy;
-  if (state.combat.enemyHp <= 0) {
-    state.defeatedEnemies[enemy.id] = true;
-  }
+  // Don't permanently defeat for now — enemy respawns each fight
   state.combat = null;
 }
 
@@ -821,7 +832,7 @@ function drawCombat() {
   const botContentY = arenaY + arenaH;
   const botH = H - botContentY;
   
-  const portraitH = Math.round(topH * 0.62);
+  const portraitH = Math.round(topH * 0.62) - 16;
   const portraitW = Math.round(portraitH * 2.5);
   
   // ── TOP BAR ──
@@ -891,18 +902,21 @@ function drawCombat() {
   const enemyCombatSize = 48;
   const groundY = arenaY + Math.round(arenaH * 0.82);
   
-  // Camera: center on player during action selection, midpoint during attack
-  const midX = W * 0.5;
+  // Camera: smooth easing between positions
   const isActionPhase = c.phase === 'action' && !c.waiting && !c.playerAttackAnim;
-  const camTargetX = isActionPhase ? W * 0.5 : W * 0.5;
+  const camTarget = isActionPhase ? 1.0 : 0.0; // 1 = centered on player, 0 = normal
+  if (c.camLerp == null) c.camLerp = 0;
+  c.camLerp += (camTarget - c.camLerp) * 0.08; // asymptotic easing
+  const cl = c.camLerp;
   
-  // Player/enemy base positions relative to camera
-  const enemyBaseX = Math.round(W * 0.28) - enemyCombatSize / 2;
-  const playerBaseX = isActionPhase ? Math.round(W * 0.5) - playerCombatSize / 2 : Math.round(W * 0.72) - playerCombatSize / 2;
+  // Player/enemy positions interpolated by camera lerp
+  const enemyNormalX = Math.round(W * 0.28) - enemyCombatSize / 2;
+  const playerNormalX = Math.round(W * 0.72) - playerCombatSize / 2;
+  const enemyActionX = Math.round(W * 0.12) - enemyCombatSize / 2; // pushed left
+  const playerActionX = Math.round(W * 0.5) - playerCombatSize / 2; // centered
   
-  // Target positions
-  const enemyTargetX = enemyBaseX;
-  const playerTargetX = playerBaseX;
+  const enemyTargetX = Math.round(enemyNormalX + (enemyActionX - enemyNormalX) * cl);
+  const playerTargetX = Math.round(playerNormalX + (playerActionX - playerNormalX) * cl);
   
   // Slide in from edges
   const enemySlideFrom = -enemyCombatSize - 20;
@@ -942,9 +956,10 @@ function drawCombat() {
     ctx.drawImage(spr.img, frame * SPRITE_FRAME_SIZE, 0, SPRITE_FRAME_SIZE, SPRITE_FRAME_SIZE,
       enemyArenaX, enemyArenaY, enemyCombatSize, enemyCombatSize);
     
-    // White flash on enemy pixels only — during target phase after slide-in
+    // White tint on enemy pixels — baseline + flash during target phase
     if (slideT >= 1 && c.phase === 'target' && !c.targetSelf) {
-      const flashAlpha = 0.1 + 0.2 * Math.sin(now / 180); // subtle, never fully white
+      const baseAlpha = 0.15; // constant white tint so you always see selection
+      const flashAlpha = baseAlpha + 0.2 * (0.5 + 0.5 * Math.sin(now / 180));
       if (flashAlpha > 0) {
         // Use offscreen canvas to create white silhouette
         if (!drawCombat._flashCanvas) {
@@ -1095,7 +1110,7 @@ function drawCombat() {
   }
   
   // HP below portrait
-  crispText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 4, 32, '#e8e0d0', 1, CRISP_FONT_ALT);
+  crispText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX + 12, pPortraitY + portraitH + 4, 32, '#e8e0d0', 0, CRISP_FONT_ALT);
   
   // ── ACTION GRID: 2 columns × 4 rows, fill left-to-right then down ──
   const gridX = pPortraitX + portraitW + 48;
@@ -1131,9 +1146,9 @@ function drawCombat() {
     
     // Highlight background — starts at first character pixel, rounded corners
     if (isSelected && !dimmed) {
-      const hx = ax + 4;  // align with text start
+      const hx = ax + 3;  // align with text start
       const hy = ay;
-      const hw = colW - 4;
+      const hw = colW - 3;
       const hh = gridRowH;
       ctx.fillStyle = 'rgba(80, 200, 60, 0.18)';
       ctx.fillRect(hx + 1, hy, hw - 2, 1);
@@ -1141,7 +1156,7 @@ function drawCombat() {
       ctx.fillRect(hx + 1, hy + hh - 1, hw - 2, 1);
     }
     
-    crispText(actions[i], ax + 4, ay + 2, 32, '#ffffff');
+    crispText(actions[i], ax + 3, ay + 2, 32, '#ffffff');
   }
   
   // Selected action stats — centered on screen, anchored positions for each stat
@@ -1304,7 +1319,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.50', canvas.width - 8, 14);
+  ctx.fillText('v0.51', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
@@ -1825,6 +1840,10 @@ function gameLoop(time) {
         if (c.attackText) {
           const act = COMBAT_ACTIONS[c.attackText] || {};
           c.enemyHp = Math.max(0, c.enemyHp - (act.eff || 0));
+          // Exit combat when enemy dies
+          if (c.enemyHp <= 0) {
+            setTimeout(() => { if (state.combat) exitCombat(); }, 600);
+          }
         }
         // Reset — player's attack executed, clear waiting state
         c.waiting = false;
@@ -1856,6 +1875,7 @@ function gameLoop(time) {
         c.waitAccumulator -= c.waitTickSpeed;
         // Cap accumulator to prevent catching up (no skipping)
         if (c.waitAccumulator > c.waitTickSpeed) c.waitAccumulator = 0;
+        playTick();
         
         // Tick player
         if (c.waiting && c.waitCountdown > 0) {
