@@ -852,16 +852,16 @@ function drawCombat() {
   // Enemy action display — name right of HP bar, stats below
   if (c.enemyAction) {
     const act = COMBAT_ACTIONS[c.enemyAction] || {};
-    crispText(c.enemyAction, infoX + barW + 8, barY - 4, 12, '#d0c0a0');
+    crispText(c.enemyAction, infoX + barW + 8, barY - 4, 32, '#d0c0a0');
     const statY = barY + barH + 4;
     let sx = infoX;
     const waitVal = c.enemyWaitCountdown >= 0 ? c.enemyWaitCountdown : (act.wait || 0);
-    sx += crispGradientText('Eff:', sx, statY, 12, GOLD_GRADIENT) + 2;
-    sx += crispText('' + (act.eff || 0), sx, statY, 12, '#e8e0d0') + 8;
-    sx += crispGradientText('Def:', sx, statY, 12, GOLD_GRADIENT) + 2;
-    sx += crispText('' + (act.def || 0), sx, statY, 12, '#e8e0d0') + 8;
-    sx += crispGradientText('Wait:', sx, statY, 12, GOLD_GRADIENT) + 2;
-    crispText('' + waitVal, sx, statY, 12, '#e8e0d0');
+    sx += crispGradientText('Eff:', sx, statY, 32, GOLD_GRADIENT) + 2;
+    sx += crispText('' + (act.eff || 0), sx, statY, 32, '#e8e0d0') + 8;
+    sx += crispGradientText('Def:', sx, statY, 32, GOLD_GRADIENT) + 2;
+    sx += crispText('' + (act.def || 0), sx, statY, 32, '#e8e0d0') + 8;
+    sx += crispGradientText('Wait:', sx, statY, 32, GOLD_GRADIENT) + 2;
+    crispText('' + waitVal, sx, statY, 32, '#e8e0d0');
   }
   
   // ── ARENA ──
@@ -977,7 +977,7 @@ function drawCombat() {
       const bobY = Math.sin(now / 200) * 3;
       const qAlpha = Math.min(1, rt < 0.1 ? rt / 0.1 : rt > 0.7 ? (1 - rt) / 0.3 : 1);
       ctx.globalAlpha = qAlpha;
-      crispText('?', enemyArenaX + enemyCombatSize / 2 - 6, enemyArenaY - 16 + bobY, 16, '#ffdc50');
+      crispText('?', enemyArenaX + enemyCombatSize / 2 - 6, enemyArenaY - 16 + bobY, 32, '#ffdc50');
       ctx.globalAlpha = 1;
     }
   }
@@ -1032,7 +1032,7 @@ function drawCombat() {
   if (elapsed > 5000) {
     const alpha = 0.3 + 0.3 * Math.sin(now / 800);
     ctx.globalAlpha = alpha;
-    crispText('Esc = Run Away', W - 120, arenaY + 4, 10, '#8c828c');
+    crispText('Esc = Run Away', W - 160, arenaY + 4, 32, '#8c828c');
     ctx.globalAlpha = 1;
   }
   
@@ -1068,7 +1068,7 @@ function drawCombat() {
   }
   
   // HP below portrait
-  crispText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 4, 14, '#e8e0d0');
+  crispText('HP ' + c.playerHp + '/' + c.playerMaxHp, pPortraitX, pPortraitY + portraitH + 4, 32, '#e8e0d0');
   
   // ── ACTION GRID: always visible, 2 columns × 4 rows ──
   const gridX = pPortraitX + portraitW + 16;
@@ -1103,7 +1103,7 @@ function drawCombat() {
     const dimmed = c.phase === 'target' || c.waiting;
     
     const color = isSelected && !dimmed ? '#ffe8c0' : dimmed ? '#4a4440' : '#a09888';
-    crispText(actions[i], ax + 4, ay + 2, 14, color);
+    crispText(actions[i], ax + 4, ay + 2, 32, color);
   }
   
   // Selected action stats at bottom — gold labels, white numbers, bigger and spread out
@@ -1113,20 +1113,20 @@ function drawCombat() {
     const statsY = H - pad - 18;
     let sx = gridX + 4;
     const waitVal = c.waiting ? c.waitCountdown : (act.wait || 0);
-    sx += crispGradientText('Eff:', sx, statsY, 12, GOLD_GRADIENT) + 2;
-    sx += crispText('' + (act.eff || 0), sx, statsY, 12, '#e8e0d0') + 12;
-    sx += crispGradientText('Def:', sx, statsY, 12, GOLD_GRADIENT) + 2;
-    sx += crispText('' + (act.def || 0), sx, statsY, 12, '#e8e0d0') + 12;
-    sx += crispGradientText('Wait:', sx, statsY, 12, GOLD_GRADIENT) + 2;
-    crispText('' + waitVal, sx, statsY, 12, '#e8e0d0');
+    sx += crispGradientText('Eff:', sx, statsY, 32, GOLD_GRADIENT) + 2;
+    sx += crispText('' + (act.eff || 0), sx, statsY, 32, '#e8e0d0') + 12;
+    sx += crispGradientText('Def:', sx, statsY, 32, GOLD_GRADIENT) + 2;
+    sx += crispText('' + (act.def || 0), sx, statsY, 32, '#e8e0d0') + 12;
+    sx += crispGradientText('Wait:', sx, statsY, 32, GOLD_GRADIENT) + 2;
+    crispText('' + waitVal, sx, statsY, 32, '#e8e0d0');
   }
   
   // Hints
   if (c.phase === 'action' && !c.waiting) {
-    crispText('X = Back', W - pad - 60, H - pad - 14, 10, '#8c828c');
+    crispText('X = Back', W - pad - 100, H - pad - 14, 32, '#8c828c');
   }
   if (c.waiting) {
-    crispText('X = Cancel', W - pad - 70, H - pad - 14, 10, '#8c828c');
+    crispText('X = Cancel', W - pad - 110, H - pad - 14, 32, '#8c828c');
   }
 }
 
@@ -1163,7 +1163,7 @@ function drawDialogue() {
   
   // Speaker name
   if (state.dialogue.speaker) {
-    crispText(state.dialogue.speaker, boxX + 12, boxY + 6, 14, '#b89cff');
+    crispText(state.dialogue.speaker, boxX + 12, boxY + 6, 32, '#b89cff');
   }
   
   // Text (word wrap) — use crisp text
@@ -1173,7 +1173,7 @@ function drawDialogue() {
     drawDialogue._mc = document.createElement('canvas').getContext('2d');
   }
   const mctx = drawDialogue._mc;
-  mctx.font = '12px "' + CRISP_FONT + '"';
+  mctx.font = '32px "' + CRISP_FONT + '"';
   const maxW = boxW - 24;
   const words = state.dialogue.text.split(' ');
   let line = '';
@@ -1181,14 +1181,14 @@ function drawDialogue() {
   for (const word of words) {
     const test = line + word + ' ';
     if (mctx.measureText(test).width > maxW && line) {
-      crispText(line.trim(), boxX + 12, lineY, 12, '#c8b8a0');
+      crispText(line.trim(), boxX + 12, lineY, 32, '#c8b8a0');
       line = word + ' ';
       lineY += 18;
     } else {
       line = test;
     }
   }
-  crispText(line.trim(), boxX + 12, lineY, 12, '#c8b8a0');
+  crispText(line.trim(), boxX + 12, lineY, 32, '#c8b8a0');
 }
 
 // ══════════════════════════════════
@@ -1262,7 +1262,7 @@ function draw() {
   ctx.fillStyle = 'rgba(200, 192, 184, 0.4)';
   ctx.font = '10px "JetBrains Mono", monospace';
   ctx.textAlign = 'right';
-  ctx.fillText('v0.44', canvas.width - 8, 14);
+  ctx.fillText('v0.45', canvas.width - 8, 14);
   
   // Font comparison overlay (press F to toggle, scroll with mousewheel or drag)
   if (state.showFontTest) {
